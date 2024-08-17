@@ -49,8 +49,8 @@ def fetched_access_token(user: User):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-#crud level
-#Signin
+# crud level
+# Signin
 async def authenticate_user(db: AsyncSession, username: str, password: str):
     user = await db.execute(select(User).filter(User.username == username))
     user = user.scalars().first()
@@ -60,7 +60,27 @@ async def authenticate_user(db: AsyncSession, username: str, password: str):
         return False
     return user
 
-#Signup
+# user existence
+async def check_username_email_availability(db: AsyncSession, username: str, email: str) -> dict:
+    result = {"username": "available", "email": "available"}
+    
+    # Check if the username exists
+    user_by_username = await db.execute(select(User).filter(User.username == username))
+    user_by_username = user_by_username.scalars().first()
+    
+    if user_by_username:
+        result["username"] = "unavailable"
+    
+    # Check if the email exists
+    user_by_email = await db.execute(select(User).filter(User.email == email))
+    user_by_email = user_by_email.scalars().first()
+    
+    if user_by_email:
+        result["email"] = "unavailable"
+    
+    return result
+
+# Signup
 async def create_user(db: AsyncSession, user_data: UserRegistrationSchema):
     username = user_data.username or user_data.email.strip().split('@')[0]
     existing_user = await db.execute(
@@ -93,7 +113,7 @@ async def create_user(db: AsyncSession, user_data: UserRegistrationSchema):
     await db.refresh(user)
     return user
 
-#Session token validity
+# Session token validity
 async def decode_user_from_token(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

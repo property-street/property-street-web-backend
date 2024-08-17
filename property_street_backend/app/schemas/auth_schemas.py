@@ -8,6 +8,9 @@ class UserSigninSchema(BaseModel):
     username: str
     password: str
 
+class ProbeUserExistenceSchema(BaseModel):
+    username: str
+    email: str
 
 class UserRegistrationSchema(BaseModel):
     email: str
