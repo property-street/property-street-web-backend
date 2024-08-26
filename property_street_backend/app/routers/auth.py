@@ -1,13 +1,16 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+import redis.asyncio as redis
 
+from property_street_backend.app.initiator import redis_client
 from property_street_backend.app.database import get_db
 from property_street_backend.app.schemas.auth_schemas import (
     UserRegistrationSchema, 
     UserSigninSchema, 
     Token, 
     TokenData, 
-    ProbeUserExistenceSchema
+    ProbeUserExistenceSchema,
+    SendEmailCodeSchema,
 )
 
 from property_street_backend.app.controllers.auth import (
@@ -16,6 +19,7 @@ from property_street_backend.app.controllers.auth import (
     decode_user_from_token, 
     fetched_access_token, 
     check_username_email_availability,
+    send_email_verification_code,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -33,6 +37,14 @@ async def register_user(user_data: UserRegistrationSchema, db: AsyncSession = De
 @router.post("/probe-user-existence", status_code=status.HTTP_200_OK)
 async def probe_user_existence(user_data: ProbeUserExistenceSchema, db: AsyncSession = Depends(get_db)):
     return await check_username_email_availability(db, user_data)
+
+# probe user existence endpoint
+@router.post("/send-email-verification-code", status_code=status.HTTP_200_OK)
+async def send_email_verification_code(requester_data: SendEmailCodeSchema, redis_client: redis.Redis = Depends(redis_client)):
+    return await send_email_verification_code(
+        requester_data = requester_data,
+        redis_client = redis_client
+    )
 
 
 # signin endpoint

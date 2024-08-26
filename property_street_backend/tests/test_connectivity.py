@@ -1,4 +1,5 @@
 import pytest
+import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from property_street_backend.app.main import app
 
@@ -28,6 +29,17 @@ async def test_client_connectivity(client__fixture):
     # Checking the response
     assert response.status_code == 200
     assert response.json() == {"message": "Hello, World!"}
+
+
+@pytest.mark.asyncio
+async def test_redis_connectivity(redis_client__fixture):
+    # fetch the client generator
+    client_gen =  redis_client__fixture
+    # get the yield client object
+    client = await client_gen.__anext__()
+
+    # Making a request to a URL
+    assert isinstance(client, redis.Redis)
 
 
 # Adding a pseudo endpoint to the FastAPI app for testing

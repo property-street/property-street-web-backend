@@ -7,11 +7,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.future import select
 from sqlalchemy.exc import IntegrityError
+import random 
+import redis.asyncio as redis
 
-from property_street_backend.app.models import User
-from property_street_backend.app.database import get_db
-from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema, TokenData
+from property_street_backend.app.models import (
+    User,
+    EmailManagementModel,
+)
+from property_street_backend.app.schemas.auth_schemas import (
+    UserRegistrationSchema, 
+    TokenData, 
+    ProbeUserExistenceSchema,
+    SendEmailCodeSchema
+)
+from property_street_backend.app.utils.store import (
+    read_email_from_html_template_name,
+    substituted_string,
+    send_email,
+)
 from property_street_backend.config.settings import JWT_SECRET_KEY, JWT_EXPIRATION_DELTA, JWT_ALGORITHM
+from property_street_backend.app.database import get_db
 
 
 import logging
@@ -61,8 +76,14 @@ async def authenticate_user(db: AsyncSession, username: str, password: str):
     return user
 
 # user existence
-async def check_username_email_availability(db: AsyncSession, username: str, email: str) -> dict:
-    result = {"username": "available", "email": "available"}
+async def check_username_email_availability(db: AsyncSession, user_data: ProbeUserExistenceSchema) -> dict:
+    username = user_data.username
+    email = user_data.email
+
+    result = {
+        "username": "available",
+        "email": "available"
+    }
     
     # Check if the username exists
     user_by_username = await db.execute(select(User).filter(User.username == username))
@@ -145,3 +166,64 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
     await db.delete(user)
     await db.commit()
     return user
+
+
+async def send_email_verification_code(requester_data: SendEmailCodeSchema, redis_client: redis.Redis):
+    email_address = requester_data.email
+    user_name = requester_data.username if requester_data.username else "User"
+    reason = "email_verification"
+    one_minute = 60
+    expiry_time = 5 * one_minute #5 miutes expiry time 
+
+    """
+        `email:reason` is the hset's key 
+        the reason is the field
+        the code is the value
+    """
+
+    # Check if the code exists in the cache
+    user_key = f'{email_address}:{reason}'
+    user_email_code = await redis_client.hget(user_key, reason)
+
+    if user_email_code: #When a result is found
+        return {"message": "Please wait before requesting a new code."}
+    else: # When no result is found
+        try:
+            # create a new cache object for the user
+        
+            # Generate a new five-digit code
+            new_code = '{:05d}'.format(random.randint(0, 99999))
+
+            # call the email function and send the email
+            # extract the email content from the template
+            email_template_content = read_email_from_html_template_name('email_verification_code_template')
+            
+            email_string = substituted_string(
+                email_template_content,
+                {
+                    "user_name":user_name,
+                    "verification_code":new_code,
+                }
+            )
+            from_address="team@stackfinancialsolutions.com"
+            subject="Property street Verification Code"
+            from_name="Property street"
+            #to_name="Customer"
+
+            send_email(
+                from_email=from_address,
+                to_email=email_address,
+                from_name=from_name,
+                subject=subject,
+                html_email=email_string
+            )
+
+            # create another instance of the user with the new code
+            await redis_client.hset(user_key, reason, new_code)
+            # set an expiry
+            await redis_client.expire(user_key, expiry_time) 
+
+            return {"message":"A new verification code has been sent to your email"}
+        except Exception as e:
+            print(e)
+            return {"message":"An error occured"}

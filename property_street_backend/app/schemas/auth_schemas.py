@@ -12,6 +12,9 @@ class ProbeUserExistenceSchema(BaseModel):
     username: str
     email: str
 
+class SendEmailCodeSchema(ProbeUserExistenceSchema):
+    pass
+
 class UserRegistrationSchema(BaseModel):
     email: str
     username: str

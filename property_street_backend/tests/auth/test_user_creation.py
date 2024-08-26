@@ -1,4 +1,6 @@
 import pytest
+import redis.asyncio as redis
+import asyncio
 
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,4 +81,95 @@ async def test_route_create_user(client__fixture: AsyncClient):
     assert json_response.get("token_type") == "bearer"
     assert "access_token" in json_response
 
+@pytest.mark.asyncio
+async def test_route_probe_user_existence(client__fixture: AsyncClient):
+    # fetch the client generator
+    client_gen =  client__fixture
+    # get the yield client object
+    client = await client_gen.__anext__()
 
+    # Define a post data
+    post_data = {
+        "email": "testuser@example.com",
+        "username": "testuser",
+        "password": "password123",
+    }
+    # sign the user up
+    await client.post(
+        "/auth/register",
+        json=post_data  # Use json instead of data for a JSON body
+    )
+
+
+    # test 1
+    # making a request with data that exists
+    probe_data_which_exists = {
+        "email": "testuser@example.com",
+        "username": "testuser",
+    }
+    # make the request
+    response = await client.post(
+        "/auth/probe-user-existence",
+        json=probe_data_which_exists  # Use json instead of data for a JSON body
+    )
+    # Assertions
+    assert response.status_code == 200
+    json_response = response.json()
+    assert json_response.get("email") == "unavailable"
+    assert json_response.get("username") == "unavailable"
+
+
+    # test 2
+    # making a request with data that does not exists
+    probe_data_which_does_not_exist = {
+        "email": "testuser2@example.com",
+        "username": "testuser2",
+    }
+    # make the request
+    response = await client.post(
+        "/auth/probe-user-existence",
+        json=probe_data_which_does_not_exist  # Use json instead of data for a JSON body
+    )
+    # Assertions
+    assert response.status_code == 200
+    json_response = response.json()
+    assert json_response.get("email") == "available"
+    assert json_response.get("username") == "available"
+
+
+@pytest.mark.asyncio
+async def test_send_email_verification_code(client__fixture: AsyncClient):    
+    # fetch the client generator
+    client_gen =  client__fixture
+    # get the yield client object
+    client = await client_gen.__anext__()
+
+    # Define a post data
+    post_data = {
+        "email": "crankgig@gmail.com",
+        "username": "crank",
+    }
+    # request a verification code
+    response = await client.post(
+        "/auth/send-email-verification-code",
+        json=post_data  # Use json instead of data for a JSON body
+    )
+
+    # Assertions
+    assert response.status_code == 200
+    json_response = response.json()
+    assert json_response.get("message") == "A new verification code has been sent to your email"
+
+    # make a temporary pause
+    await asyncio.sleep(5)
+
+    # request another to verify that the expiry works 
+    # the other code has expired
+    response = await client.post(
+        "/auth/send-email-verification-code",
+        json=post_data  # Use json instead of data for a JSON body
+    )    
+    # Assertions
+    assert response.status_code == 200
+    json_response = response.json()
+    assert json_response.get("message") == "A new verification code has been sent to your email"
