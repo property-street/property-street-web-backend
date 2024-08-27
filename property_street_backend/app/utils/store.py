@@ -1,5 +1,5 @@
 import resend
-import importlib.resources as files
+import importlib.resources as resources 
 from string import Template
 
 
@@ -16,6 +16,7 @@ def send_email(from_email, from_name, subject, to_email,  html_email, to_name=No
     return resend.Emails.send(params)
     
     
+
 def read_email_from_html_template_name(template_name):
     try:
         # Define the package where your email templates are located
@@ -25,10 +26,13 @@ def read_email_from_html_template_name(template_name):
         template_filename = f"{template_name}.html"
         
         # Use importlib.resources to read the template file
-        with files(package).joinpath(template_filename).open('r', encoding='utf-8') as f:
+        with resources.files(package).joinpath(template_filename).open('r', encoding='utf-8') as f:
             template_content = f.read()
         
         return template_content
+    except FileNotFoundError:
+        print(f"Template {template_name} not found in the package {package}.")
+        return None
     except Exception as e:
         print(f"Error reading email template: {e}")
         return None

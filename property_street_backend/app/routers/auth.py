@@ -11,6 +11,7 @@ from property_street_backend.app.schemas.auth_schemas import (
     TokenData, 
     ProbeUserExistenceSchema,
     SendEmailCodeSchema,
+    SignupCodeVerificationSchema,
 )
 
 from property_street_backend.app.controllers.auth import (
@@ -19,7 +20,8 @@ from property_street_backend.app.controllers.auth import (
     decode_user_from_token, 
     fetched_access_token, 
     check_username_email_availability,
-    send_email_verification_code,
+    send_email_verification_code as controller_send_email_verification_code,
+    confirm_email_verification_code as controller_confirm_email_verification_code
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -38,10 +40,18 @@ async def register_user(user_data: UserRegistrationSchema, db: AsyncSession = De
 async def probe_user_existence(user_data: ProbeUserExistenceSchema, db: AsyncSession = Depends(get_db)):
     return await check_username_email_availability(db, user_data)
 
-# probe user existence endpoint
+# send email verification for signup endpoint
 @router.post("/send-email-verification-code", status_code=status.HTTP_200_OK)
 async def send_email_verification_code(requester_data: SendEmailCodeSchema, redis_client: redis.Redis = Depends(redis_client)):
-    return await send_email_verification_code(
+    return await controller_send_email_verification_code(
+        requester_data = requester_data,
+        redis_client = redis_client
+    )
+
+# confirm email verification endpoint
+@router.post("/confirm-email-verification-code", status_code=status.HTTP_200_OK)
+async def confirm_email_verification_code(requester_data: SignupCodeVerificationSchema, redis_client: redis.Redis = Depends(redis_client)):
+    return await controller_confirm_email_verification_code(
         requester_data = requester_data,
         redis_client = redis_client
     )
