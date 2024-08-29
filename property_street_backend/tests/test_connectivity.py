@@ -19,8 +19,10 @@ async def test_db_connectivity(get_test_db__fixture: AsyncSession):
 async def test_client_connectivity(client__fixture):
     # fetch the client generator
     client_gen =  client__fixture
-    # get the yield client object
-    client = await client_gen.__anext__()
+    # get the yield client objects
+    client, redis_client = await client_gen.__anext__()
+
+    assert isinstance(redis_client, redis.Redis)
 
     # Making a request to a URL
     url = "/"

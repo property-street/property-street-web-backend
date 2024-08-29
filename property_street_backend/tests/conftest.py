@@ -72,13 +72,13 @@ async def client__fixture(get_test_db__fixture, redis_client__fixture, request, 
     test_db = await get_test_db__fixture
 
     # fetch the redis client generator
-    client_gen =  redis_client__fixture
-    # get the yield client object
-    client = await client_gen.__anext__()
+    redis_client_gen = redis_client__fixture
+    # get the yield redis client object
+    redis_client_yield = await redis_client_gen.__anext__()
 
     # overriding the client's get_db dependency
     app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
-    app.dependency_overrides[redis_client] = lambda: client  # Override redis_client dependency
+    app.dependency_overrides[redis_client] = lambda: redis_client_yield  # Override redis_client dependency
 
     # cleanup to close the test database
     async def cleanup():
@@ -91,6 +91,6 @@ async def client__fixture(get_test_db__fixture, redis_client__fixture, request, 
     transport = ASGITransport(app=app)
     # return the client instance
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
-        yield ac
+        yield ac, redis_client_yield
 
 
