@@ -16,7 +16,10 @@ from sqlalchemy.future import select
 from sqlalchemy import types as _types
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from property_street_backend.app.enums import EmailManagementReasonChoice
+from property_street_backend.app.enums import (
+    EmailManagementReasonChoice,
+    ClientTypeChoice,
+)
 from property_street_backend.app.database import Base
 
 #models
@@ -34,6 +37,7 @@ class User(Base):
     country_of_origin = Column(String)
     account_status = Column(String, default="Active")
     misc = Column(JSON, default=dict, nullable=True)
+    client_type = Column(SQLAlchemyEnum(ClientTypeChoice, name='client_type_choice'), nullable=True)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
     

@@ -9,6 +9,7 @@ from property_street_backend.app.database import Base, get_db
 from property_street_backend.app.initiator import redis_client
 from property_street_backend.app.main import app
 from property_street_backend.config.settings import TEST_DATABASE_URL
+from property_street_backend.app.utils.store import email_verification_code_ttl
 
 # Async SQLAlchemy engine and session for testing
 # async_engine: An asynchronous SQLAlchemy engine created using create_async_engine for the test database.
@@ -49,39 +50,57 @@ async def get_test_db__fixture(request, event_loop):
 
 
 @pytest.fixture(scope="function")
-async def redis_client__fixture():
+async def redis_client__fixture(request,event_loop):
     # Initialize Redis client
     redis_client = redis.Redis(
         host='localhost',
         port=6379,
         db=3  # Using db3 for property street test
     )
-    
-    try:
-        yield redis_client
-    finally:
-        # Cleanup code
-        await redis_client.flushdb()  # Clear all data from the database
-        await redis_client.aclose()  # Close the Redis connection
 
+    async def cleanup():
+        print("**closing redis")
+        await redis_client.aclose()
+        await redis_client.flushdb()
+
+    # Use an event loop to ensure cleanup happens after tests complete
+    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup()))
+    
+    return redis_client
 
 
 @pytest.fixture(scope="function")
-async def client__fixture(get_test_db__fixture, redis_client__fixture, request, event_loop):
+def test_email_verification_code_ttl__fixture():
+    one_minute = 60
+    expiry_time = (1/2) * one_minute # 30 secs 
+    return expiry_time
+
+
+@pytest.fixture(scope="function")
+async def client__fixture(
+    get_test_db__fixture, 
+    redis_client__fixture, 
+    request, 
+    event_loop,
+    test_email_verification_code_ttl__fixture,
+):
     # getting the test_db fixture
     test_db = await get_test_db__fixture
 
-    # fetch the redis client generator
-    redis_client_gen = redis_client__fixture
-    # get the yield redis client object
-    redis_client_yield = await redis_client_gen.__anext__()
+    # fetch the client fixture
+    redis_client_fixture =  await redis_client__fixture
+
+    # Calculate the email verification code TTL by calling the fixture function
+    email_code_ttl_fixture = test_email_verification_code_ttl__fixture
 
     # overriding the client's get_db dependency
     app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
-    app.dependency_overrides[redis_client] = lambda: redis_client_yield  # Override redis_client dependency
+    app.dependency_overrides[redis_client] = lambda: redis_client_fixture  # Override redis_client dependency
+    app.dependency_overrides[email_verification_code_ttl] = lambda: email_code_ttl_fixture  # Override email_code ttl dependency
 
     # cleanup to close the test database
     async def cleanup():
+        print("**closing client")
         await test_db.close()
 
     # Use an event loop to ensure cleanup happens after tests complete
@@ -91,6 +110,6 @@ async def client__fixture(get_test_db__fixture, redis_client__fixture, request, 
     transport = ASGITransport(app=app)
     # return the client instance
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
-        yield ac, redis_client_yield
+        yield ac, redis_client_fixture
 
 

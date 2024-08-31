@@ -52,11 +52,11 @@ async def test_controller_authenticate_user(get_test_db__fixture: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_route_signin(client__fixture: AsyncClient, get_test_db__fixture: AsyncSession):
+async def test_route_signin(client__fixture: tuple):
     # fetch the client generator
     client_gen =  client__fixture
     # get the yield client object
-    client = await client_gen.__anext__()
+    client, redis_client = await client_gen.__anext__()
 
     # Define a post data
     post_data = {

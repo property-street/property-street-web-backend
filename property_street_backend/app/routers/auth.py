@@ -13,7 +13,6 @@ from property_street_backend.app.schemas.auth_schemas import (
     SendEmailCodeSchema,
     SignupCodeVerificationSchema,
 )
-
 from property_street_backend.app.controllers.auth import (
     create_user, 
     authenticate_user, 
@@ -22,6 +21,9 @@ from property_street_backend.app.controllers.auth import (
     check_username_email_availability,
     send_email_verification_code as controller_send_email_verification_code,
     confirm_email_verification_code as controller_confirm_email_verification_code
+)
+from property_street_backend.app.utils.store import (
+    email_verification_code_ttl,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -37,23 +39,36 @@ async def register_user(user_data: UserRegistrationSchema, db: AsyncSession = De
 
 # probe user existence endpoint
 @router.post("/probe-user-existence", status_code=status.HTTP_200_OK)
-async def probe_user_existence(user_data: ProbeUserExistenceSchema, db: AsyncSession = Depends(get_db)):
+async def probe_user_existence(
+    user_data: ProbeUserExistenceSchema,    
+    db: AsyncSession = Depends(get_db)
+):
     return await check_username_email_availability(db, user_data)
 
 # send email verification for signup endpoint
 @router.post("/send-email-verification-code", status_code=status.HTTP_200_OK)
-async def send_email_verification_code(requester_data: SendEmailCodeSchema, redis_client: redis.Redis = Depends(redis_client)):
+async def send_email_verification_code(
+    requester_data: SendEmailCodeSchema, 
+    redis_client: redis.Redis = Depends(redis_client),
+    expiry_time_in_secs: int = Depends(email_verification_code_ttl)
+):
     return await controller_send_email_verification_code(
         requester_data = requester_data,
-        redis_client = redis_client
+        redis_client = redis_client,
+        expiry_time_in_secs = expiry_time_in_secs
     )
 
 # confirm email verification endpoint
 @router.post("/confirm-email-verification-code", status_code=status.HTTP_200_OK)
-async def confirm_email_verification_code(requester_data: SignupCodeVerificationSchema, redis_client: redis.Redis = Depends(redis_client)):
+async def confirm_email_verification_code(
+    requester_data: SignupCodeVerificationSchema, 
+    redis_client: redis.Redis = Depends(redis_client),
+    db: AsyncSession = Depends(get_db),
+):
     return await controller_confirm_email_verification_code(
         requester_data = requester_data,
-        redis_client = redis_client
+        redis_client = redis_client,
+        db = db
     )
 
 

@@ -35,13 +35,11 @@ async def test_client_connectivity(client__fixture):
 
 @pytest.mark.asyncio
 async def test_redis_connectivity(redis_client__fixture):
-    # fetch the client generator
-    client_gen =  redis_client__fixture
-    # get the yield client object
-    client = await client_gen.__anext__()
+    # fetch the client fixture
+    redis_client =  await redis_client__fixture
 
     # Making a request to a URL
-    assert isinstance(client, redis.Redis)
+    assert isinstance(redis_client, redis.Redis)
 
 
 # Adding a pseudo endpoint to the FastAPI app for testing

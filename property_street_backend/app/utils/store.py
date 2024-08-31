@@ -46,3 +46,8 @@ def substituted_string(context: str, map: dict) -> str:
     string_template=Template(context)
     response=string_template.substitute(map)
     return response
+
+def email_verification_code_ttl():
+    one_minute = 60
+    expiry_time = 5 * one_minute  # 5 minutes
+    return expiry_time

@@ -22,6 +22,7 @@ from property_street_backend.app.schemas.auth_schemas import (
 )
 from property_street_backend.app.utils.store import (
     read_email_from_html_template_name,
+    email_verification_code_ttl,
     substituted_string,
     send_email,
 )
@@ -168,12 +169,16 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
     return user
 
 
-async def send_email_verification_code(requester_data: SendEmailCodeSchema, redis_client: redis.Redis):
+async def send_email_verification_code(
+    requester_data: SendEmailCodeSchema, 
+    redis_client: redis.Redis,
+    expiry_time_in_secs: int,
+):
+    print(f"**expiry_time_in_secs: {expiry_time_in_secs}")
+
     email_address = requester_data.email
     user_name = requester_data.username if requester_data.username else "User"
     reason = "email_verification"
-    one_minute = 60
-    expiry_time = one_minute #5 minutes 
 
     """
         `email:reason` is the hset's key 
@@ -194,10 +199,8 @@ async def send_email_verification_code(requester_data: SendEmailCodeSchema, redi
         }
     else: # When no result is found
         try:
-            # create a new cache object for the user
-        
             # Generate a new five-digit code
-            new_code = '{:04d}'.format(random.randint(0, 99999))
+            new_code = '{:04d}'.format(random.randint(0, 9999))
 
             # call the email function and send the email
             # extract the email content from the template
@@ -227,12 +230,18 @@ async def send_email_verification_code(requester_data: SendEmailCodeSchema, redi
 
             # create another instance of the user with the new code
             await redis_client.hset(user_key, reason, new_code)
-            # get the current time and save to the time_requested field
+
+            # get the current time and add the ttl
             current_time = datetime.now(timezone.utc)
-            ttl_time = (current_time + timedelta(minutes=5)).isoformat()
-            await redis_client.hset(user_key, 'time_requested', ttl_time)
-            # set an expiry
-            await redis_client.expire(user_key, expiry_time) 
+            ttl_time = (current_time + timedelta(seconds=expiry_time_in_secs)).isoformat()
+
+            # save the ttl_time in the ttl field of the user's key
+            await redis_client.hset(user_key, "ttl", ttl_time)
+
+            # set an expiry for the user key
+            # explicitly convert the expiry_time_in_secs to int
+            # to avoid `value is not an integer or out of range` error
+            await redis_client.expire(user_key, int(expiry_time_in_secs)) 
 
             return {
                 "email_status":"DispatchedNow",
@@ -249,7 +258,11 @@ async def send_email_verification_code(requester_data: SendEmailCodeSchema, redi
             )
         
 
-async def confirm_email_verification_code(requester_data: SignupCodeVerificationSchema, redis_client: redis.Redis):
+async def confirm_email_verification_code(
+    requester_data: SignupCodeVerificationSchema, 
+    redis_client: redis.Redis,
+    db: AsyncSession,
+):
     email_address = requester_data.email
     reason = "email_verification"
     input_code = requester_data.verification_code
@@ -273,8 +286,55 @@ async def confirm_email_verification_code(requester_data: SignupCodeVerification
             detail="Invalid verification code."
         )
 
-    # If the code is valid, you can proceed with further logic, e.g., marking the email as verified
-    return {
-        "email_status": "Verified",
-        "message": "The email has been successfully verified."
-    }
+    # Hash the user's password before saving it to the database
+    hashed_password = get_password_hash(requester_data.password)
+
+    # Create the new user instance
+    new_user = User(
+        email=email_address,
+        username=requester_data.username,
+        password_hash=hashed_password,
+        client_type=requester_data.client_type,
+    )
+    # extracting names from the fullname
+    name_list = requester_data.fullname.split()
+    
+    # adding the first_name
+    new_user.first_name = name_list[0]
+    
+    # adding last_name
+    if len(name_list) > 1:
+        new_user.last_name = name_list[-1]
+    
+    # Adding other_names (middle names or any names between the first and last)
+    if len(name_list) > 2:
+        new_user.other_names = " ".join(name_list[1:-1])
+
+    try:
+        # Add the new user to the session and commit the transaction
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+
+        # Optionally, delete the verification code from Redis after successful registration
+        await redis_client.delete(user_key)
+
+        return {
+            "email_status": "Verified",
+            "message": "The email has been successfully verified and the user has been registered.",
+            "user_id": new_user.id,
+        }
+
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email or username already exists."
+        )
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while creating the user."
+        )

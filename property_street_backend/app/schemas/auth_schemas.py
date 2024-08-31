@@ -26,6 +26,7 @@ class UserRegistrationSchema(BaseModel):
 class SignupCodeVerificationSchema(UserRegistrationSchema):
     verification_code: str
     fullname: str
+    client_type: str
 
 class Token(BaseModel):
     access_token: str
