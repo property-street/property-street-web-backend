@@ -2,10 +2,13 @@
 #Utilizes Pydantic for data validation and serialization.
 #Ensures data consistency between the client and the server.
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
+from typing import Optional
+
 
 class UserSigninSchema(BaseModel):
-    username: str
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
     password: str
 
 class ProbeUserExistenceSchema(BaseModel):

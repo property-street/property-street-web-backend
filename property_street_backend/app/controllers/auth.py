@@ -67,13 +67,21 @@ def fetched_access_token(user: User):
 
 # crud level
 # Signin
-async def authenticate_user(db: AsyncSession, username: str, password: str):
-    user = await db.execute(select(User).filter(User.username == username))
-    user = user.scalars().first()
+async def authenticate_user(db: AsyncSession, login: str, password: str):
+    # Check if the login is either a username or an email
+    user_query = select(User).filter((User.username == login) | (User.email == login))
+    
+    # Execute the query
+    result = await db.execute(user_query)
+    user = result.scalars().first()
+
     if not user:
         return False
+
+    # Verify the provided password against the stored password hash
     if not verify_password(password, user.password_hash):
         return False
+
     return user
 
 # user existence

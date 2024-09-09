@@ -73,7 +73,7 @@ async def test_route_signin(client__fixture: tuple):
 
 
     signin_post_data = {
-        'username': post_data.get("username"),
+        'email': post_data.get("email"),
         'password': post_data.get("password")
     }
     response = await client.post(

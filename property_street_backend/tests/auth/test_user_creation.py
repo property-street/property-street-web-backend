@@ -338,4 +338,3 @@ async def test_confirm_email_verification_code(client__fixture: tuple):
     json_response = response.json()
     assert json_response.get("detail") == "Verification code not found or expired."
 
-

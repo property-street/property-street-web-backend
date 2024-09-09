@@ -75,7 +75,11 @@ async def confirm_email_verification_code(
 # signin endpoint
 @router.post("/signin", response_model=Token, status_code=status.HTTP_200_OK)
 async def signin_for_access_token(user_data: UserSigninSchema, db: AsyncSession = Depends(get_db)):
-    user = await authenticate_user(db, user_data.username, user_data.password)
+    user = await authenticate_user(
+        db = db, 
+        login = user_data.email, 
+        password = user_data.password
+    )
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
