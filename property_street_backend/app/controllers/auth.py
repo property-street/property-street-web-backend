@@ -257,8 +257,6 @@ async def send_email_verification_code(
                 "ttl": ttl_time
             }
         except Exception as e:
-            print("**error in sending email")
-            print(e)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Internal Server Error: Something went wrong. Please try again later.",

@@ -26,6 +26,9 @@ class UserRegistrationSchema(BaseModel):
     #last_name: str
     # Add other fields as needed
 
+class AgentRegistrationSchema(UserRegistrationSchema):
+    pass
+
 class SignupCodeVerificationSchema(UserRegistrationSchema):
     verification_code: str
     fullname: str

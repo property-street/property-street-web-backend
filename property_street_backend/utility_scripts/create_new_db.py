@@ -43,3 +43,11 @@ if __name__ == "__main__":
 
 # python create_new_db.py my_database --host localhost --user postgres --password postgres
 # Here, my_database is the name of the database you want to create.    
+
+# i.e
+# Extracted connection details from the URL: postgresql+asyncpg://postgres:postgres@localhost/property_street_store
+# db_name = 'property_street_store'
+# user = 'postgres'
+# password = 'postgres'
+# host = 'localhost'
+# port = '5432'  # Default PostgreSQL port

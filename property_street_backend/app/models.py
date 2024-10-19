@@ -7,16 +7,19 @@ from sqlalchemy import (
     Boolean, 
     JSON, 
     Text, 
-    DateTime,
+    Table,
     Enum as SQLAlchemyEnum, 
-    event,
     func,
-    Numeric
+    Numeric,
+    DateTime,
+    event,
 )
 from sqlalchemy.future import select
 from sqlalchemy import types as _types
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.declarative import declared_attr
+
 
 from property_street_backend.app.enums import (
     EmailManagementReasonChoice,
@@ -25,33 +28,41 @@ from property_street_backend.app.enums import (
 )
 from property_street_backend.app.database import Base
 
-#models
-class User(Base):
-    __tablename__ = 'users'
+
+# abstract class dependency for models with cloud images fields
+class AbstractCloudImage(Base):
+    __abstract__ = True  # Ensure this class is not mapped to its own table
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True)
-    username = Column(String, unique=True, index=True)
-    password_hash = Column(String, nullable=False)
-    first_name = Column(String)
-    last_name = Column(String)
-    other_names = Column(String)
-    date_of_birth = Column(Date)
-    country_of_origin = Column(String)
-    account_status = Column(String, default="Active")
-    misc = Column(JSON, default=dict, nullable=True)
-    client_type = Column(SQLAlchemyEnum(ClientTypeChoice, name='client_type_choice'), nullable=True)
-    is_active = Column(Boolean, default=True)
-    is_admin = Column(Boolean, default=False)
-    
-    # Reverse relationships
-    profile_avatar = relationship(
-        'CloudImageDetail', 
-        back_populates='user', 
-        uselist=False
-    ) 
-    
+    created_at = Column(String, nullable=False)  # Format: ISO 8601
+    format = Column(String, nullable=False)
+    bytes = Column(Integer, nullable=False)
+    height = Column(Integer, nullable=False)
+    public_id = Column(String, unique=True, nullable=False)
+    secure_url = Column(String, nullable=False)
+    width = Column(Integer, nullable=False)
 
+    # Optionally, if you want dynamic table names, you can define a declared_attr:
+    @declared_attr
+    def __tablename__(cls):
+        return cls.__name__.lower()  # Use class name as table name
+
+
+# Association Table for many-to-many relationship
+asset_tag_association = Table(
+    'asset_tag_association',
+    Base.metadata,
+    Column('asset_id', Integer, ForeignKey('assets.id'), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('tags.id'), primary_key=True)
+)
+
+
+# models
+
+# cascade="all, delete-orphan"
+# this specifies the operations that should "cascade" 
+# from the parent object to the related child objects 
+# (usually in a one-to-many or many-to-one relationship).
 
 class EmailManagementModel(Base):
     __tablename__ = 'email_management_model'
@@ -111,65 +122,126 @@ class EmailManagementModel(Base):
         )
         return result.scalars().first() is not None
 
-        # Listen for the 'before_insert' event to set updated_at
-    
-#@event.listens_for(EmailManagementModel, 'before_insert')
-#def set_updated_at_before_insert(mapper, connection, target):
-#    target.updated_at = func.now()
 
-
-class MediaFile(Base):
-    __tablename__ = 'media_files'
-
-    id = Column(Integer, primary_key=True, index=True)
-    file_url = Column(String, nullable=False)
-    file_type = Column(String, nullable=False)
-    hash = Column(String, unique=True, nullable=False)
-
-    # foreign keys
-    asset_id = Column(Integer, ForeignKey('assets.id'))
-    feature_id = Column(Integer, ForeignKey('asset_features.id'))
-    user_id = Column(Integer, ForeignKey('users.id'))
-
-    # reverse relationship
-    asset = relationship('Asset', back_populates='media_files')
-    asset_feature = relationship('AssetFeature', back_populates='media_files')
-    user = relationship(
-        'User', 
-        back_populates='media_file', 
-        uselist=False
-    ) 
-    # uselist=False -> makes the foreignkey
-    # a one to one relationship; 
-
-class CloudImageDetail(Base):
+class CloudImageDetail(AbstractCloudImage):  # Inherit the abstract base
     __tablename__ = 'cloud_image_details'
 
-    id = Column(Integer, primary_key=True, index=True)
-    asset_id = Column(String, nullable=False)
-    created_at = Column(String, nullable=False)  # Format: ISO 8601, e.g., "2024-09-02T14:42:48Z"
-    format = Column(String, nullable=False)
-    bytes = Column(Integer, nullable=False)
-    height = Column(Integer, nullable=False)
-    public_id = Column(String, unique=True, nullable=False)
-    secure_url = Column(String, nullable=False)
-    width = Column(Integer, nullable=False)
-
-    # foreign keys
-    asset_id = Column(Integer, ForeignKey('assets.id'))
-    feature_id = Column(Integer, ForeignKey('asset_features.id'))
-    user_id = Column(Integer, ForeignKey('users.id'))
-
-    # reverse relationship
-    asset = relationship('Asset', back_populates='cloud_image_details')
-    asset_feature = relationship('AssetFeature', back_populates='cloud_image_details')
+    # Reverse relationship to user
     user = relationship(
         'User', 
-        back_populates='cloud_image_detail', 
-        uselist=False
-    ) 
-    # uselist=False -> makes the foreignkey
-    # a one to one relationship; 
+        back_populates='profile_avatar',
+        uselist=False  # explicitly tell SQLAlchemy it's a one-to-one
+    )
+
+    # Reverse relationship to Asset
+    asset = relationship(
+        'Asset', 
+        back_populates='cover_image',
+        uselist=False,  # explicitly tell SQLAlchemy it's a one-to-one 
+        post_update=True
+    )
+
+
+class Agent(Base):
+    __tablename__ = 'agents'
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # reverse relationship with the User model
+    user = relationship(
+        'User', 
+        back_populates='agent_profile',
+        uselist=False  # explicitly tell SQLAlchemy it's a one-to-one
+    )
+    
+    # Reverse relationship to Asset (cascade on delete)
+    assets = relationship(
+        'Asset',
+        back_populates='agent',
+        cascade="all, delete-orphan"  # Cascade deletion from Agent to Asset
+    )
+   
+
+class User(Base):
+    __tablename__ = 'users'
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    username = Column(String, unique=True, index=True)
+    password_hash = Column(String, nullable=False)
+    first_name = Column(String)
+    last_name = Column(String)
+    other_names = Column(String)
+    date_of_birth = Column(Date)
+    country_of_origin = Column(String)
+    account_status = Column(String, default="Active")
+    misc = Column(JSON, default=dict, nullable=True)
+    client_type = Column(SQLAlchemyEnum(ClientTypeChoice, name='client_type_choice'), nullable=True)
+    is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
+
+    # dates
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # One-to-one relationship for cover image (no cascade)
+    profile_avatar_id = Column(
+        Integer, 
+        ForeignKey(
+            'cloud_image_details.id', 
+            name='fk_user_profile_avatar_id', 
+            use_alter=True,
+            ondelete='SET NULL'
+        ), 
+        nullable=True
+    )
+    profile_avatar = relationship(
+        'CloudImageDetail', 
+        back_populates='user',
+        uselist=False, # explicitly tell SQLAlchemy it's a one-to-one
+        foreign_keys=[profile_avatar_id]
+    )
+  
+    # Foreign key to Agent for one-to-one relationship (nullable until user becomes agent)
+    agent_profile_id = Column(
+        Integer, 
+        ForeignKey(
+            'agents.id', 
+            name='fk_users_agent_profile_id', 
+            use_alter=True, 
+            ondelete='SET NULL'
+        ), 
+        unique=True, 
+        nullable=True
+    )
+    agent_profile = relationship(
+        'Agent', 
+        back_populates = 'user',
+        uselist=False, # explicitly tell SQLAlchemy it's a one-to-one
+        foreign_keys=[agent_profile_id],
+    )
+    
+    # method for a user to become an agent
+    async def become_agent(self, session):
+        """Method to convert a user into an agent."""
+        if not self.agent_profile:
+            agent = Agent(user=self)
+            session.add(agent)
+            await session.commit()
+
+
+class Tag(Base):
+    __tablename__ = 'tags'
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+
+    # Relationship
+    assets = relationship(
+        'Asset', 
+        secondary='asset_tag_association', 
+        back_populates='tags'
+    )
 
 
 class Asset(Base):
@@ -180,23 +252,72 @@ class Asset(Base):
     country = Column(String, nullable=False)
     address = Column(String, nullable=False)
     currency = Column(String, nullable=False)
+    status = Column(String, nullable=False)
     amount = Column(Numeric, nullable=False)
     description = Column(Text, nullable=True)
     has_features = Column(Boolean, default=False)
-    tags = Column(String, nullable=True)
     availability = Column(Boolean, default=True)
 
-    # enums
-    category = Column(SQLAlchemyEnum(AssetCategoryChoice), nullable=False)
-    
-    # foreignkey
-    user_id = Column(Integer, ForeignKey('users.id'))
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # reverse relationship
-    user = relationship('User', back_populates='assets')
-    media_files = relationship('MediaFile', back_populates='asset')
-    cloud_image_details = relationship('CloudImageDetail', back_populates='asset')
-    features = relationship('AssetFeature', back_populates='asset')
+    # Enums
+    category = Column(String, nullable=False)
+
+    # Foreign key relationship to Agent
+    agent_id = Column(
+        Integer, 
+        ForeignKey(
+            'agents.id', 
+            name='fk_assets_agent_id', 
+            ondelete='CASCADE'
+        )
+    )
+    agent = relationship(
+        'Agent', 
+        back_populates='assets'
+    )
+
+    # One-to-one relationship for cover image (no cascade)
+    cover_image_id = Column(
+        Integer, 
+        ForeignKey(
+            'cloud_image_details.id', 
+            name='fk_assets_cover_image_id', 
+            use_alter=True, 
+            ondelete='SET NULL'
+        ), 
+        nullable=True
+    )
+    cover_image = relationship(
+        'CloudImageDetail', 
+        back_populates='asset',
+        uselist=False, # explicitly tell SQLAlchemy it's a one-to-one
+        foreign_keys=[cover_image_id], 
+        post_update=True
+    )
+    
+    # Many-to-many relationship with Tag
+    tags = relationship(
+        'Tag', 
+        secondary='asset_tag_association', 
+        back_populates='assets'
+    )
+
+    # Reverse relationship to asset feature
+    features = relationship(
+        'AssetFeature', 
+        back_populates='asset',
+        cascade="all, delete-orphan", # cascade from Asset to AssetFeature
+    )
+
+    # Reverse relationship to the AssetCloudImage
+    cloud_images = relationship(
+        'AssetCloudImage', 
+        back_populates='asset',
+        cascade="all, delete-orphan", # cascade from Asset to AssetCloudImage
+    )
 
 
 
@@ -206,10 +327,71 @@ class AssetFeature(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
 
-    # foreign keys
-    asset_id = Column(Integer, ForeignKey('assets.id'))
+    # Foreign key relationship to Asset (cascade on delete)
+    asset_id = Column(
+        Integer, 
+        ForeignKey(
+            'assets.id', 
+            name='fk_asset_features_asset_id', 
+            use_alter=True,
+            ondelete='CASCADE'
+        )
+    )
+    asset = relationship(
+        'Asset', 
+        back_populates='features',
+        foreign_keys=[asset_id],
+    )
 
-    # reverse relationship
-    asset = relationship('Asset', back_populates='features')
-    media_files = relationship('MediaFile', back_populates='asset_feature')
-    cloud_image_details = relationship('CloudImageDetail', back_populates='asset_feature')
+    # Reverse relationship to the AssetCloudImage
+    cloud_images = relationship(
+        'AssetCloudImage', 
+        back_populates='asset_feature',
+        cascade="all, delete-orphan", # cascade from AssetFeature to AssetCloudImage
+    )
+
+
+class AssetCloudImage(AbstractCloudImage):
+    __tablename__ = 'asset_cloud_images'
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Foreign key relationship to asset (no cascade)
+    asset_id = Column(
+        Integer, 
+        ForeignKey(
+            'assets.id', 
+            name='fk_asset_cloud_images_asset_id', 
+            use_alter=True,
+            ondelete='CASCADE'
+        )
+    )
+    asset = relationship(
+        'Asset', 
+        back_populates='cloud_images',
+        foreign_keys=[asset_id],
+    )
+
+    # Foreign key relationship to asset_features (no cascade)
+    asset_feature_id = Column(
+        Integer, 
+        ForeignKey(
+            'asset_features.id', 
+            name='fk_asset_cloud_images_asset_feature_id', 
+            use_alter=True,
+            ondelete='CASCADE'
+        )
+    )
+    asset_feature = relationship(
+        'AssetFeature', 
+        back_populates='cloud_images',
+        foreign_keys=[asset_feature_id],
+    )
+
+
+
+@event.listens_for(User, 'before_insert')
+@event.listens_for(Asset, 'before_insert')
+# Listen for the 'before_insert' event to set updated_at
+def set_updated_at_before_insert(mapper, connection, target):
+    target.updated_at = func.now()
