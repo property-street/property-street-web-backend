@@ -320,7 +320,6 @@ class Asset(Base):
     )
 
 
-
 class AssetFeature(Base):
     __tablename__ = 'asset_features'
 
