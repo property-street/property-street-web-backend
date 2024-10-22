@@ -3,13 +3,13 @@ from sqlalchemy.orm import Session
 from typing import Type, Dict, Any
 from sqlalchemy.future import select
 
-from property_street_backend.app.database import get_db
 from property_street_backend.app.models import (
-    Asset, 
     Tag, 
+    Asset, 
+    Agent,
     CloudImageDetail,
     AssetFeature, 
-    Agent
+    AssetCloudImage,
 )
 
 router = APIRouter()
@@ -35,27 +35,38 @@ def create_or_update_object(db: Session, model: Type[Any], obj_data: Dict[str, A
     Returns:
         Any: The created or updated model instance.
     """
+    # log the argument of debugging purpose
+    print(f'model:{model} obj_data:{obj_data} proxyObject:{proxyObject} table_id: {table_id}')
+
+    # Initialize an instance
     instance = None
+
+    # Pop out the relationship object if there is
+    relationships = obj_data.pop('relationship', {})
+    
+    # Fetches the instance whose id matches table_id if it exists
     if table_id is not None:
         instance = db.query(model).filter(model.id == table_id).first()
 
-    if instance is None:
+    if instance is None: # creates a new instance if instance is none
         instance = model(**obj_data)
-    else:
+    else: # modifies the already existing instance
         for key, value in obj_data.items():
             setattr(instance, key, value)
 
-    relationships = obj_data.pop('relationship', {})
 
+    # loops throught the relationship object
     for field, related_indices in relationships.items():
         related_value = None
-        if isinstance(related_indices, list):
+        if isinstance(related_indices, list): # makes the related_value a list of related index if related_indeces is a list
             related_value = [proxyObject[index] for index in related_indices]
         else:
             related_value = proxyObject.get(related_indices)
 
+        # assigns the realation to the model instance
         setattr(instance, field, related_value)
 
+    # adds the instance to the db session and returns it
     db.add(instance)
     return instance
 
@@ -65,12 +76,17 @@ def return_model_from_string(str_value: str):
     """
     if str_value == 'Tag':
         return Tag
+    elif str_value == 'Agent':
+        return Agent
     elif str_value == 'Asset':
         return Asset
-    elif str_value == 'CloudImageDetail':
-        return CloudImageDetail
     elif str_value == 'AssetFeature':
         return AssetFeature
+    elif str_value == 'AssetCloudImage':
+        return AssetCloudImage
+    elif str_value == 'CloudImageDetail':
+        return CloudImageDetail
+
 
 async def process_asset(data: Dict, db: Session):
     """
@@ -90,12 +106,13 @@ async def process_asset(data: Dict, db: Session):
         agent_instance = await db.execute(select(Agent).filter(Agent.id == data[0]["db_table_id"]))
         agent_instance = agent_instance.scalars().first()
         
-        # assign this 
+        # assign this to the proxy object 
         proxy[0] = agent_instance
-        # delete the entry from the data
-        data.pop[0]
 
-        # Wrap the process in a transaction to ensure atomicity
+        # delete the agent entry from the data object since 
+        # it would not be neeeded for the remaining processing
+        data.pop(0)
+
         for key, value in data.items():
             if value.get('db_delete') and value.get('db_table_id') > 0:
                 handle_instance_delete(
@@ -103,9 +120,8 @@ async def process_asset(data: Dict, db: Session):
                     model=return_model_from_string(value['db_table_name']),
                     id=value['db_table_id']
                 )
-                continue
 
-            elif value['db_table_id'] >= -1:
+            elif value.get('db_delete') == False:
                 instance = create_or_update_object(
                     db=db,
                     model=return_model_from_string(value['db_table_name']),
@@ -116,9 +132,11 @@ async def process_asset(data: Dict, db: Session):
                 proxy[key] = instance
 
         # Commit all changes at once after all operations are completed
-        db.commit()
+        await db.commit()
         
+        print({"status": "success", "processed": len(data)})
         return {"status": "success", "processed": len(data)}
     except Exception as e:
-        db.rollback()  # Rollback if there's an error to ensure atomicity
+        await db.rollback()  # Rollback if there's an error to ensure atomicity
+        print({"status": "error", "message": str(e)})
         return {"status": "error", "message": str(e)}

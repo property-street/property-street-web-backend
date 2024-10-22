@@ -15,7 +15,7 @@ from property_street_backend.app.utils.store import email_verification_code_ttl
 # async_engine: An asynchronous SQLAlchemy engine created using create_async_engine for the test database.
 # TestingSessionLocal: An asynchronous session factory created using sessionmaker with AsyncSession.
 
-test_async_engine = create_async_engine(TEST_DATABASE_URL, echo=True)
+test_async_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 # Async SQLAlchemy session for testing
 AsyncTestSessionLocal = sessionmaker(
     bind=test_async_engine,

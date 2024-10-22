@@ -14,6 +14,7 @@ from sqlalchemy import (
     DateTime,
     event,
 )
+from urllib.parse import urlparse
 from sqlalchemy.future import select
 from sqlalchemy import types as _types
 from sqlalchemy.orm import relationship
@@ -34,13 +35,17 @@ class AbstractCloudImage(Base):
     __abstract__ = True  # Ensure this class is not mapped to its own table
 
     id = Column(Integer, primary_key=True, index=True)
-    created_at = Column(String, nullable=False)  # Format: ISO 8601
     format = Column(String, nullable=False)
+    cloud_asset_id = Column(String, nullable=False)
     bytes = Column(Integer, nullable=False)
     height = Column(Integer, nullable=False)
     public_id = Column(String, unique=True, nullable=False)
     secure_url = Column(String, nullable=False)
     width = Column(Integer, nullable=False)
+
+    # dates
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Optionally, if you want dynamic table names, you can define a declared_attr:
     @declared_attr
@@ -48,12 +53,32 @@ class AbstractCloudImage(Base):
         return cls.__name__.lower()  # Use class name as table name
 
 
+
+
 # Association Table for many-to-many relationship
 asset_tag_association = Table(
     'asset_tag_association',
     Base.metadata,
-    Column('asset_id', Integer, ForeignKey('assets.id'), primary_key=True),
-    Column('tag_id', Integer, ForeignKey('tags.id'), primary_key=True)
+    Column(
+        'asset_id', 
+        Integer, 
+        ForeignKey(
+            'assets.id', 
+            name='fk_asset_tag_association_asset_id',
+            ondelete='CASCADE'
+        ), 
+        primary_key=True
+    ),
+    Column(
+        'tag_id', 
+        Integer, 
+        ForeignKey(
+            'tags.id', 
+            name='fk_asset_tag_association_tag_id',
+            ondelete='RESTRICT'
+        ), 
+        primary_key=True
+    )
 )
 
 
@@ -263,7 +288,7 @@ class Asset(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Enums
-    category = Column(String, nullable=False)
+    category= Column(SQLAlchemyEnum(AssetCategoryChoice, name='asset_category_choice'), nullable=True)
 
     # Foreign key relationship to Agent
     agent_id = Column(
@@ -391,6 +416,7 @@ class AssetCloudImage(AbstractCloudImage):
 
 @event.listens_for(User, 'before_insert')
 @event.listens_for(Asset, 'before_insert')
+@event.listens_for(AbstractCloudImage, 'before_insert')
 # Listen for the 'before_insert' event to set updated_at
 def set_updated_at_before_insert(mapper, connection, target):
     target.updated_at = func.now()
