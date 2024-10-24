@@ -288,7 +288,8 @@ class Asset(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Enums
-    category= Column(SQLAlchemyEnum(AssetCategoryChoice, name='asset_category_choice'), nullable=True)
+    #category= Column(SQLAlchemyEnum(AssetCategoryChoice, name='asset_category_choice'), nullable=True)
+    category= Column(String, nullable=False)
 
     # Foreign key relationship to Agent
     agent_id = Column(

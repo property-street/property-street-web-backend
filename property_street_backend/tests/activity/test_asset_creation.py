@@ -122,7 +122,6 @@ async def create_test_asset(db, agent_id=None):
             public_id="test_image_123",
             secure_url="https://example.com/test_image.jpg",
             width=600,
-            asset_id=1,
         )
     )
     return await create_asset(db, asset_data)

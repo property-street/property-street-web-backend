@@ -1,7 +1,11 @@
+from sqlalchemy import delete
 from fastapi import APIRouter
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 from typing import Type, Dict, Any
 from sqlalchemy.future import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import (
     Tag, 
@@ -10,23 +14,71 @@ from property_street_backend.app.models import (
     CloudImageDetail,
     AssetFeature, 
     AssetCloudImage,
+    asset_tag_association,
 )
 
 router = APIRouter()
 
 
-def handle_instance_delete(db: Session, model: Type[Any], id: int):
+async def get_existing_instance_from_unique_fields(
+    db: AsyncSession, 
+    model: Type[Any], 
+    obj_data: Dict[str, Any]
+) -> Any:
     """
-    Deletes an instance of a given model by id.
-    """
-    db.query(model).filter(model.id == id).delete()
-
-def create_or_update_object(db: Session, model: Type[Any], obj_data: Dict[str, Any], proxyObject: Dict[int, Any], table_id: int = None) -> Any:
-    """
-    Creates or updates a model instance based on the passed object data.
+    Automatically find and fetch the instance that violates the uniqueness constraint asynchronously
+    by reflecting on the model's unique fields.
     
     Args:
-        db (Session): SQLAlchemy database session.
+        db (AsyncSession): SQLAlchemy asynchronous database session.
+        model (Type[Any]): SQLAlchemy model class.
+        obj_data (Dict[str, Any]): Dictionary containing the fields and values for the model instance.
+
+    Returns:
+        Any: The existing model instance that violated the uniqueness constraint, or None if not found.
+    """
+    # Get the unique constraints of the model
+    mapper = inspect(model)
+    unique_columns = []
+    
+    # Get columns marked as unique or part of a unique constraint
+    for column in mapper.columns:
+        if column.unique or column.primary_key:
+            unique_columns.append(column.name)
+
+    # Build a query dynamically based on the unique fields found in obj_data
+    stmt = select(model)
+    for field in unique_columns:
+        if field in obj_data:
+            stmt = stmt.where(getattr(model, field) == obj_data[field])
+
+    # Execute the query asynchronously
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()  # Return the instance if found, else None
+
+
+async def handle_instance_delete(db: AsyncSession, model: Type[Any], id: int):
+    """
+    Asynchronously deletes an instance of a given model by id.
+    """
+    # Perform the deletion asynchronously
+    await db.execute(
+        model.__table__.delete().where(model.id == id)
+    )
+
+
+async def create_or_update_object(
+    db: AsyncSession, 
+    model: Type[Any], 
+    obj_data: Dict[str, Any], 
+    proxyObject: Dict[int, Any], 
+    table_id: int = None
+) -> Any:
+    """
+    Asynchronously creates or updates a model instance based on the passed object data.
+
+    Args:
+        db (AsyncSession): SQLAlchemy async database session.
         model (Type[Any]): SQLAlchemy model class.
         obj_data (Dict[str, Any]): Dictionary containing the fields and values for the model instance.
         proxyObject (Dict[int, Any]): Dictionary storing already created instances to resolve relationships.
@@ -35,40 +87,55 @@ def create_or_update_object(db: Session, model: Type[Any], obj_data: Dict[str, A
     Returns:
         Any: The created or updated model instance.
     """
-    # log the argument of debugging purpose
-    print(f'model:{model} obj_data:{obj_data} proxyObject:{proxyObject} table_id: {table_id}')
+    # Log the arguments for debugging
+    # print(f'obj_data: {obj_data} proxyObject: {proxyObject} table_id: {table_id}\r')
 
     # Initialize an instance
     instance = None
 
-    # Pop out the relationship object if there is
+    # Pop out the relationship object if it exists
     relationships = obj_data.pop('relationship', {})
     
-    # Fetches the instance whose id matches table_id if it exists
+    # Fetch the instance if table_id is provided
     if table_id is not None:
-        instance = db.query(model).filter(model.id == table_id).first()
+        model_instance = await db.execute(
+            select(model).filter(
+                model.id == table_id
+            )
+        )
+        instance = model_instance.scalars().first()
 
-    if instance is None: # creates a new instance if instance is none
-        instance = model(**obj_data)
-    else: # modifies the already existing instance
+    if instance is None:  # Create a new instance if it doesn't exist
+        
+        # Pre-check to avoid duplicate insertions
+        existing_instance = await get_existing_instance_from_unique_fields(db, model, obj_data)
+        
+        if existing_instance:
+            instance = existing_instance
+        else:
+            instance = model(**obj_data)
+    else:  # Update the existing instance
         for key, value in obj_data.items():
             setattr(instance, key, value)
 
+    # Handle relationships
+    if len(relationships):
+        for field, related_indices in relationships.items():
+            related_value = None
+            if isinstance(related_indices, list):
+                related_value = [proxyObject[index] for index in related_indices]
+            else:
+                related_value = proxyObject.get(related_indices)
 
-    # loops throught the relationship object
-    for field, related_indices in relationships.items():
-        related_value = None
-        if isinstance(related_indices, list): # makes the related_value a list of related index if related_indeces is a list
-            related_value = [proxyObject[index] for index in related_indices]
-        else:
-            related_value = proxyObject.get(related_indices)
+            setattr(instance, field, related_value)
 
-        # assigns the realation to the model instance
-        setattr(instance, field, related_value)
 
-    # adds the instance to the db session and returns it
+    # Add the instance back to the session
     db.add(instance)
+    
+    # Return the instance
     return instance
+
 
 def return_model_from_string(str_value: str):
     """
@@ -102,27 +169,34 @@ async def process_asset(data: Dict, db: Session):
     proxy = {}
 
     try:
-        # get the agent instance
-        agent_instance = await db.execute(select(Agent).filter(Agent.id == data[0]["db_table_id"]))
-        agent_instance = agent_instance.scalars().first()
-        
-        # assign this to the proxy object 
-        proxy[0] = agent_instance
+        # get the agent instance if it exists
+        agent_obj = data.get('0')
+        if agent_obj:
+            agent_instance = await db.execute(
+                select(Agent).filter(
+                    Agent.id == data[0]["db_table_id"]
+                )
+            )
+            agent_instance = agent_instance.scalars().first()
+            
+            # assign this to the proxy object 
+            proxy[0] = agent_instance
 
-        # delete the agent entry from the data object since 
-        # it would not be neeeded for the remaining processing
-        data.pop(0)
+            # delete the agent entry from the data object since 
+            # it would not be neeeded for the remaining processing
+            data.pop(0)
 
+        # process the rest of items
         for key, value in data.items():
             if value.get('db_delete') and value.get('db_table_id') > 0:
-                handle_instance_delete(
+                await handle_instance_delete(
                     db=db,
                     model=return_model_from_string(value['db_table_name']),
                     id=value['db_table_id']
                 )
 
             elif value.get('db_delete') == False:
-                instance = create_or_update_object(
+                instance = await create_or_update_object(
                     db=db,
                     model=return_model_from_string(value['db_table_name']),
                     obj_data=value['fields'],
@@ -140,3 +214,35 @@ async def process_asset(data: Dict, db: Session):
         await db.rollback()  # Rollback if there's an error to ensure atomicity
         print({"status": "error", "message": str(e)})
         return {"status": "error", "message": str(e)}
+
+
+async def remove_tags_from_asset(session: AsyncSession, asset_id: int, tag_ids: list[int]) -> bool:
+    """
+    Asynchronously remove multiple tags from an asset in the many-to-many relationship.
+    
+    Args:
+        session (AsyncSession): SQLAlchemy asynchronous database session.
+        asset_id (int): ID of the asset.
+        tag_ids (list[int]): List of tag IDs to remove.
+    
+    Returns:
+        bool: True if at least one tag was successfully removed, False otherwise.
+    """
+    # Return early if no tags are provided
+    if not tag_ids:
+        return False
+
+    # Create a delete statement to remove the relationships for the given tags from the association table
+    stmt = delete(asset_tag_association).where(
+        asset_tag_association.c.asset_id == asset_id,
+        asset_tag_association.c.tag_id.in_(tag_ids)  # Use IN clause for multiple tag IDs
+    )
+
+    # Execute the statement asynchronously
+    result = await session.execute(stmt)
+    
+    # Commit the transaction asynchronously
+    await session.commit()
+    
+    # Return whether any rows were affected (True if at least one tag was removed, False otherwise)
+    return result.rowcount > 0

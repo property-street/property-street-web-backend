@@ -12,7 +12,7 @@ from property_street_backend.app.enums import AssetCategoryChoice
 
 class AssetFeatureCreateSchema(BaseModel):
     title: str = Field(..., description="The title of the feature")
-    asset_id: int = Field(..., description="The ID of the asset to which this feature belongs")
+    asset_id: Optional[int] = Field(None, description="The ID of the asset to which this feature belongs")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -25,7 +25,7 @@ class CloudImageCreateSchema(BaseModel):
     width: int = Field(..., description="The width of the image in pixels")
     public_id: str = Field(..., description="The public ID of the image in the cloud storage")
     secure_url: str = Field(..., description="The secure URL of the image in the cloud storage")
-    asset_id: Optional[int] = Field(..., description="The ID of the asset to which this image is linked")
+    asset_id: Optional[int] = Field(None, description="The ID of the asset to which this image is linked")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -36,7 +36,7 @@ class AssetCreateSchema(BaseModel):
     currency: str = Field(..., description="The currency used for the asset's price (e.g. USD, EUR)")
     amount: float = Field(..., description="The monetary value of the asset")
     description: str = Field(..., description="A detailed description of the asset, possibly in HTML")
-    category: AssetCategoryChoice = Field(..., description="The category of the asset (e.g. House, Hotel)")
+    category: str = Field(..., description="The category of the asset (e.g. House, Hotel)")
     status: str = Field(..., description="The category of the asset (e.g. House, Hotel)")
     availability: bool = Field(..., description="Whether the asset is currently available")
     # Tags can be a string or a list of strings
