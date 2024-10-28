@@ -11,7 +11,7 @@ from property_street_backend.app.models import (
 from property_street_backend.tests.auth.test_create_agent import (
     create_test_agent as create_agent
 )
-from property_street_backend.tests.activity.test_asset_creation import (
+from property_street_backend.tests.activity.test_controller.test_asset_creation import (
     create_test_asset,
     create_test_asset_feature,
 )
@@ -20,10 +20,24 @@ from property_street_backend.app.controllers.activity.agent_crud_processing impo
     process_asset,
     remove_tags_from_asset,
 )
-from property_street_backend.tests.activity.test_objects import (
+from property_street_backend.tests.activity.test_controller.test_objects import (
     feature_obj,
     no_feature_obj
 )
+
+async def add_created_clientId_to_payload(db,payload):
+    # Define a test agent
+    user_data = UserRegistrationSchema(
+        email="agent@example.com",
+        username="agentuser",
+        password="password123"
+    )
+
+    # Call the create_agent function
+    created_agent = await create_agent(db, user_data)
+
+    # modify feature object to include an agent's id
+    payload[0]['db_table_id'] = created_agent.id
 
 
 
@@ -32,18 +46,11 @@ async def test_create_asset_with_feature(get_test_db__fixture: AsyncSession):
     try:
         test_db = await get_test_db__fixture
 
-        # Define a test agent
-        user_data = UserRegistrationSchema(
-            email="agent@example.com",
-            username="agentuser",
-            password="password123"
+        # call the function that would add a real client id to the payload
+        await add_created_clientId_to_payload(
+            db = test_db,
+            payload =feature_obj
         )
-
-        # Call the create_user function
-        created_agent = await create_agent(test_db, user_data)
-
-        # modify feature object to include an agent's id
-        feature_obj[0]['db_table_id'] = created_agent.id
         
         # Process asset with features
         await process_asset(feature_obj, test_db)
@@ -69,18 +76,11 @@ async def test_create_asset_with_no_feature(get_test_db__fixture: AsyncSession):
     try:
         test_db = await get_test_db__fixture
 
-        # Define a test agent
-        user_data = UserRegistrationSchema(
-            email="agent@example.com",
-            username="agentuser",
-            password="password123"
+        # call the function that would add a real client id to the payload
+        await add_created_clientId_to_payload(
+            db = test_db,
+            payload =feature_obj
         )
-
-        # Call the create_user function
-        created_agent = await create_agent(test_db, user_data)
-
-        # modify feature object to include an agent's id
-        no_feature_obj[0]['db_table_id'] = created_agent.id
         
         # Process asset with features
         await process_asset(no_feature_obj, test_db)

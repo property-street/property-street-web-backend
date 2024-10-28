@@ -110,6 +110,33 @@ async def client__fixture(
     transport = ASGITransport(app=app)
     # return the client instance
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
-        yield ac, redis_client_fixture
+        yield ac, redis_client_fixture, test_db
+
+
+@pytest.fixture(scope="function")
+async def client__fixture_with_onlyDB_fixture(
+    get_test_db__fixture, 
+    request, 
+    event_loop,
+):
+    # getting the test_db fixture
+    test_db = await get_test_db__fixture
+
+    # overriding the client's get_db dependency
+    app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
+
+    # cleanup to close the test database
+    async def cleanup():
+        print("**closing client")
+        await test_db.close()
+
+    # Use an event loop to ensure cleanup happens after tests complete
+    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup()))
+    
+    # Use ASGITransport with the app
+    transport = ASGITransport(app=app)
+    # return the client instance
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        yield ac, test_db
 
 

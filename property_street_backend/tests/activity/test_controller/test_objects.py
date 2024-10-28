@@ -1,7 +1,7 @@
 # Test data
 feature_obj = {
     0: {
-        "db_table_id": 1,
+        "db_table_id": -1,
         "db_table_name": "Agent",
     },
     1: {

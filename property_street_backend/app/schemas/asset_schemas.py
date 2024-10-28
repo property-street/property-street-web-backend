@@ -29,6 +29,7 @@ class CloudImageCreateSchema(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class AssetCreateSchema(BaseModel):
     title: str = Field(..., description="The title of the asset")
     country: str = Field(..., description="The country where the asset is located")
@@ -43,5 +44,12 @@ class AssetCreateSchema(BaseModel):
     tags: Optional[str | List[str]] = Field(None, description="Tags associated with the asset")
     agent_id: Optional[int] = Field(None, description="The ID of the agent managing the asset")
     cover_image: CloudImageCreateSchema
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RemoveTagFromAssetSchema(BaseModel):
+    asset_id: int = Field(..., description="The id of the asset whose tags is to be removed")
+    tag_ids: List[int] = Field(..., description="Ids of tags to be removed from the asset")
 
     model_config = ConfigDict(from_attributes=True)

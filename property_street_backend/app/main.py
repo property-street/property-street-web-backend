@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from property_street_backend.config.settings import CORS_ORIGINS
 from property_street_backend.app.initiator import app
-from property_street_backend.app.routers import auth
+from property_street_backend.app.routers import auth, activity
 
 
 
@@ -37,5 +37,6 @@ def read_root():
 
 # Include routers
 app.include_router(auth.router)
+app.include_router(activity.router)
 app.include_router(home_router)
 
