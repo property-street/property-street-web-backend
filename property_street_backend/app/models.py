@@ -279,6 +279,7 @@ class Asset(Base):
     currency = Column(String, nullable=False)
     status = Column(String, nullable=False)
     amount = Column(Numeric, nullable=False)
+    lease_duration = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     has_features = Column(Boolean, default=False)
     availability = Column(Boolean, default=True)

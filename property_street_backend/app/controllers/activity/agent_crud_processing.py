@@ -1,9 +1,11 @@
 from sqlalchemy import delete
 from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import inspect
 from typing import Type, Dict, Any
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from property_street_backend.app.models import (
     Tag, 
@@ -204,21 +206,41 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
         agent_obj = data.get(0)
 
         if agent_obj:
-            agent_instance = await db.execute(
-                select(Agent).filter(
-                    Agent.id == agent_obj["db_table_id"]
+            try:
+                # Attempt to retrieve agent instance
+                agent_instance = await db.execute(
+                    select(Agent).filter(
+                        Agent.id == agent_obj["db_table_id"]
+                    )
                 )
-            )
-            agent_instance = agent_instance.scalars().first()
-            
-            # assign this to the proxy object 
-            proxy[0] = agent_instance
+                agent_instance = agent_instance.scalars().first()
 
-            # delete the agent entry from the data object since 
-            # it would not be neeeded for the remaining processing
-            data.pop(0)
+                if not agent_instance:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Agent not found"
+                    )
 
-        # process the rest of items
+                # Assign this to the proxy object 
+                proxy[0] = agent_instance
+
+                # Delete the agent entry from the data object as it's no longer needed
+                data.pop(0)
+
+            except SQLAlchemyError as e:
+                await db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database error occurred while retrieving agent instance"
+                ) from e
+            except Exception as e:
+                await db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="An unexpected error occurred while retrieving agent instance"
+                ) from e
+
+        # Process the rest of the items
         for key, value in data.items():
             if value.get('db_delete') and value.get('db_table_id') > 0:
                 await handle_instance_delete(
@@ -230,20 +252,19 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
             elif value.get('db_delete') == False:
                 instance = await create_or_update_object(
                     db=db,
-                    model=return_model_from_string(
-                        value['db_table_name']),
-                        obj_data=value['fields'],
-                        proxyObject=proxy,
-                        table_id=None if value['db_table_id'] == -1 else value['db_table_id']
-                    )
+                    model=return_model_from_string(value['db_table_name']),
+                    obj_data=value['fields'],
+                    proxyObject=proxy,
+                    table_id=None if value['db_table_id'] == -1 else value['db_table_id']
+                )
                 proxy[key] = instance
 
-        # Commit all changes at once after all operations are completed
+        # Commit all changes after all operations are completed
         await db.commit()
         
-        # for debugging
-        # print({"status": "success", "processed": len(data)})
+        # For debugging
         return {"status": "success", "processed": len(data)}
+
     except Exception as e:
         await db.rollback()  # Rollback if there's an error to ensure atomicity
         print({"status": "error", "message": str(e)})
@@ -251,4 +272,3 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while creating the user."
         )
-

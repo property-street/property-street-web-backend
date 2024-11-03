@@ -22,7 +22,6 @@ from property_street_backend.app.schemas.auth_schemas import (
 )
 from property_street_backend.app.utils.store import (
     read_email_from_html_template_name,
-    email_verification_code_ttl,
     substituted_string,
     send_email,
 )
@@ -111,7 +110,10 @@ async def check_username_email_availability(db: AsyncSession, user_data: ProbeUs
     return result
 
 # Signup
-async def create_user(db: AsyncSession, user_data: UserRegistrationSchema):
+async def create_user(
+    db: AsyncSession, 
+    user_data: UserRegistrationSchema
+):
     username = user_data.username or user_data.email.strip().split('@')[0]
     existing_user = await db.execute(
         select(User).filter((User.email == user_data.email) | (User.username == username))
@@ -143,8 +145,33 @@ async def create_user(db: AsyncSession, user_data: UserRegistrationSchema):
     await db.refresh(user)
     return user
 
+async def create_agent(
+    db:AsyncSession, 
+    user_data:UserRegistrationSchema,
+):
+
+    """
+    Helper function to create and return a test agent.
+    """
+    
+    # Call the create_user function
+    created_user = await create_user(
+        db = db, 
+        user_data = user_data,
+    )
+    
+    # call the `become agent` on the created user
+    await created_user.become_agent(db)
+
+    # return the newly created agent
+    return created_user.agent_profile  
+
+
 # Session token validity
-async def decode_user_from_token(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+async def decode_user_from_token(
+    token: str = Depends(oauth2_scheme), 
+    db: AsyncSession = Depends(get_db)
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -264,7 +291,7 @@ async def send_email_verification_code(
             )
         
 
-async def confirm_email_verification_code(
+async def confirm_email_verification_code_and_sign_user_up(
     requester_data: SignupCodeVerificationSchema, 
     redis_client: redis.Redis,
     db: AsyncSession,
@@ -293,34 +320,51 @@ async def confirm_email_verification_code(
         )
 
     # Hash the user's password before saving it to the database
-    hashed_password = get_password_hash(requester_data.password)
+    # hashed_password = get_password_hash(requester_data.password)
 
-    # Create the new user instance
-    new_user = User(
+    # get the client type User or Agent
+    client_type = requester_data.client_type.lower()
+    
+    user_data = UserRegistrationSchema(
         email=email_address,
         username=requester_data.username,
-        password_hash=hashed_password,
-        client_type=requester_data.client_type,
+        password=requester_data.password,
     )
+
+    created_client = None  # Initialize variable to avoid UnboundLocalError
+
+    if client_type == 'client':
+        # Create the new user instance
+        created_client = await create_user(
+            db = db,
+            user_data = user_data   
+        )
+    elif client_type == 'agent':
+        agent = await create_agent(
+            db = db,
+            user_data = user_data
+        )
+        created_client = agent.user
+
     # extracting names from the fullname
     name_list = requester_data.fullname.split()
     
     # adding the first_name
-    new_user.first_name = name_list[0]
+    created_client.first_name = name_list[0]
     
     # adding last_name
     if len(name_list) > 1:
-        new_user.last_name = name_list[-1]
+        created_client.last_name = name_list[-1]
     
     # Adding other_names (middle names or any names between the first and last)
     if len(name_list) > 2:
-        new_user.other_names = " ".join(name_list[1:-1])
+        created_client.other_names = " ".join(name_list[1:-1])
 
     try:
         # Add the new user to the session and commit the transaction
-        db.add(new_user)
+        db.add(created_client)
         await db.commit()
-        await db.refresh(new_user)
+        await db.refresh(created_client)
 
         # Optionally, delete the verification code from Redis after successful registration
         await redis_client.delete(user_key)
@@ -328,7 +372,7 @@ async def confirm_email_verification_code(
         return {
             "email_status": "Verified",
             "message": "The email has been successfully verified and the user has been registered.",
-            "user_id": new_user.id,
+            "user_id": created_client.id,
         }
 
     except IntegrityError:

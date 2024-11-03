@@ -65,10 +65,16 @@ async def test_route_signin(client__fixture_with_onlyDB_fixture: tuple):
         "password": "password123",
     }
 
-    # Make the request using the client provided by the fixture
-    await client.post(
-        "/auth/register",
-        json=post_data  # Use json instead of data for a JSON body
+    user_data = UserRegistrationSchema(
+        email=post_data['email'],
+        username=post_data['username'],
+        password=post_data['password']
+    )
+
+    # Call the create_user function
+    created_user = await create_user(
+        test_db, 
+        user_data
     )
 
 

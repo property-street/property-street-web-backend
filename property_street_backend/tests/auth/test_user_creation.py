@@ -60,11 +60,11 @@ async def test_controller_create_user(get_test_db__fixture: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_route_create_user(client__fixture: AsyncClient):
+async def test_route_create_user(client__fixture_with_onlyDB_fixture: tuple):
     # fetch the client generator
-    client_gen =  client__fixture
+    client_gen =  client__fixture_with_onlyDB_fixture
     # get the yield client object
-    client = await client_gen.__anext__()
+    client, test_db = await client_gen.__anext__()
 
     # Define a post data
     post_data = {
@@ -142,7 +142,7 @@ async def test_route_probe_user_existence(client__fixture: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_send_email_verification_code(client__fixture: tuple):    
+async def test_send_email_verification_code_hash(client__fixture: tuple):    
     # fetch the client generator
     client_gen =  client__fixture
     # get the yield client object
@@ -188,98 +188,7 @@ async def test_confirm_email_verification_code(client__fixture: tuple):
 
     # Define the post data for sending the email verification code
     send_code_data = {
-        "email": "crankgig@gmail.com",
-        "username": "crank",
-    }
-
-    # Request a verification code
-    response = await client.post(
-        "/auth/send-email-verification-code",
-        json=send_code_data  # Use json instead of data for a JSON body
-    )
-
-    # Assertions for sending the verification code
-    assert response.status_code == 200
-    json_response = response.json()
-    assert json_response.get("message") == "A new verification code has been sent to your email."
-
-    # Retrieve the code directly from Redis (this simulates the user entering the code they received)
-    user_key = f'{send_code_data["email"]}:email_verification'
-    verification_code = await redis_client.hget(user_key, "email_verification")
-    assert verification_code is not None
-
-
-
-    # ** testing the confirm_email_verification_code function
-    # ...
-
-    # Define the post data for confirming the verification code
-    confirm_code_data = {
-        "email": send_code_data["email"],
-        "verification_code": verification_code.decode('utf-8'),
-        "username": "",
-        "fullname": "",
-        "password": "",
-    }
-
-    # Confirm the verification code
-    response = await client.post(
-        "/auth/confirm-email-verification-code",
-        json=confirm_code_data  # Use json instead of data for a JSON body
-    )
-
-    #Assertions for confirming the verification code
-    assert response.status_code == 200
-    json_response = response.json()
-    assert json_response.get("email_status") == "Verified"
-    assert json_response.get("message") == "The email has been successfully verified."
-
-
-    # Test with an incorrect code
-    incorrect_code_data = {
-        "email": send_code_data["email"],
-        "verification_code": "12345",  # Assuming this is not the correct code
-        "username": "",
-        "fullname": "",
-        "password": "",
-    }
-
-    # Try confirming with the incorrect code
-    response = await client.post(
-        "/auth/confirm-email-verification-code",
-        json=incorrect_code_data  # Use json instead of data for a JSON body
-    )
-
-    # Assertions for the incorrect code
-    assert response.status_code == 400
-    json_response = response.json()
-    assert json_response.get("detail") == "Invalid verification code."
-
-    # Test with an expired code
-    await asyncio.sleep(90)  # Wait for 90 seconds to let the code expire assuming expiry time is 60 seconds
-
-    # Try confirming with the expired code
-    response = await client.post(
-        "/auth/confirm-email-verification-code",
-        json=confirm_code_data  # Re-use the correct code data
-    )
-    # Assertions for the expired code
-    assert response.status_code == 404
-    json_response = response.json()
-    assert json_response.get("detail") == "Verification code not found or expired."
-
-
-
-@pytest.mark.asyncio
-async def test_confirm_email_verification_code(client__fixture: tuple):    
-    # Fetch the client generator
-    client_gen = client__fixture
-    # Get the yield client objects
-    client, redis_client = await client_gen.__anext__()
-
-    # Define the post data for sending the email verification code
-    send_code_data = {
-        "email": "crankgig@gmail.com",
+        "email": "wisdomscott98@gmail.com",
         "username": "crank",
     }
 
@@ -309,7 +218,7 @@ async def test_confirm_email_verification_code(client__fixture: tuple):
         "username": "crank",
         "fullname": "John Doe",
         "password": "strongpassword",
-        "client_type": "client"
+        "client_type": "Agent"
     }
 
     # Confirm the verification code with correct data

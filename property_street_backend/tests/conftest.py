@@ -110,7 +110,7 @@ async def client__fixture(
     transport = ASGITransport(app=app)
     # return the client instance
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
-        yield ac, redis_client_fixture, test_db
+        yield ac, redis_client_fixture#, test_db
 
 
 @pytest.fixture(scope="function")

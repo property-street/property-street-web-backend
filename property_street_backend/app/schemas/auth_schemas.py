@@ -22,7 +22,6 @@ class UserRegistrationSchema(BaseModel):
     email: str
     username: str
     password: str
-    #first_name: str
     #last_name: str
     # Add other fields as needed
 

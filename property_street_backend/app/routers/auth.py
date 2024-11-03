@@ -20,7 +20,7 @@ from property_street_backend.app.controllers.auth import (
     fetched_access_token, 
     check_username_email_availability,
     send_email_verification_code as controller_send_email_verification_code,
-    confirm_email_verification_code as controller_confirm_email_verification_code
+    confirm_email_verification_code_and_sign_user_up as controller_confirm_email_verification_code_and_sign_user_up
 )
 from property_street_backend.app.utils.store import (
     email_verification_code_ttl,
@@ -65,7 +65,7 @@ async def confirm_email_verification_code(
     redis_client: redis.Redis = Depends(redis_client),
     db: AsyncSession = Depends(get_db),
 ):
-    return await controller_confirm_email_verification_code(
+    return await controller_confirm_email_verification_code_and_sign_user_up(
         requester_data = requester_data,
         redis_client = redis_client,
         db = db
