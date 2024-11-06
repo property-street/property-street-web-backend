@@ -1,5 +1,13 @@
 import pytest
+from sqlalchemy.future import select
 
+from property_street_backend.app.controllers.auth import (
+    fetched_access_token,
+    create_agent
+)
+from property_street_backend.app.models import (
+    User,
+)
 from property_street_backend.tests.activity.test_controller.test_objects import (
     feature_obj,
 )
@@ -8,30 +16,45 @@ from property_street_backend.tests.activity.test_controller.test_asset_managemen
 )
 
 
+
 @pytest.mark.asyncio
-async def test_asset_upload(client__fixture_with_onlyDB_fixture: tuple):
-    # fetch the client generator
-    client_gen =  client__fixture_with_onlyDB_fixture
-    # get the yield client object
+async def test_asset_upload_with_auth(client__fixture_with_onlyDB_fixture: tuple):
+    # Fetch the client generator
+    client_gen = client__fixture_with_onlyDB_fixture
+    # Get the yielded client object
     client, test_db = await client_gen.__anext__()
 
-    # Define a post data
+    # Add the created client ID to the payload (assuming feature_obj is predefined)
     await add_created_clientId_to_payload(
-        db = test_db,
-        payload = feature_obj
+        db=test_db,
+        payload=feature_obj
     )
 
-    # print(feature_obj)
+    # fetch the test user
+    result = await test_db.execute(select(User).filter(User.username == "agentuser"))
+    agent_user = result.scalars().first()
 
+    # assert that the agent_user agent_profile id is 1
+    assert agent_user.agent_profile_id == 1
+    
+    # fetch a token for the user
+    tokenObj = fetched_access_token(user=agent_user)
+
+    # Define the payload for the request
     payload = {
         'tags_to_remove_object': {},
         'asset_data_to_process': feature_obj
     }
 
+    # Generate an access token for authentication
+    token = tokenObj['access_token']
+    headers = {"Authorization": f"Bearer {token}"}
+
     # Make the request using the client provided by the fixture
     response = await client.post(
         "/activity/process_asset",
-        json=payload  # Use json instead of data for a JSON body
+        json=payload,  # Use json instead of data for a JSON body
+        headers=headers
     )
     
     # Assertions

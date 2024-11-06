@@ -89,6 +89,26 @@ async def signin_for_access_token(user_data: UserSigninSchema, db: AsyncSession 
     return fetched_access_token(user)
 
 
-@router.get("/fetch-user")
-async def fetch_user(current_user: TokenData = Depends(decode_user_from_token)):
-    return {"username": current_user.username}
+@router.get("/retrieve-client-details")
+async def fetch_user(
+    current_user: TokenData = Depends(decode_user_from_token)
+):
+    return {
+        "username": current_user.username,
+        "user_id": current_user.id
+    }
+
+
+@router.get("/retrieve-agent-details")
+async def fetch_user(
+    current_user: TokenData = Depends(decode_user_from_token)
+):
+    if current_user.agent_profile:
+        return {
+            "agent_id": current_user.agent_profile_id
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agent not found"
+        )

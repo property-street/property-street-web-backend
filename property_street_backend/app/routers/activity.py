@@ -5,10 +5,13 @@ from fastapi import APIRouter, Depends, status
 from property_street_backend.app.models import (
     User,
 )
+from property_street_backend.app.database import get_db
 from property_street_backend.app.controllers.auth import (
     decode_user_from_token,
 )
-from property_street_backend.app.database import get_db
+from property_street_backend.app.schemas.auth_schemas import (
+    TokenData, 
+)
 from property_street_backend.app.controllers.activity.agent_crud_processing import (
     process_asset as controller_process_asset,
     remove_tags_from_asset,
@@ -21,15 +24,15 @@ router = APIRouter(prefix="/activity", tags=["activity"])
 async def process_asset(
     data: Dict, 
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(decode_user_from_token)
+    current_user: TokenData = Depends(decode_user_from_token)
 ):
     # check if the tags to remove is present
     tags_to_remove_object = data.get('tags_to_remove_object')
     if (len(tags_to_remove_object)):
         await remove_tags_from_asset(
             session = db,
-            asset_id = tags_to_remove_object.asset_id,
-            tag_ids=tags_to_remove_object.tag_ids
+            asset_id = tags_to_remove_object['asset_id'],
+            tag_ids=tags_to_remove_object['tag_ids']
         )
     
     # check for asset data to process

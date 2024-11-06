@@ -190,31 +190,35 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
     Processes a batch of assets. Deletes or creates/updates instances as necessary.
     
     Args:
-        data (Dict): The data containing the objects to process.
+        data_to_be_processed (Dict): The data containing the objects to process.
         db (Session): The database session (injected by FastAPI).
     
     Returns:
-        Dict: The result of the processing (you can adjust the return type).
+        Dict: The result of the processing.
     """
-    # initialize proxy object
+    # Initialize proxy object
     proxy = {}
-    # Convert keys to integers
+    # Convert keys to integers for predictable ordering
     data = {int(k): v for k, v in data_to_be_processed.items()}
 
     try:
-        # get the agent instance if it exists
+        # Attempt to retrieve the agent instance
         agent_obj = data.get(0)
-
         if agent_obj:
             try:
-                # Attempt to retrieve agent instance
+                # Log received agent object
+                print(f"Processing agent with ID: {agent_obj['db_table_id']}, and id type {type(agent_obj['db_table_id'])}")
+                
+                # Ensure db_table_id is integer
+                agent_id = int(agent_obj.get("db_table_id", -1))
+                
+                # Retrieve the agent instance
                 agent_instance = await db.execute(
-                    select(Agent).filter(
-                        Agent.id == agent_obj["db_table_id"]
-                    )
+                    select(Agent).filter(Agent.id == agent_id)
                 )
                 agent_instance = agent_instance.scalars().first()
 
+                # Check if agent instance was found
                 if not agent_instance:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
@@ -224,7 +228,7 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
                 # Assign this to the proxy object 
                 proxy[0] = agent_instance
 
-                # Delete the agent entry from the data object as it's no longer needed
+                # Remove the agent entry from data as it's now in the proxy
                 data.pop(0)
 
             except SQLAlchemyError as e:
@@ -248,7 +252,6 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
                     model=return_model_from_string(value['db_table_name']),
                     id=value['db_table_id']
                 )
-
             elif value.get('db_delete') == False:
                 instance = await create_or_update_object(
                     db=db,
@@ -270,5 +273,5 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
         print({"status": "error", "message": str(e)})
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while creating the user."
+            detail="An error occurred while creating the asset."
         )

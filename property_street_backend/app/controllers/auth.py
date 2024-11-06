@@ -209,7 +209,7 @@ async def send_email_verification_code(
     redis_client: redis.Redis,
     expiry_time_in_secs: int,
 ):
-    print(f"**expiry_time_in_secs: {expiry_time_in_secs}")
+    # print(f"**expiry_time_in_secs: {expiry_time_in_secs}")
 
     email_address = requester_data.email
     user_name = requester_data.username if requester_data.username else "User"
