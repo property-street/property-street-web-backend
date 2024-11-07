@@ -8,8 +8,8 @@ from property_street_backend.app.models import (
     AssetFeature, 
     asset_tag_association,
 )
-from property_street_backend.tests.auth.test_create_agent import (
-    create_test_agent as create_agent
+from property_street_backend.app.controllers.auth import (
+    create_agent
 )
 from property_street_backend.tests.activity.test_controller.test_asset_creation import (
     create_test_asset,
@@ -49,7 +49,7 @@ async def test_create_asset_with_feature(get_test_db__fixture: AsyncSession):
         # call the function that would add a real client id to the payload
         await add_created_clientId_to_payload(
             db = test_db,
-            payload =feature_obj
+            payload = feature_obj
         )
         
         # Process asset with features
@@ -79,7 +79,7 @@ async def test_create_asset_with_no_feature(get_test_db__fixture: AsyncSession):
         # call the function that would add a real client id to the payload
         await add_created_clientId_to_payload(
             db = test_db,
-            payload =feature_obj
+            payload = no_feature_obj
         )
         
         # Process asset with features

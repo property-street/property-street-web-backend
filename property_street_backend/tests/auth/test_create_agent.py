@@ -1,25 +1,17 @@
 import pytest
+from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.schemas.auth_schemas import (
     UserRegistrationSchema,
 )
-from property_street_backend.app.controllers.auth import create_user
-from property_street_backend.app.controllers.auth import get_password_hash
-
-async def create_test_agent(db:AsyncSession, user_data:UserRegistrationSchema):
-
-    """
-    Helper function to create and return a test agent.
-    """
-    
-    # Call the create_user function
-    created_user = await create_user(db, user_data)
-    
-    # call the become agent on the created user
-    await created_user.become_agent(db)
-
-    return created_user.agent_profile    
+from property_street_backend.app.controllers.auth import (
+    create_agent,
+    verify_password,
+)
+from property_street_backend.app.models import (
+    Agent,
+)
 
 
 @pytest.mark.asyncio
@@ -33,12 +25,17 @@ async def test_create_agent(get_test_db__fixture: AsyncSession):
             username="agentuser",
             password="password123"
         )
-        created_agent = await create_test_agent(test_db, user_data)
-
-        # Assertions
-        assert created_agent is not None
-        assert created_agent.user.email == user_data.email
+        created_agent = await create_agent(
+            db = test_db, 
+            user_data = user_data
+        )
+        
+        # assertions 
         assert created_agent.user.username == user_data.username
-        assert created_agent.user.password_hash != user_data.password  # Ensure the password
+        assert created_agent.user.email == user_data.email
+        assert verify_password(
+            plain_password = user_data.password,
+            hashed_password = created_agent.user.password_hash        
+        )
     finally:
         await test_db.close()

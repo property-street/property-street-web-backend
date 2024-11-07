@@ -107,7 +107,7 @@ feature_obj = {
 
 no_feature_obj = {
     0: {
-        "db_table_id": 1,
+        "db_table_id": -1,
         "db_table_name": "Agent",
     },
     1: {
@@ -207,13 +207,15 @@ no_feature_obj = {
             "status": "auction",
             "description": "<span>bla bla bla</span>",
             "has_features": False,
-        },
 
-        "relationship": {
-            "tags": [1],
-            "cover_image": 2,
-            "cloud_images":[3,4,5]
-        }
+            "relationship": {
+                "tags": [
+                    1
+                ],
+                "cover_image": 2,
+                "cloud_images":[3,4,5]
+            }
+        },
     },
 }
 

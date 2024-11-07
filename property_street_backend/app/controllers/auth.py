@@ -161,7 +161,9 @@ async def create_agent(
     )
     
     # call the `become agent` on the created user
-    await created_user.become_agent(db)
+    await created_user.become_agent(
+        session = db
+    )
 
     # return the newly created agent
     return created_user.agent_profile  

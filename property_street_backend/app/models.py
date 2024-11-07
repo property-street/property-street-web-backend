@@ -170,7 +170,12 @@ class CloudImageDetail(AbstractCloudImage):  # Inherit the abstract base
 class Agent(Base):
     __tablename__ = 'agents'
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer, 
+        primary_key=True, 
+        index=True,
+        autoincrement=True,
+    )
     
     # reverse relationship with the User model
     user = relationship(
@@ -244,15 +249,19 @@ class User(Base):
         back_populates = 'user',
         uselist=False, # explicitly tell SQLAlchemy it's a one-to-one
         foreign_keys=[agent_profile_id],
+        lazy="selectin",  # Ensures relationship loads in async contexts
     )
     
     # method for a user to become an agent
     async def become_agent(self, session):
         """Method to convert a user into an agent."""
         if not self.agent_profile:
+            # Create a new Agent instance associated with this user
             agent = Agent(user=self)
             session.add(agent)
+            await session.flush()  # Ensures the new `agent` has an `id` before committing
             await session.commit()
+            await session.refresh(self)  # Refresh `self` to update the `agent_profile`
 
 
 class Tag(Base):

@@ -18,9 +18,10 @@ from property_street_backend.app.schemas.asset_schemas import (
 from property_street_backend.app.schemas.auth_schemas import (
     UserRegistrationSchema, 
 )
-from property_street_backend.tests.auth.test_create_agent import (
-    create_test_agent as create_agent
+from property_street_backend.app.controllers.auth import (
+    create_agent,
 )
+
 
 async def create_asset(db: AsyncSession, asset_data: AssetCreateSchema):
     new_asset = Asset(

@@ -17,7 +17,7 @@ pytest path_to_test_script
 
 ## activate the fast api shell
 ```
-    ipython -i Scripts/ipython_config.py
+    ipython -i scripts/ipython_config.py
 ```
 
 

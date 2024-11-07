@@ -271,7 +271,7 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
     except Exception as e:
         await db.rollback()  # Rollback if there's an error to ensure atomicity
         print({"status": "error", "message": str(e)})
-        raise HTTPException(
+        raise HTTPException(    
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while creating the asset."
         )

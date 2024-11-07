@@ -41,6 +41,13 @@ async def test_controller_create_user(get_test_db__fixture: AsyncSession):
         # Call the create_user function
         created_user = await create_user(test_db, user_data)
 
+        # testing the become agent method of the user
+        await created_user.become_agent(
+            session = test_db
+        )
+        print(f'***agent_id: {created_user.agent_profile_id}')
+
+
         # Assertions
         assert created_user is not None
         assert created_user.email == user_data.email
