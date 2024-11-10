@@ -3,7 +3,6 @@ from sqlalchemy.future import select
 
 from property_street_backend.app.controllers.auth import (
     fetched_access_token,
-    create_agent
 )
 from property_street_backend.app.models import (
     User,

@@ -219,5 +219,25 @@ no_feature_obj = {
     },
 }
 
-update_obj = {
+agent_assets = {
+    0:{
+        'category': str,
+        'cover_image':{
+            'db_table_id': int,
+            'cloud_details':dict,
+        },
+        'country': str,
+        'address': str,
+        'feature':{
+            0:{
+                'title':str,
+                'db_table_id': int,
+                'cloud_images':{
+                    0:dict,
+                    # ...
+                }
+            }
+            # ...
+        }
+    }
 }

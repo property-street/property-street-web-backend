@@ -1,9 +1,10 @@
 from typing import Dict
+from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 
 from property_street_backend.app.models import (
-    User,
+    Agent,
 )
 from property_street_backend.app.database import get_db
 from property_street_backend.app.controllers.auth import (
@@ -16,7 +17,12 @@ from property_street_backend.app.controllers.activity.agent_crud_processing impo
     process_asset as controller_process_asset,
     remove_tags_from_asset,
 )
-from property_street_backend.app.schemas.route_based_asset_schemas import AssetComponentSchema
+from property_street_backend.app.controllers.activity.agent_assets_retrieval import (
+    get_agent_assets
+)
+from property_street_backend.clogs.logger_config import (
+    log_message
+)
 
 router = APIRouter(prefix="/activity", tags=["activity"])
 
@@ -24,7 +30,7 @@ router = APIRouter(prefix="/activity", tags=["activity"])
 async def process_asset(
     data: Dict, 
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(decode_user_from_token)
+    _: TokenData = Depends(decode_user_from_token)
 ):
     # check if the tags to remove is present
     tags_to_remove_object = data.get('tags_to_remove_object')
@@ -41,4 +47,39 @@ async def process_asset(
         return await controller_process_asset(
             data_to_be_processed = asset_data_to_process,
             db = db
+        )
+    
+@router.get("/fetch_agent_assets")
+async def fetch_agent_assets(
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(decode_user_from_token)
+):
+    try:
+        # get the authenticated user's agent profile
+        agent = current_user.agent_profile
+
+        if not agent:
+            # log the error
+            log_message(
+                log_type='error',
+                message='Agent not found'
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Agent not found"
+            )
+        
+        return await get_agent_assets(
+            db = db,
+            agent_id = agent.id
+        )
+    except Exception as e:
+        # log the error
+        log_message(
+            log_type='error',
+            message=f'An error occured on retrieval of agent data. Reason: {e}'
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occured on retrieval of agent data."
         )

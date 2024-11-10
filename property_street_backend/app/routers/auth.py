@@ -100,7 +100,7 @@ async def fetch_user(
 
 
 @router.get("/retrieve-agent-details")
-async def fetch_user(
+async def fetch_agent(
     current_user: TokenData = Depends(decode_user_from_token)
 ):
     if current_user.agent_profile:

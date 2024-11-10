@@ -14,7 +14,6 @@ from sqlalchemy import (
     DateTime,
     event,
 )
-from urllib.parse import urlparse
 from sqlalchemy.future import select
 from sqlalchemy import types as _types
 from sqlalchemy.orm import relationship
