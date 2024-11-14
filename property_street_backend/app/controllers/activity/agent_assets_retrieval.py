@@ -62,12 +62,13 @@ async def get_agent_assets(db: AsyncSession, agent_id: int):
                     "secure_url": asset.cover_image.secure_url,
                     "width": asset.cover_image.width,
 
-                    "db_table_id": db_table_id
+                    "db_table_id": db_table_id,
+                    "db_table_name": "CloudImageDetail"
                 }
                 cover_image_data = {
                     0:{
                         "files": {
-                            asset.public_id : cover_image_cloud_details
+                            asset.cover_image.public_id : cover_image_cloud_details
                         }
                     }
                 }
@@ -98,7 +99,9 @@ async def get_agent_assets(db: AsyncSession, agent_id: int):
                             "public_id": asset_cloud_image.public_id,
                             "secure_url": asset_cloud_image.secure_url,
                             "width": asset_cloud_image.width,
-                            "db_table_id": asset_cloud_image.id
+
+                            "db_table_id": asset_cloud_image.id,
+                            "db_table_name": "AssetCloudImage",
                         }
                         feature_cloud_details[asset_cloud_image.public_id] = cloud_image
 
@@ -126,7 +129,9 @@ async def get_agent_assets(db: AsyncSession, agent_id: int):
                         "public_id": asset_cloud_image.public_id,
                         "secure_url": asset_cloud_image.secure_url,
                         "width": asset_cloud_image.width,
-                        "db_table_id": asset_cloud_image.id
+
+                        "db_table_id": asset_cloud_image.id,
+                        "db_table_name": "AssetCloudImage",
                     }
                     no_feature_data[0]['files'][asset_cloud_image.public_id] = cloud_image_obj
 
@@ -146,7 +151,7 @@ async def get_agent_assets(db: AsyncSession, agent_id: int):
                 "cover_image": cover_image_data,
                 "country": asset.country,
                 "address": asset.address,
-                "feature": features_data if asset.has_features else None,
+                "features": features_data if asset.has_features else None,
                 "no_feature": no_feature_data if not asset.has_features else None,
                 "currency": asset.currency,
                 "amount": asset.amount,

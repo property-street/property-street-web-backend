@@ -18,7 +18,7 @@ pytest path_to_test_script
 ## activate the fast api shell
 ```
     ipython -i scripts/ipython_config.py
-```
+``` 
 
 
 ## Configure alembic.ini and env.py for your database
