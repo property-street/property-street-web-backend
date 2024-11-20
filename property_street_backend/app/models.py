@@ -154,7 +154,8 @@ class CloudImageDetail(AbstractCloudImage):  # Inherit the abstract base
     user = relationship(
         'User', 
         back_populates='profile_avatar',
-        uselist=False  # explicitly tell SQLAlchemy it's a one-to-one
+        uselist=False,  # explicitly tell SQLAlchemy it's a one-to-one
+        lazy="selectin",  # Ensures relationship loads in async contexts
     )
 
     # Reverse relationship to Asset
@@ -162,7 +163,8 @@ class CloudImageDetail(AbstractCloudImage):  # Inherit the abstract base
         'Asset', 
         back_populates='cover_image',
         uselist=False,  # explicitly tell SQLAlchemy it's a one-to-one 
-        post_update=True
+        post_update=True,
+        lazy="selectin",  # Ensures relationship loads in async contexts
     )
 
 
@@ -187,7 +189,9 @@ class Agent(Base):
     assets = relationship(
         'Asset',
         back_populates='agent',
-        cascade="all, delete-orphan"  # Cascade deletion from Agent to Asset
+        cascade="all, delete-orphan",  # Cascade deletion from Agent to Asset
+        lazy="selectin",  # Ensures relationship loads in async contexts
+
     )
    
 
@@ -228,7 +232,9 @@ class User(Base):
         'CloudImageDetail', 
         back_populates='user',
         uselist=False, # explicitly tell SQLAlchemy it's a one-to-one
-        foreign_keys=[profile_avatar_id]
+        foreign_keys=[profile_avatar_id],
+        lazy="selectin",  # Ensures relationship loads in async contexts
+
     )
   
     # Foreign key to Agent for one-to-one relationship (nullable until user becomes agent)
@@ -273,7 +279,9 @@ class Tag(Base):
     assets = relationship(
         'Asset', 
         secondary='asset_tag_association', 
-        back_populates='tags'
+        back_populates='tags',
+        lazy="selectin",  # Ensures relationship loads in async contexts
+
     )
 
 
@@ -311,7 +319,9 @@ class Asset(Base):
     )
     agent = relationship(
         'Agent', 
-        back_populates='assets'
+        back_populates='assets',
+        lazy="selectin",  # Ensures relationship loads in async contexts
+
     )
 
     # One-to-one relationship for cover image (no cascade)
@@ -330,14 +340,16 @@ class Asset(Base):
         back_populates='asset',
         uselist=False, # explicitly tell SQLAlchemy it's a one-to-one
         foreign_keys=[cover_image_id], 
-        post_update=True
+        post_update=True,
+        lazy="selectin",  # Ensures relationship loads in async contexts
     )
     
     # Many-to-many relationship with Tag
     tags = relationship(
         'Tag', 
         secondary='asset_tag_association', 
-        back_populates='assets'
+        back_populates='assets',
+        lazy="selectin",  # Ensures relationship loads in async contexts
     )
 
     # Reverse relationship to asset feature
@@ -345,6 +357,8 @@ class Asset(Base):
         'AssetFeature', 
         back_populates='asset',
         cascade="all, delete-orphan", # cascade from Asset to AssetFeature
+        lazy="selectin",  # Ensures relationship loads in async contexts
+
     )
 
     # Reverse relationship to the AssetCloudImage
@@ -352,6 +366,8 @@ class Asset(Base):
         'AssetCloudImage', 
         back_populates='asset',
         cascade="all, delete-orphan", # cascade from Asset to AssetCloudImage
+        lazy="selectin",  # Ensures relationship loads in async contexts
+
     )
 
 
@@ -375,6 +391,8 @@ class AssetFeature(Base):
         'Asset', 
         back_populates='features',
         foreign_keys=[asset_id],
+        lazy="selectin",  # Ensures relationship loads in async contexts
+
     )
 
     # Reverse relationship to the AssetCloudImage
@@ -382,6 +400,7 @@ class AssetFeature(Base):
         'AssetCloudImage', 
         back_populates='asset_feature',
         cascade="all, delete-orphan", # cascade from AssetFeature to AssetCloudImage
+        lazy="selectin",  # Ensures relationship loads in async contexts
     )
 
 
@@ -404,6 +423,8 @@ class AssetCloudImage(AbstractCloudImage):
         'Asset', 
         back_populates='cloud_images',
         foreign_keys=[asset_id],
+        lazy="selectin",  # Ensures relationship loads in async contexts
+
     )
 
     # Foreign key relationship to asset_features (no cascade)
@@ -420,6 +441,8 @@ class AssetCloudImage(AbstractCloudImage):
         'AssetFeature', 
         back_populates='cloud_images',
         foreign_keys=[asset_feature_id],
+        lazy="selectin",  # Ensures relationship loads in async contexts
+
     )
 
 

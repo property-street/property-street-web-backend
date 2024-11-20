@@ -1,13 +1,16 @@
 # main.py
+import asyncio
 from fastapi import APIRouter
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 
 from property_street_backend.config.settings import CORS_ORIGINS
-from property_street_backend.app.initiator import app
+from property_street_backend.app.initiator import app, redis_client
 from property_street_backend.app.routers import auth, activity
-
+from property_street_backend.app.controllers.activity.asset_routine_methods import (
+    asset_auto_category_expiry,
+)
 
 
 # CORS middleware
@@ -40,3 +43,19 @@ app.include_router(auth.router)
 app.include_router(activity.router)
 app.include_router(home_router)
 
+# Initiate rountine startup
+# run routine
+# async def on_startup():
+#     # Get the Redis client asynchronously
+#     try:
+#         redis = await redis_client().__anext__()
+#         await asset_auto_category_expiry(
+#             redis_client = redis
+#         )
+#     finally:
+#         pass
+# 
+# @app.on_event("startup")
+# async def startup_event():
+#     # Call the on_startup function asynchronously during the app startup
+#     await on_startup()

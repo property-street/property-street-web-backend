@@ -16,6 +16,9 @@ from property_street_backend.app.models import (
     AssetCloudImage,
     asset_tag_association,
 )
+from property_street_backend.clogs.logger_config import (
+    log_message
+)
 
 
 async def get_existing_instance_from_unique_fields(
@@ -265,12 +268,16 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
         # Commit all changes after all operations are completed
         await db.commit()
         
-        # For debugging
-        return {"status": "success", "processed": len(data)}
+        return {
+            "detail": "Asset processed successfully",
+            
+            # For debugging
+            "status": "success", 
+            "processed": len(data),
+        }
 
     except Exception as e:
         await db.rollback()  # Rollback if there's an error to ensure atomicity
-        print({"status": "error", "message": str(e)})
         raise HTTPException(    
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while creating the asset."

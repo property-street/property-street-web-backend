@@ -17,6 +17,8 @@ async def redis_client():
         db=2, #db2 for property street main cache; 3 should be for production
     )
     try:
+        await client.config_set('notify-keyspace-events', 'Ex')
         yield client
     finally:
         await client.aclose()
+
