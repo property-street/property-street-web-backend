@@ -25,7 +25,7 @@ app.add_middleware(
 
 
 # Assuming your media files are in the "media" directory
-app.mount("/media", StaticFiles(directory="media"), name="media")
+# app.mount("/media", StaticFiles(directory="media"), name="media")
 
 
 

@@ -163,7 +163,9 @@ async def create_test_agent(db):
     user_data = UserRegistrationSchema(
         email="agent@example.com",
         username="agentuser",
-        password="password123"
+        password="password123",
+        first_name="sodovuchi",
+        last_name="vinci",
     )
     return await create_agent(db, user_data)
 

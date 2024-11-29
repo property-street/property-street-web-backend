@@ -101,3 +101,11 @@ class AssetSchema(BaseModel):
         if values.features and values.cloud_images:
             raise ValueError("Only one of 'features' or 'cloud_images' can be included in the response at a time.")
         return values
+    
+class AssetFetchResponseSchema(BaseModel):
+    assets: List[AssetSchema]
+    first_name: Optional[str] = None
+    client_is_agent: Optional[bool] = None
+    is_authenticated: bool
+
+    model_config = ConfigDict(from_attributes=True)

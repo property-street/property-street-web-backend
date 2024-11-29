@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, Optional
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from property_street_backend.app.database import get_db
 from property_street_backend.app.controllers.auth import (
     decode_user_from_token,
+    decode_user_from_token_optional,
 )
 from property_street_backend.app.schemas.auth_schemas import (
     TokenData, 
@@ -14,7 +15,7 @@ from property_street_backend.app.models import (
     Asset, 
 )
 from property_street_backend.app.schemas.asset_schemas import (
-    AssetSchema, 
+    AssetFetchResponseSchema, 
 )
 from property_street_backend.app.controllers.activity.agent_crud_processing import (
     process_asset as controller_process_asset,
@@ -112,21 +113,50 @@ async def fetch_agent_assets(
         )
 
 
+
 @router.get(
-    "/assets/latest", 
-    response_model = List[AssetSchema],
+    "/assets/latest",
+    response_model=AssetFetchResponseSchema,
 )
 async def fetch_latest_assets(
     session: AsyncSession = Depends(get_db),
-    _: TokenData = Depends(decode_user_from_token)
+    current_user: Optional[TokenData] = Depends(decode_user_from_token_optional)
 ):
     """
     Fetches the 100 latest assets based on the created_at timestamp.
+    Includes user authentication status in the response.
     """
     try:
+        # Fetch latest 100 assets
         stmt = select(Asset).order_by(Asset.created_at.desc()).limit(100)
         result = await session.execute(stmt)
         assets = result.scalars().all()
-        return assets
+
+        # Determine user status
+        is_authenticated = current_user is not None
+        user_details = (
+            {
+                "first_name": current_user.first_name,
+                "client_is_agent": True if current_user.agent_profile else False
+            }
+            if is_authenticated else {}
+        )
+
+        log_message(
+            log_type="success",
+            message="Latest assets successfully retrieved"
+        )
+
+        # Return assets and user authentication status
+        return {
+            "assets": assets,
+            "is_authenticated": is_authenticated,
+            **user_details,
+        }
+
     except Exception as e:
+        log_message(
+            log_type="error",
+            message=f"An error occurred on retrieval of latest assets. Reason: {e}"
+        )
         raise HTTPException(status_code=500, detail=str(e))

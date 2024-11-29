@@ -6,7 +6,6 @@ from property_street_backend.app.models import (
     AssetFeature, 
     AssetCloudImage,
     CloudImageDetail,
-    AbstractCloudImage
 )
 from property_street_backend.app.controllers.auth import (
     fetched_access_token,
@@ -89,8 +88,11 @@ async def test_fetch_latest_assets(client__fixture_with_onlyDB_fixture: tuple):
 
     # Validate response structure
     data = response.json()
-    assert isinstance(data, list)
-    assert len(data) <= 100  # Ensure only 100 assets are returned
+    assert data.get('first_name') == test_user.first_name
+    assert data.get('client_is_agent')
+    assets = data.get('assets')
+    assert isinstance(assets, list)
+    assert len(assets) <= 100  # Ensure only 100 assets are returned
 
     # Validate the structure of each asset
     required_keys = {
@@ -106,5 +108,38 @@ async def test_fetch_latest_assets(client__fixture_with_onlyDB_fixture: tuple):
         "availability",
         "has_features",
     }
-    for asset in data:
+    for asset in assets:
+        assert all(key in asset for key in required_keys)
+
+    # fetch without authentication
+    headers = {"Authorization": f"Bearer "}
+    response = await client.get("/activity/assets/latest", headers=headers)
+    
+    # Validate response status
+    assert response.status_code == 200
+
+    # Validate response structure
+    data = response.json()
+    assert data.get('first_name') == None
+    assert data.get('client_is_agent') == None
+    assert data.get('is_authenticated') == False
+    assets = data.get('assets')
+    assert isinstance(assets, list)
+    assert len(assets) <= 100  # Ensure only 100 assets are returned
+
+    # Validate the structure of each asset
+    required_keys = {
+        "title",
+        "country",
+        "address",
+        "currency",
+        "amount",
+        "lease_duration",
+        "description",
+        "category",
+        "status",
+        "availability",
+        "has_features",
+    }
+    for asset in assets:
         assert all(key in asset for key in required_keys)

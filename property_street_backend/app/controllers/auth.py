@@ -1,14 +1,13 @@
-from fastapi import FastAPI, APIRouter, HTTPException, status, Depends
-from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
-from jose import jwt, JWTError
-from datetime import datetime, timedelta, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.future import select
-from sqlalchemy.exc import IntegrityError
 import random 
 import redis.asyncio as redis
+from jose import jwt, JWTError
+from sqlalchemy.future import select
+from passlib.context import CryptContext
+from sqlalchemy.exc import IntegrityError
+from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timedelta, timezone
+from fastapi import FastAPI, APIRouter, HTTPException, status, Depends
 
 from property_street_backend.app.models import (
     User,
@@ -124,10 +123,17 @@ async def create_user(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email or Username already exists")
 
     hashed_password = get_password_hash(user_data.password)
+    # clone the model so deleting the password entry wont affect the original schema
+    cloned_data = user_data.model_copy()
+    # convert the user_data to a dictionary
+    user_map = vars(cloned_data)
+    # remove the password field
+    user_map.pop('password')
+
+    # instantiate a user object
     user = User(
-        email=user_data.email,
-        username=username,
-        password_hash=hashed_password
+        password_hash=hashed_password,
+        **user_map,
     )
     
     try:
@@ -192,6 +198,27 @@ async def decode_user_from_token(
     user = result.scalars().first()
     if user is None:
         raise credentials_exception
+    return user
+
+async def decode_user_from_token_optional(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Decode user from token without raising exceptions.
+    Returns None if the token is invalid or the user is not found.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if not username:
+            return None
+    except JWTError:
+        return None
+
+    # Query the user in the database
+    result = await db.execute(select(User).filter(User.username == username))
+    user = result.scalars().first()
     return user
 
 
@@ -368,7 +395,7 @@ async def confirm_email_verification_code_and_sign_user_up(
         await db.commit()
         await db.refresh(created_client)
 
-        # Optionally, delete the verification code from Redis after successful registration
+        # delete the verification code from Redis after successful registration
         await redis_client.delete(user_key)
 
         return {
