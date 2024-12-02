@@ -76,6 +76,7 @@ class TagSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class AssetSchema(BaseModel):
+    id: int = Field(..., description="The id of the asset")
     title: str = Field(..., description="The title of the asset")
     country: str = Field(..., description="The country where the asset is located")
     address: str = Field(..., description="The physical address of the asset")
@@ -103,9 +104,14 @@ class AssetSchema(BaseModel):
         return values
     
 class AssetFetchResponseSchema(BaseModel):
-    assets: List[AssetSchema]
     first_name: Optional[str] = None
     client_is_agent: Optional[bool] = None
     is_authenticated: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+class LatestAssetsFetchResponseSchema(AssetFetchResponseSchema):
+    assets: List[AssetSchema]
+
+class AssetFetchByIdResponseSchema(AssetFetchResponseSchema):
+    asset: AssetSchema

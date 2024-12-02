@@ -15,7 +15,8 @@ from property_street_backend.app.models import (
     Asset, 
 )
 from property_street_backend.app.schemas.asset_schemas import (
-    AssetFetchResponseSchema, 
+    LatestAssetsFetchResponseSchema,
+    AssetFetchByIdResponseSchema 
 )
 from property_street_backend.app.controllers.activity.agent_crud_processing import (
     process_asset as controller_process_asset,
@@ -116,7 +117,7 @@ async def fetch_agent_assets(
 
 @router.get(
     "/assets/latest",
-    response_model=AssetFetchResponseSchema,
+    response_model=LatestAssetsFetchResponseSchema,
 )
 async def fetch_latest_assets(
     session: AsyncSession = Depends(get_db),
@@ -160,3 +161,65 @@ async def fetch_latest_assets(
             message=f"An error occurred on retrieval of latest assets. Reason: {e}"
         )
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get(
+    "/assets/{asset_id}",
+    response_model=AssetFetchByIdResponseSchema,
+)
+async def fetch_asset_by_id(
+    asset_id: int,  # Accept asset ID as a path parameter
+    session: AsyncSession = Depends(get_db),
+    current_user: Optional[TokenData] = Depends(decode_user_from_token_optional)
+):
+    """
+    Fetches a single asset by its ID.
+    Includes user authentication status in the response.
+    """
+    # Explicitly handle the 404 logic outside the try block
+    stmt = select(Asset).filter(Asset.id == asset_id)
+    result = await session.execute(stmt)
+    asset = result.scalars().first()
+
+    if not asset:
+        log_message(
+            log_type="error",
+            message=f"Asset with ID {asset_id} not found"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Asset with ID {asset_id} not found"
+        )
+
+    try:
+        # Determine user status
+        is_authenticated = current_user is not None
+        user_details = (
+            {
+                "first_name": current_user.first_name,
+                "client_is_agent": True if current_user.agent_profile else False
+            }
+            if is_authenticated else {}
+        )
+
+        log_message(
+            log_type="success",
+            message=f"Asset with ID {asset_id} successfully retrieved"
+        )
+
+        # Return asset and user authentication status
+        return {
+            "asset": asset,
+            "is_authenticated": is_authenticated,
+            **user_details,
+        }
+
+    except Exception as e:
+        log_message(
+            log_type="error",
+            message=f"An unexpected error occurred while retrieving asset ID {asset_id}. Reason: {e}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred. Please try again later."
+        )
