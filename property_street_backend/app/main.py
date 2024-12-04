@@ -1,7 +1,6 @@
 # main.py
-import asyncio
-from fastapi import APIRouter
-from fastapi.staticfiles import StaticFiles
+import redis
+from fastapi import APIRouter, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -38,10 +37,21 @@ home_router = APIRouter()
 def read_root():
     return {"message": "Hello, World!"}
 
+@home_router.get("/test-redis")
+async def test_redis(
+    redis_client: redis.Redis = Depends(redis_client),
+):
+    await redis_client.set("test_key", "value")
+    value = await redis_client.get("test_key")
+    return {"test_key": value.decode()}
+
+
 # Include routers
 app.include_router(auth.router)
 app.include_router(activity.router)
 app.include_router(home_router)
+
+
 
 # Initiate rountine startup
 # run routine

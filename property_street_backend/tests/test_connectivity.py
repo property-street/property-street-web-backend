@@ -32,6 +32,14 @@ async def test_client_connectivity(client__fixture):
     assert response.status_code == 200
     assert response.json() == {"message": "Hello, World!"}
 
+    # Making a request to a URL
+    url = "/test-redis"
+    response = await client.get(url)
+
+    assert response.status_code == 200
+    assert response.json() == {"test_key": "value"}
+
+
 
 @pytest.mark.asyncio
 async def test_redis_connectivity(redis_client__fixture):
