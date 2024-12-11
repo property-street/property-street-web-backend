@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 # Load environment variables from a .env file if present
 load_dotenv()
 
+environment = os.getenv("ENVIRONMENT", "development")
+
 # Base directory of the project
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -18,7 +20,7 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
 
 # SQLAlchemy database configuration for PostgreSQL
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql+asyncpg://user:password@localhost/dbname')
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql+asyncpg://user:password:5432@localhost/dbname')
 
 TEST_DATABASE_URL = os.getenv('TEST_DATABASE_URL', 'postgresql+asyncpg://user:password@localhost/dbname')
 

@@ -228,16 +228,35 @@ agent_assets = {
         },
         'country': str,
         'address': str,
+        'currency': str,
+        'amount': float,
+        'status': str,
+        'tags':[
+            {
+                'db_table_id': int,
+                'name': str
+            },
+            # ...
+        ],
         'feature':{
             0:{
                 'title':str,
                 'db_table_id': int,
                 'cloud_images':{
-                    0:dict,
+                    'public_id':dict, # dictionary of the cloud image details with the entries including database table id
                     # ...
                 }
             }
             # ...
+        },
+        # or
+        'no_feature':{
+            0:{
+                'cloud_detais':{
+                    'public_id':dict, # dictionary of the cloud image details with the entries including the database table id
+                    # ...
+                }
+            }
         }
     }
 }

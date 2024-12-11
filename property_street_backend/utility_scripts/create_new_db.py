@@ -41,13 +41,14 @@ if __name__ == "__main__":
     # Call the function with command-line arguments
     create_database(args.db_name, args.host, args.user, args.password)
 
-# python create_new_db.py my_database --host localhost --user postgres --password postgres
+# python create_new_db.py my_database --host localhost --username postgres --password postgres
 # Here, my_database is the name of the database you want to create.    
 
 # i.e
-# Extracted connection details from the URL: postgresql+asyncpg://postgres:postgres@localhost/property_street_store
-# db_name = 'property_street_store'
-# user = 'postgres'
-# password = 'postgres'
-# host = 'localhost'
-# port = '5432'  # Default PostgreSQL port
+# postgresql+asyncpg://<username>:<password>@<hostname>:<port>/<database_name>
+# postgresql+asyncpg: Specifies the database type and the driver (e.g., asyncpg is the asynchronous PostgreSQL driver, commonly used with asyncpg and FastAPI).
+# <username>: The database username.
+# <password>: The password associated with the database username.
+# <hostname>: The host where the PostgreSQL database is running (e.g., db if running inside Docker, or localhost if running locally).
+# <port>: The port the database is running on (the default PostgreSQL port is 5432).
+# <database_name>: The name of the specific database you want to connect to.

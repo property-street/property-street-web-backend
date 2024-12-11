@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 import logging
 import redis.asyncio as redis
+from property_street_backend.config.settings import environment
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -11,10 +12,12 @@ logger = logging.getLogger(__name__)\
 app = FastAPI()
 
 async def redis_client():
+    host = 'localhost' if environment == 'development' else 'redis'
+    cache_db = 2 if environment == 'development' else 1
     client = await redis.Redis(
-        host='localhost', 
+        host=host, 
         port=6379, 
-        db=2, #db2 for property street main cache; 3 should be for production
+        db=cache_db, #db2 for property street dev cache; 1 should be for production
     )
     try:
         await client.config_set('notify-keyspace-events', 'Ex')

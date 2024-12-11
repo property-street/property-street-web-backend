@@ -4,15 +4,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from property_street_backend.app.main import app
 
 @pytest.mark.asyncio
-async def test_db_connectivity(get_test_db__fixture: AsyncSession):
-    try:
+async def test_db_connectivity(
+    client__fixture_with_onlyDB_fixture
+):
+    client__fixture_with_onlyDB_fixture_gen = client__fixture_with_onlyDB_fixture
 
-        test_db = await get_test_db__fixture
+    client, test_db = await client__fixture_with_onlyDB_fixture_gen.__anext__()
 
-        assert isinstance(test_db, AsyncSession)
-    finally:
-        print("***closing connection")
-        await test_db.close()
+    assert isinstance(test_db, AsyncSession)
+
+    # Making a request to a URL
+    url = "/test-database"
+    response = await client.get(url)
+
+    # Checking the response
+    assert response.status_code == 200
+    assert response.json() == {
+        "database_connected": True,
+        "test_value": 1,
+        "environment": "development"
+    }
 
 
 @pytest.mark.asyncio
@@ -38,7 +49,6 @@ async def test_client_connectivity(client__fixture):
 
     assert response.status_code == 200
     assert response.json() == {"test_key": "value"}
-
 
 
 @pytest.mark.asyncio
