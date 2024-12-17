@@ -48,7 +48,6 @@ async def get_test_db__fixture(request, event_loop):
         return session
 
 
-
 @pytest.fixture(scope="function")
 async def redis_client__fixture(request,event_loop):
     # Initialize Redis client

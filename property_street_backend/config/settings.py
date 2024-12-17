@@ -24,6 +24,11 @@ DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql+asyncpg://user:password:543
 
 TEST_DATABASE_URL = os.getenv('TEST_DATABASE_URL', 'postgresql+asyncpg://user:password@localhost/dbname')
 
+# REDIS DB
+REDIS_CACHE_DB = os.getenv('REDIS_CACHE_DB', 0)
+TEST_REDIS_CACHE_DB = os.getenv('TEST_REDIS_CACHE_DB', 0)
+
+
 # CORS settings
 CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*').split(',')
 

@@ -56,7 +56,7 @@ async def test_redis_connectivity(redis_client__fixture):
     # fetch the client fixture
     redis_client =  await redis_client__fixture
 
-    # Making a request to a URL
+    assert redis_client.connection_pool.connection_kwargs['db'] == 3
     assert isinstance(redis_client, redis.Redis)
 
 

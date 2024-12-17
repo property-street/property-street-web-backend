@@ -1,12 +1,15 @@
 # main.py
 import redis
+from fastapi import (
+    APIRouter, 
+    Depends, 
+    FastAPI
+)
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
-    create_async_engine, 
     AsyncSession
 )
-from sqlalchemy.orm import sessionmaker
-from fastapi import APIRouter, Depends
+from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -22,9 +25,26 @@ from property_street_backend.app.initiator import (
     app, 
     redis_client
 )
-from property_street_backend.config.settings import environment
-from property_street_backend.config.settings import CORS_ORIGINS
+from property_street_backend.config.settings import (
+    environment,
+    CORS_ORIGINS
+)
+from property_street_backend.app.controllers.activity.asset_routine_methods import (
+    asset_auto_category_expiry
+)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    redis = await redis_client().__anext__()
+    await asset_auto_category_expiry(
+        redis_client=redis
+    )
+    yield  # Application runs here
+    # Shutdown logic (if needed)
+    # e.g., await redis_client.close()
+
+app = FastAPI(lifespan=lifespan)
 
 
 # CORS middleware
@@ -102,7 +122,3 @@ app.include_router(home_router)
 #     finally:
 #         pass
 # 
-
-# @app.on_event("startup")
-# async def do_sth():
-#     pass

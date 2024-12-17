@@ -8,7 +8,7 @@ from property_street_backend.app.models import (
     Asset,
     AssetFeature,
 )
-from property_street_backend.clogs.logger_config import (
+from property_street_backend.log_config.logger_config import (
     log_message
 )
 
