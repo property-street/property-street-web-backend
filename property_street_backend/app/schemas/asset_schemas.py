@@ -86,7 +86,7 @@ class AssetSchema(BaseModel):
     description: str = Field(..., description="A detailed description of the asset, possibly in HTML")
     category: str = Field(..., description="The category of the asset (e.g., House, Hotel)")
     status: str = Field(..., description="The status of the asset (e.g., Available, Sold)")
-    availability: bool = Field(..., description="Whether the asset is currently available")
+    availability: str = Field(..., description="availability status")
     has_features: bool = Field(..., description="Boolean indicating if the asset has features or not")
 
     # Updated fields to allow for multiple entries

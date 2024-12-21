@@ -42,12 +42,8 @@ async def get_agent_assets(db: AsyncSession, agent_id: int):
             )
 
         assets_data = {}
-        grouped_cloud_details = {}
 
         for asset_index, asset in enumerate(agent.assets):
-            # Initialize sub-entry in grouped_cloud_details with index starting from 0
-            grouped_cloud_details[asset_index] = {}
-            sub_index = 0  # Reset sub-entry index for each asset
 
             # Prepare cover image structure
             cover_image_data = None
@@ -72,13 +68,6 @@ async def get_agent_assets(db: AsyncSession, agent_id: int):
                         }
                     }
                 }
-
-                # Add to grouped_cloud_details
-                grouped_cloud_details[asset_index][sub_index] = {
-                    'db_table_name': 'CloudImageDetail',
-                    'cloud_details': cover_image_cloud_details
-                }
-                sub_index += 1  # Increment sub-entry index
 
             # Prepare tags structure
             tags_data = [{"db_table_id": tag.id, "name": tag.name} for tag in asset.tags]
@@ -105,13 +94,6 @@ async def get_agent_assets(db: AsyncSession, agent_id: int):
                         }
                         feature_cloud_details[asset_cloud_image.public_id] = cloud_image
 
-                        # Add to grouped_cloud_details
-                        grouped_cloud_details[asset_index][sub_index] = {
-                            'db_table_name': 'AssetCloudImage',
-                            'db_table_id': asset_cloud_image.id,
-                            'cloud_details': cloud_image
-                        }
-                        sub_index += 1  # Increment sub-entry index
 
                     features_data[i] = {
                         "db_table_id": feature.id,
@@ -135,14 +117,6 @@ async def get_agent_assets(db: AsyncSession, agent_id: int):
                     }
                     no_feature_data[0]['files'][asset_cloud_image.public_id] = cloud_image_obj
 
-                    # Add to grouped_cloud_details
-                    grouped_cloud_details[asset_index][sub_index] = {
-                        'db_table_name': 'AssetCloudImage',
-                        'db_table_id': asset_cloud_image.id,
-                        'cloud_details': cloud_image_obj
-                    }
-                    sub_index += 1  # Increment sub-entry index
-
             # Prepare asset structure
             asset_data = {
                 "asset_id": asset.id,
@@ -159,8 +133,6 @@ async def get_agent_assets(db: AsyncSession, agent_id: int):
                 "tags": tags_data,
                 "lease_duration": asset.lease_duration,
                 "description": asset.description,
-
-                
             }
 
             # Add asset data to the collection
@@ -174,7 +146,6 @@ async def get_agent_assets(db: AsyncSession, agent_id: int):
 
         return {
             "assets_data": assets_data,
-            "grouped_cloud_details": grouped_cloud_details,
         }
 
     except Exception as e:

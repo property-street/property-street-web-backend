@@ -298,7 +298,7 @@ class Asset(Base):
     lease_duration = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     has_features = Column(Boolean, default=False)
-    availability = Column(Boolean, default=True)
+    availability = Column(Text, nullable=False, default="available")
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

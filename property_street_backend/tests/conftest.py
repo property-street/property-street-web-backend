@@ -8,7 +8,10 @@ import redis.asyncio as redis
 from property_street_backend.app.database import Base, get_db
 from property_street_backend.app.initiator import redis_client
 from property_street_backend.app.main import app
-from property_street_backend.config.settings import TEST_DATABASE_URL
+from property_street_backend.config.settings import (
+    TEST_DATABASE_URL, 
+    REDIS_CACHE_DB,
+)
 from property_street_backend.app.utils.store import email_verification_code_ttl
 
 # Async SQLAlchemy engine and session for testing
@@ -49,12 +52,38 @@ async def get_test_db__fixture(request, event_loop):
 
 
 @pytest.fixture(scope="function")
-async def redis_client__fixture(request,event_loop):
+async def redis_client__fixture(
+    request,
+    event_loop,
+):
     # Initialize Redis client
     redis_client = redis.Redis(
         host='localhost',
         port=6379,
-        db=3  # Using db3 for property street test
+        db=3,  # Using db3 for property street test
+    )
+
+    async def cleanup():
+        print("**closing redis")
+        await redis_client.aclose()
+        await redis_client.flushdb()
+
+    # Use an event loop to ensure cleanup happens after tests complete
+    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup()))
+    
+    return redis_client
+
+@pytest.fixture(scope="function")
+async def prod_redis_client__fixture(
+    request,
+    event_loop,
+):
+    # Initialize Redis client
+    redis_client = redis.Redis(
+        host='localhost',
+        port=6379,
+        db=REDIS_CACHE_DB,  # Using db3 for property street test
+        decode_responses=True,
     )
 
     async def cleanup():
@@ -96,6 +125,37 @@ async def client__fixture(
     app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
     app.dependency_overrides[redis_client] = lambda: redis_client_fixture  # Override redis_client dependency
     app.dependency_overrides[email_verification_code_ttl] = lambda: email_code_ttl_fixture  # Override email_code ttl dependency
+
+    # cleanup to close the test database
+    async def cleanup():
+        print("**closing client")
+        await test_db.close()
+
+    # Use an event loop to ensure cleanup happens after tests complete
+    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup()))
+    
+    # Use ASGITransport with the app
+    transport = ASGITransport(app=app)
+    # return the client instance
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        yield ac, redis_client_fixture#, test_db
+
+@pytest.fixture(scope="function")
+async def client__fixture_with_prod_redis(
+    request, 
+    event_loop,
+    get_test_db__fixture, 
+    prod_redis_client__fixture,
+):
+    # getting the test_db fixture
+    test_db = await get_test_db__fixture
+
+    # fetch the client fixture
+    redis_client_fixture =  await prod_redis_client__fixture
+
+    # overriding the client's get_db dependency
+    app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
+    app.dependency_overrides[redis_client] = lambda: redis_client_fixture  # Override redis_client dependency
 
     # cleanup to close the test database
     async def cleanup():

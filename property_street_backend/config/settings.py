@@ -27,7 +27,7 @@ TEST_DATABASE_URL = os.getenv('TEST_DATABASE_URL', 'postgresql+asyncpg://user:pa
 # REDIS DB
 REDIS_CACHE_DB = os.getenv('REDIS_CACHE_DB', 0)
 TEST_REDIS_CACHE_DB = os.getenv('TEST_REDIS_CACHE_DB', 0)
-
+NEWLY_CREATED_ASSET_TTL = os.getenv('NEWLY_CREATED_ASSET_TTL', 2592000)
 
 # CORS settings
 CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*').split(',')
@@ -36,4 +36,3 @@ CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*').split(',')
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret_key')
 JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_DELTA = int(os.getenv('JWT_EXPIRATION_DELTA', 30))
-

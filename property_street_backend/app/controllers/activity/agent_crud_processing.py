@@ -1,12 +1,17 @@
+import json
 from sqlalchemy import delete
+import redis.asyncio as redis
+from sqlalchemy import inspect
+from sqlalchemy.future import select
+from typing import Type, Dict, Any
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import inspect
-from typing import Type, Dict, Any
-from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
+from property_street_backend.app.schemas.asset_schemas import (
+    AssetSchema
+)
 from property_street_backend.app.models import (
     Tag, 
     Asset, 
@@ -16,8 +21,14 @@ from property_street_backend.app.models import (
     AssetCloudImage,
     asset_tag_association,
 )
+from property_street_backend.config.settings import (
+    DEBUG
+)
 from property_street_backend.log_config.logger_config import (
     log_message
+)
+from property_street_backend.app.controllers.activity.asset_routine_methods import (
+    create_or_update_newly_created_asset_cache
 )
 
 
@@ -188,7 +199,13 @@ async def remove_tags_from_asset(session: AsyncSession, asset_id: int, tag_ids: 
     return result.rowcount > 0
 
 
-async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
+async def process_asset(
+    data_to_be_processed: Dict, 
+    db: AsyncSession,
+    redis_client: redis.Redis,
+    newly_created: bool,
+    ttl_in_seconds: int,
+):
     """
     Processes a batch of assets. Deletes or creates/updates instances as necessary.
     
@@ -199,6 +216,8 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
     Returns:
         Dict: The result of the processing.
     """
+    # variable to hold asset instance
+    asset_instance = None
     # Initialize proxy object
     proxy = {}
     # Convert keys to integers for predictable ordering
@@ -209,8 +228,9 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
         agent_obj = data.get(0)
         if agent_obj:
             try:
-                # Log received agent object
-                print(f"Processing agent with ID: {agent_obj['db_table_id']}, and id type {type(agent_obj['db_table_id'])}")
+                if DEBUG:
+                    # Log received agent object
+                    print(f"Processing agent with ID: {agent_obj['db_table_id']}, and id type {type(agent_obj['db_table_id'])}")
                 
                 # Ensure db_table_id is integer
                 agent_id = int(agent_obj.get("db_table_id", -1))
@@ -264,9 +284,26 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
                     table_id=None if value['db_table_id'] == -1 else value['db_table_id']
                 )
                 proxy[key] = instance
+                # check if the instance is an Asset model instance
+                if isinstance(instance, Asset):
+                    asset_instance =  instance
 
         # Commit all changes after all operations are completed
         await db.commit()
+
+        # handle caching
+        asset_id = asset_instance.id
+        asset_schema = AssetSchema.model_validate(asset_instance)
+        asset_cache_object = json.dumps(
+            asset_schema.model_dump()
+        )
+        await create_or_update_newly_created_asset_cache(
+            asset_id = asset_id,
+            asset_data = asset_cache_object,
+            redis_client = redis_client,
+            newly_created = newly_created,
+            expiry_seconds = ttl_in_seconds,
+        )
         
         return {
             "detail": "Asset processed successfully",
@@ -278,6 +315,10 @@ async def process_asset(data_to_be_processed: Dict, db: AsyncSession):
 
     except Exception as e:
         await db.rollback()  # Rollback if there's an error to ensure atomicity
+        log_message(
+            log_type='error',
+            message=f'An error occured on processing of asset. Reason: {e}'
+        )
         raise HTTPException(    
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while creating the asset."

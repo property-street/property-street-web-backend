@@ -61,6 +61,8 @@ feature_obj = {
             "status": "auction",
             "description": "<span>bla bla bla</span>",
             "has_features": True,
+            "lease_duration": "Three months",
+            "availability": "balablu",
 
             "relationship": {
                 "tags": [1, 2],
@@ -207,6 +209,8 @@ no_feature_obj = {
             "status": "auction",
             "description": "<span>bla bla bla</span>",
             "has_features": False,
+            "lease_duration": None,
+            "availability": "bulaba",
 
             "relationship": {
                 "tags": [

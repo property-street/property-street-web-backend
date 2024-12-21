@@ -107,18 +107,3 @@ async def test_database(
 app.include_router(auth.router)
 app.include_router(activity.router)
 app.include_router(home_router)
-
-
-
-# Initiate rountine startup
-# run routine
-# async def on_startup():
-#     # Get the Redis client asynchronously
-#     try:
-#         redis = await redis_client().__anext__()
-#         await asset_auto_category_expiry(
-#             redis_client = redis
-#         )
-#     finally:
-#         pass
-# 

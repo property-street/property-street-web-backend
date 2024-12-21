@@ -1,13 +1,18 @@
+import redis.asyncio as redis
 from typing import Dict, Optional
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
 from property_street_backend.app.database import get_db
+from property_street_backend.config.settings import (
+    NEWLY_CREATED_ASSET_TTL
+)
 from property_street_backend.app.controllers.auth import (
     decode_user_from_token,
     decode_user_from_token_optional,
 )
+from property_street_backend.app.initiator import redis_client
 from property_street_backend.app.schemas.auth_schemas import (
     TokenData, 
 )
@@ -35,6 +40,7 @@ router = APIRouter(prefix="/activity", tags=["activity"])
 async def process_asset(
     data: Dict, 
     db: AsyncSession = Depends(get_db),
+    redis_client: redis.Redis = Depends(redis_client),
     _: TokenData = Depends(decode_user_from_token)
 ):
     try:
@@ -52,7 +58,10 @@ async def process_asset(
         if (len(asset_data_to_process)):
             return await controller_process_asset(
                 data_to_be_processed = asset_data_to_process,
-                db = db
+                db = db,
+                redis_client = redis_client,
+                newly_created = data.get('newly_created'),
+                ttl_in_seconds=data.get('ttl',NEWLY_CREATED_ASSET_TTL)
             )
 
         # log the error
@@ -64,11 +73,11 @@ async def process_asset(
         # log the error
         log_message(
             log_type='error',
-            message=f'An error occured on retrieval of agent data. Reason: {e}'
+            message=f'An error occured on processing of asset. Reason: {e}'
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occured on retrieval of agent data."
+            detail="An error occured on processing of asset"
         )
     
     
