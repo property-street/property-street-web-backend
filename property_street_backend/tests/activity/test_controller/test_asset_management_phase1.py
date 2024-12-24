@@ -1,4 +1,4 @@
-import pytest
+import pytest, json
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,19 +11,28 @@ from property_street_backend.app.models import (
 from property_street_backend.app.controllers.auth import (
     create_agent
 )
-from property_street_backend.tests.activity.test_controller.test_asset_creation import (
-    create_test_asset,
-    create_test_asset_feature,
+from property_street_backend.app.schemas.asset_schemas import (
+    AssetSchema
+)
+from property_street_backend.tests.activity.test_controller.test_objects import (
+    feature_obj,
+    no_feature_obj
 )
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
 from property_street_backend.app.controllers.activity.agent_crud_processing import (
     process_asset,
     remove_tags_from_asset,
 )
-from property_street_backend.tests.activity.test_controller.test_objects import (
-    feature_obj,
-    no_feature_obj
+from property_street_backend.tests.activity.test_controller.test_asset_creation import (
+    create_test_asset,
+    create_test_asset_feature,
 )
+from property_street_backend.tests.activity.test_controller.test_newly_created_asset_cache_management import (
+    expiry_seconds,
+    finality_after_caching, 
+    assertions_after_caching,
+)
+
 
 async def add_created_clientId_to_payload(db,payload):
     # Define a test agent
@@ -39,12 +48,16 @@ async def add_created_clientId_to_payload(db,payload):
     # modify feature object to include an agent's id
     payload[0]['db_table_id'] = created_agent.id
 
-
-
 @pytest.mark.asyncio
-async def test_create_asset_with_feature(get_test_db__fixture: AsyncSession):
+async def test_create_asset_with_feature(
+    get_test_db__fixture: AsyncSession,
+    prod_redis_client__fixture,
+):
     try:
         test_db = await get_test_db__fixture
+
+        # fetch the client fixture
+        redis_client =  await prod_redis_client__fixture
 
         # call the function that would add a real client id to the payload
         await add_created_clientId_to_payload(
@@ -53,11 +66,30 @@ async def test_create_asset_with_feature(get_test_db__fixture: AsyncSession):
         )
         
         # Process asset with features
-        await process_asset(feature_obj, test_db)
+        await process_asset(
+            data_to_be_processed=feature_obj, 
+            db = test_db,
+            redis_client = redis_client,
+            newly_created = True,
+            ttl_in_seconds = expiry_seconds,
+        )
 
         # Fetch the created asset from the database
         result = await test_db.execute(select(Asset).filter(Asset.title == feature_obj[4]['fields']['title']))
         created_asset = result.scalars().first()
+        asset_schema = AssetSchema.model_validate(created_asset)
+        asset_cache_object = json.dumps(
+            asset_schema.model_dump()
+        )
+        asset_json = json.dumps(asset_cache_object)
+
+        # cache assertions
+        await assertions_after_caching(
+            redis_client=redis_client,
+            asset_id=created_asset.id,
+            asset_data=asset_cache_object,
+            asset_json = asset_json,
+        )
 
         # Assertions
         assert created_asset is not None
@@ -70,11 +102,23 @@ async def test_create_asset_with_feature(get_test_db__fixture: AsyncSession):
         assert asset_feature is not None
     finally:
         await test_db.close()
+        # cache finality
+        await finality_after_caching(
+            redis_client = redis_client,
+            asset_id = created_asset.id
+        )
 
 @pytest.mark.asyncio
-async def test_create_asset_with_no_feature(get_test_db__fixture: AsyncSession):
+async def test_create_asset_with_no_feature(
+    get_test_db__fixture: AsyncSession,
+    prod_redis_client__fixture,
+):
     try:
+        # fetch the database fixture
         test_db = await get_test_db__fixture
+
+        # fetch the client fixture
+        redis_client =  await prod_redis_client__fixture
 
         # call the function that would add a real client id to the payload
         await add_created_clientId_to_payload(
@@ -83,11 +127,29 @@ async def test_create_asset_with_no_feature(get_test_db__fixture: AsyncSession):
         )
         
         # Process asset with features
-        await process_asset(no_feature_obj, test_db)
-
+        await process_asset(
+            data_to_be_processed=no_feature_obj, 
+            db = test_db,
+            redis_client = redis_client,
+            newly_created = True,
+            ttl_in_seconds = expiry_seconds,
+        )
         # Fetch the created asset from the database
         result = await test_db.execute(select(Asset).filter(Asset.title == no_feature_obj[6]['fields']['title']))
         created_asset = result.scalars().first()
+        asset_schema = AssetSchema.model_validate(created_asset)
+        asset_cache_object = json.dumps(
+            asset_schema.model_dump()
+        )
+        asset_json = json.dumps(asset_cache_object)
+
+        # cache assertions
+        await assertions_after_caching(
+            redis_client=redis_client,
+            asset_id=created_asset.id,
+            asset_data=asset_cache_object,
+            asset_json = asset_json,
+        )
 
         # Assertions
         assert created_asset is not None
@@ -95,6 +157,11 @@ async def test_create_asset_with_no_feature(get_test_db__fixture: AsyncSession):
         assert created_asset.has_features is False
     finally:
         await test_db.close()
+        # cache finality
+        await finality_after_caching(
+            redis_client = redis_client,
+            asset_id = created_asset.id
+        )
 
 @pytest.mark.asyncio
 async def test_asset_update(get_test_db__fixture: AsyncSession):

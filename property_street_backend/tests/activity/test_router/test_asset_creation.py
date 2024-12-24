@@ -1,11 +1,15 @@
-import pytest
+import pytest, json
 from sqlalchemy.future import select
 
+from property_street_backend.app.models import (
+    User,
+    Asset,
+)
 from property_street_backend.app.controllers.auth import (
     fetched_access_token,
 )
-from property_street_backend.app.models import (
-    User,
+from property_street_backend.app.schemas.asset_schemas import (
+    AssetSchema
 )
 from property_street_backend.tests.activity.test_controller.test_objects import (
     feature_obj,
@@ -69,14 +73,33 @@ async def test_asset_upload_with_auth(
             json=payload,  # Use json instead of data for a JSON body
             headers=headers
         )
+                # Fetch the created asset from the database
         
         # Assertions
+        result = await test_db.execute(select(Asset).filter(Asset.title == feature_obj[4]['fields']['title']))
+        created_asset = result.scalars().first()
+        asset_schema = AssetSchema.model_validate(created_asset)
+        asset_cache_object = json.dumps(
+            asset_schema.model_dump()
+        )
+        asset_json = json.dumps(asset_cache_object)
+
+        # cache assertions
+        await assertions_after_caching(
+            redis_client=redis_client,
+            asset_id=created_asset.id,
+            asset_data=asset_cache_object,
+            asset_json = asset_json,
+        )
+
         assert response.status_code == 200
         json_response = response.json()
         len_processed = json_response.get("processed")
         assert isinstance(len_processed, int)
 
-        # cache assertions
-        await assertions_after_caching(redis_client)
     finally:
-        await finality_after_caching(redis_client)
+        # cache finality
+        await finality_after_caching(
+            redis_client = redis_client,
+            asset_id = created_asset.id
+        )

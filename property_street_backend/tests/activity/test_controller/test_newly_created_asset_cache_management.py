@@ -8,15 +8,17 @@ from property_street_backend.app.controllers.activity.asset_routine_methods impo
 )
 
 # Mock inputs
-asset_id = 12345
-asset_data = {"name": "Test Asset", "category": "Test Category"}
-asset_json = json.dumps(asset_data)
 expiry_seconds = 5
-
 hash_key = "newly_created_asset"
 hset_key = "auto_category"
 
-async def assertions_after_caching(redis_client):
+
+async def assertions_after_caching(
+    redis_client,
+    asset_id,
+    asset_data,
+    asset_json
+):
     # Assert that the asset ID was added to the tracking set
     assert await redis_client.sismember(f"{hash_key}", asset_id)
 
@@ -46,11 +48,14 @@ async def assertions_after_caching(redis_client):
         collection = json.loads(auto_category)
         assert str(asset_id) not in collection
 
-async def finality_after_caching(redis_client):
+async def finality_after_caching(
+    redis_client,
+    asset_id,
+):
     # Cleanup to ensure no residual data in Redis
     await redis_client.delete(f"{hash_key}:{asset_id}")
     await redis_client.srem(hash_key, asset_id)
-    auto_category = await redis_client.hget(hash_key, hash_key)
+    auto_category = await redis_client.hget(hset_key, hash_key)
     if auto_category:
         collection = json.loads(auto_category)
         collection.pop(str(asset_id), None)
@@ -68,6 +73,10 @@ async def test_cache_newly_created_asset(client__fixture_with_prod_redis):
     client_gen = client__fixture_with_prod_redis
     client, redis_client = await client_gen.__anext__()
 
+    asset_id = 12345
+    asset_data = {"name": "Test Asset", "category": "Test Category"}
+    asset_json = json.dumps(asset_data)
+
     try:
         # -*-*-*First call-*-*-*
         # Call the function
@@ -80,7 +89,12 @@ async def test_cache_newly_created_asset(client__fixture_with_prod_redis):
         )
 
         # Assertions before expiry
-        await assertions_after_caching(redis_client)
+        await assertions_after_caching(
+            redis_client = redis_client,
+            asset_data= asset_data,
+            asset_json=asset_json,
+            asset_id=asset_id,
+        )
 
 
         # -*-*-*Second call-*-*-*
@@ -109,4 +123,7 @@ async def test_cache_newly_created_asset(client__fixture_with_prod_redis):
 
 
     finally:
-        await finality_after_caching(redis_client)
+        await finality_after_caching(
+            redis_client,
+            asset_id=asset_id,
+        )

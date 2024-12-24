@@ -144,6 +144,9 @@ async def create_or_update_object(
 
     # Add the instance back to the session
     db.add(instance)
+
+    # synchronize the current in-memory state without committing
+    await db.flush()
     
     # Return the instance
     return instance
@@ -217,7 +220,7 @@ async def process_asset(
         Dict: The result of the processing.
     """
     # variable to hold asset instance
-    asset_instance = None
+    asset_instance_id_after_flush_before_commit = None
     # Initialize proxy object
     proxy = {}
     # Convert keys to integers for predictable ordering
@@ -286,19 +289,26 @@ async def process_asset(
                 proxy[key] = instance
                 # check if the instance is an Asset model instance
                 if isinstance(instance, Asset):
-                    asset_instance =  instance
+                    asset_instance_id_after_flush_before_commit =  instance.id
 
         # Commit all changes after all operations are completed
         await db.commit()
 
+
         # handle caching
-        asset_id = asset_instance.id
+        # fetch the asset after all transactions have been done
+        result = await db.execute(
+            select(Asset).filter(
+                Asset.id == asset_instance_id_after_flush_before_commit
+            )
+        )
+        asset_instance = result.scalars().first()
         asset_schema = AssetSchema.model_validate(asset_instance)
         asset_cache_object = json.dumps(
             asset_schema.model_dump()
         )
         await create_or_update_newly_created_asset_cache(
-            asset_id = asset_id,
+            asset_id = asset_instance.id,
             asset_data = asset_cache_object,
             redis_client = redis_client,
             newly_created = newly_created,

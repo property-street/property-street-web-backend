@@ -39,7 +39,7 @@ class AssetCreateSchema(BaseModel):
     description: str = Field(..., description="A detailed description of the asset, possibly in HTML")
     category: str = Field(..., description="The category of the asset (e.g. House, Hotel)")
     status: str = Field(..., description="The category of the asset (e.g. House, Hotel)")
-    availability: bool = Field(..., description="Whether the asset is currently available")
+    availability: str = Field(..., description="availability status of the asset; i.e available")
     # Tags can be a string or a list of strings
     tags: Optional[str | List[str]] = Field(None, description="Tags associated with the asset")
     agent_id: Optional[int] = Field(None, description="The ID of the agent managing the asset")
@@ -82,7 +82,7 @@ class AssetSchema(BaseModel):
     address: str = Field(..., description="The physical address of the asset")
     currency: str = Field(..., description="The currency used for the asset's price (e.g., USD, EUR)")
     amount: float = Field(..., description="The monetary value of the asset")
-    lease_duration: str = Field(..., description="The lease duration of the asset, if it's a lease.")
+    lease_duration: Optional[str] = Field(None, description="The lease duration of the asset, if it's a lease.")
     description: str = Field(..., description="A detailed description of the asset, possibly in HTML")
     category: str = Field(..., description="The category of the asset (e.g., House, Hotel)")
     status: str = Field(..., description="The status of the asset (e.g., Available, Sold)")

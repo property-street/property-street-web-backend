@@ -1,5 +1,4 @@
 import pytest
-from datetime import datetime
 
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +8,9 @@ from property_street_backend.app.models import (
     AssetFeature, 
     AssetCloudImage,
     CloudImageDetail,
+)
+from property_street_backend.app.schemas.asset_schemas import (
+    AssetSchema
 )
 from property_street_backend.app.schemas.asset_schemas import (
     AssetCreateSchema, 
@@ -23,7 +25,11 @@ from property_street_backend.app.controllers.auth import (
 )
 
 
-async def create_asset(db: AsyncSession, asset_data: AssetCreateSchema):
+async def create_asset(
+    db: AsyncSession, 
+    asset_data: AssetCreateSchema,
+    cloud_images
+):
     new_asset = Asset(
         title=asset_data.title,
         country=asset_data.country,
@@ -62,6 +68,9 @@ async def create_asset(db: AsyncSession, asset_data: AssetCreateSchema):
         width=cover_image_detail.width,
     )
     new_asset.cover_image = cover_image
+
+    # addition of no_feature cloud image
+    new_asset.cloud_images = cloud_images
 
     # database modification
     db.add(new_asset)
@@ -103,6 +112,15 @@ async def create_test_asset(db, agent_id=None):
     """
     Helper function to create a test asset for other tests.
     """
+    image_detail = {
+        "cloud_asset_id":"dkajdlkajdlkajsdkfjasldkfj",
+        "format":"jpg",
+        "bytes":102400,
+        "height":800,
+        "public_id":"test_image_123",
+        "secure_url":"https://example.com/test_image.jpg",
+        "width":600,
+    }
     asset_data = AssetCreateSchema(
         title="Test Asset",
         country="Test Country",
@@ -112,20 +130,23 @@ async def create_test_asset(db, agent_id=None):
         description="Test description",
         category="House",
         status="auction",
-        availability=True,
+        availability="available",
         agent_id=agent_id,  # Add agent ID if needed
         tags = ["house", "condo"],
         cover_image = CloudImageCreateSchema(
-            cloud_asset_id="dkajdlkajdlkajsdkfjasldkfj",
-            format="jpg",
-            bytes=102400,
-            height=800,
-            public_id="test_image_123",
-            secure_url="https://example.com/test_image.jpg",
-            width=600,
-        )
+            **image_detail,
+        ),
     )
-    return await create_asset(db, asset_data)
+    
+    # create the asset_cloud_image and modify its public_id  
+    asset_cloud_image = AssetCloudImage(
+        **image_detail,
+    )
+    asset_cloud_image.public_id="test_image_1234"
+    cloud_images = [
+        asset_cloud_image
+    ]
+    return await create_asset(db, asset_data, cloud_images)
 
 
 async def create_test_asset_feature(db, asset_id):
@@ -185,6 +206,8 @@ async def test_controller_create_asset_feature_and_image(get_test_db__fixture: A
         created_asset = await create_test_asset(test_db,created_agent.id)
         assert created_asset is not None
         assert created_asset.title == "Test Asset"
+        # direct testing of the AssetSchema schema on an asset instance 
+        AssetSchema.model_validate(created_asset)
         
         # Create an asset feature linked to the asset
         created_feature = await create_test_asset_feature(test_db, created_asset.id)

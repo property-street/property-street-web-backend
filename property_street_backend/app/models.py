@@ -367,7 +367,6 @@ class Asset(Base):
         back_populates='asset',
         cascade="all, delete-orphan", # cascade from Asset to AssetCloudImage
         lazy="selectin",  # Ensures relationship loads in async contexts
-
     )
 
 
