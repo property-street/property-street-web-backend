@@ -55,5 +55,18 @@ alembic current
 alembic history
 ```
 
+## Generate SQL Scripts for Migrations
+```
+alembic upgrade <revision_or_head> --sql > migration.sql
+```
+- Replace <revision_or_head> with:
+    A specific migration revision (e.g., 1234abcd).
+    head for the latest migration.
+## Store and Manage SQL Scripts
+```
+docker exec -i <db_container> psql -U <username> -d <database> < sql_migrations/002_add_new_table.sql
+
+```
+
 ## docker image
 property-street-backend
