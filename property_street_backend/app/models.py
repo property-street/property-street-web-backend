@@ -13,6 +13,7 @@ from sqlalchemy import (
     Numeric,
     DateTime,
     event,
+    ARRAY,
 )
 from sqlalchemy.future import select
 from sqlalchemy import types as _types
@@ -54,7 +55,7 @@ class AbstractCloudImage(Base):
 
 
 
-# Association Table for many-to-many relationship
+# asset-tag Association Table for many-to-many relationship
 asset_tag_association = Table(
     'asset_tag_association',
     Base.metadata,
@@ -74,6 +75,56 @@ asset_tag_association = Table(
         ForeignKey(
             'tags.id', 
             name='fk_asset_tag_association_tag_id',
+            ondelete='RESTRICT'
+        ), 
+        primary_key=True
+    )
+)
+# message-thread Association Table for many-to-many relationship
+thread_chat_session_association = Table(
+    'thread_chat_session_association',
+    Base.metadata,
+    Column(
+        'thread_id', 
+        Integer, 
+        ForeignKey(
+            'threads.id', 
+            name='fk_thread_chat_session_association_thread_id',
+            ondelete='RESTRICT'
+        ), 
+        primary_key=True
+    ),
+    Column(
+        'chat_session_id', 
+        Integer, 
+        ForeignKey(
+            'chat_sessions.id', 
+            name='fk_thread_chat_session_association_chat_session_id',
+            ondelete='RESTRICT'
+        ), 
+        primary_key=True
+    )
+)
+# message-thread Association Table for many-to-many relationship
+thread_participants_association = Table(
+    'thread_participants_association',
+    Base.metadata,
+    Column(
+        'thread_id', 
+        Integer, 
+        ForeignKey(
+            'users.id', 
+            name='fk_thread_participants_association_thread_id',
+            ondelete='CASCADE'
+        ), 
+        primary_key=True
+    ),
+    Column(
+        'user_id', 
+        Integer, 
+        ForeignKey(
+            'threads.id', 
+            name='fk_thread_participants_association_user_id',
             ondelete='RESTRICT'
         ), 
         primary_key=True
@@ -234,7 +285,6 @@ class User(Base):
         uselist=False, # explicitly tell SQLAlchemy it's a one-to-one
         foreign_keys=[profile_avatar_id],
         lazy="selectin",  # Ensures relationship loads in async contexts
-
     )
   
     # Foreign key to Agent for one-to-one relationship (nullable until user becomes agent)
@@ -256,7 +306,36 @@ class User(Base):
         foreign_keys=[agent_profile_id],
         lazy="selectin",  # Ensures relationship loads in async contexts
     )
+
+    # relationship to chat session
+    chat_session = relationship(
+        'ChatSession', 
+        back_populates = 'user',
+        lazy="selectin",  # Ensures relationship loads in async contexts
+    )
+
+    # many to many relationship with thread
+    threads = relationship(
+        'Threads',
+        secondary='thread_participants_association',
+        back_populates='participants',
+        lazy='selectin'
+    )
     
+    # Relationships for sent and received messages
+    sent_messages = relationship(
+        'Message',
+        foreign_keys='Message.sender_id',
+        back_populates='sender',
+        lazy='selectin'
+    )
+    received_messages = relationship(
+        'Message',
+        foreign_keys='Message.recipient_id',
+        back_populates='recipient',
+        lazy='selectin'
+    )
+
     # method for a user to become an agent
     async def become_agent(self, session):
         """Method to convert a user into an agent."""
@@ -281,7 +360,6 @@ class Tag(Base):
         secondary='asset_tag_association', 
         back_populates='tags',
         lazy="selectin",  # Ensures relationship loads in async contexts
-
     )
 
 
@@ -321,7 +399,6 @@ class Asset(Base):
         'Agent', 
         back_populates='assets',
         lazy="selectin",  # Ensures relationship loads in async contexts
-
     )
 
     # One-to-one relationship for cover image (no cascade)
@@ -445,6 +522,132 @@ class AssetCloudImage(AbstractCloudImage):
     )
 
 
+class AddOn(Base):
+    __tablename__ = 'add_ons'
+
+    id = Column(Integer, primary_key=True, index=True)
+    tag_list = Column(ARRAY(String))  # Or JSON, based on your preference
+
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Foreign key relationship to User
+    user_id = Column(
+        Integer, 
+        ForeignKey(
+            'users.id', 
+            name='fk_chat_sessions_user_id', 
+            ondelete='CASCADE'
+        )
+    )
+    user = relationship(
+        'User', 
+        back_populates='session',
+        lazy="selectin",  # Ensures relationship loads in async contexts
+        uselist=False, # many to one relationship, restricts it to associating with only one User instance.
+    )
+
+    # relationship to threads
+    threads = relationship(
+        'Thread',
+        secondary='thread_chat_session_association',
+        back_populates='chat_sessions',
+        lazy='selectin', # Ensures relationship loads in async contexts
+    )
+
+
+class Thread(Base):
+    __tablename__ = "threads"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # relationship with messages
+    messages = relationship(
+        'Message', 
+        back_populates='thread',
+        lazy="selectin",  # Ensures relationship loads in async contexts
+    )
+
+    # Many-to-many relationship to chat_session
+    chat_sessions = relationship(
+        'ChatSession',
+        secondary='thread_chat_session_association',
+        back_populates='threads',
+        lazy='selectin', # Ensures relationship loads in async contexts
+    )
+
+    # Many to many relationship to User
+    participants = relationship(
+        'User',
+        secondary='thread_participants_association',
+        back_populates='threads',
+        lazy='selectin'
+    )
+
+
+class Message(Base):
+    __tablename__ = "messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    text_content = Column(String, nullable=True)
+    status = Column(String, nullable=False)
+    timestamp = Column(Integer, nullable=False)
+    updated_timestamp = Column(Integer, nullable=True)
+
+    # Foreign key relationship to Thread
+    thread_id = Column(
+        Integer, 
+        ForeignKey(
+            'threads.id', 
+            name='fk_messages_thread_id', 
+            ondelete='CASCADE'
+        )
+    )
+    thread = relationship(
+        'Thread',
+        back_populates='messages',
+        lazy='selectin'
+    )
+
+    # Foreign key relationship to sender
+    sender_id = Column(
+        Integer, 
+        ForeignKey(
+            'users.id', 
+            name='fk_messages_sender_id', 
+            ondelete='CASCADE'
+        )
+    )
+    sender = relationship(
+        'User',
+        foreign_keys=[sender_id],
+        back_populates='sent_messages',
+        lazy='selectin'
+    )
+
+    # Foreign key relationship to recipient
+    recipient_id = Column(
+        Integer, 
+        ForeignKey(
+            'users.id', 
+            name='fk_messages_recipient_id', 
+            ondelete='CASCADE'
+        )
+    )
+    recipient = relationship(
+        'User',
+        foreign_keys=[recipient_id],
+        back_populates='received_messages',
+        lazy='selectin'
+    )
+
+
+
+    
 
 @event.listens_for(User, 'before_insert')
 @event.listens_for(Asset, 'before_insert')

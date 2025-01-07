@@ -1,7 +1,6 @@
 import pytest
 import json
 import asyncio
-import redis.asyncio as redis
 from property_street_backend.config.settings import REDIS_CACHE_DB
 from property_street_backend.app.controllers.activity.asset_routine_methods import (
     create_or_update_newly_created_asset_cache
@@ -21,6 +20,8 @@ async def assertions_after_caching(
 ):
     # Assert that the asset ID was added to the tracking set
     assert await redis_client.sismember(f"{hash_key}", asset_id)
+
+
 
     # Assert that the value of the newly_created_asset:{asset_id} matches asset_json
     stored_asset_json = await redis_client.get(f"{hash_key}:{asset_id}")
@@ -48,6 +49,7 @@ async def assertions_after_caching(
         collection = json.loads(auto_category)
         assert str(asset_id) not in collection
 
+
 async def finality_after_caching(
     redis_client,
     asset_id,
@@ -65,7 +67,7 @@ async def finality_after_caching(
             )
         else:
             await redis_client.hdel(hset_key, hash_key)
-
+ 
 
 @pytest.mark.asyncio
 async def test_cache_newly_created_asset(client__fixture_with_prod_redis):
