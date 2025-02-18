@@ -30,25 +30,29 @@ AsyncTestSessionLocal = sessionmaker(
 
 # Minimal Dependency structure to get async test DB session
 @pytest.fixture(scope="function")
-async def get_test_db__fixture(request, event_loop):
-    
+async def get_test_db__fixture(
+    request,
+    event_loop,
+):
     async with test_async_engine.begin() as conn:
         # Create the database schema
-        print(Colors.green, "***Creating the Base's metadata")
         await conn.run_sync(Base.metadata.create_all)
+        print("***Created the Base's metadata")
 
-    # Finalizer function
-    async def cleanup_testdb():
+    async def cleanup():
         async with test_async_engine.begin() as conn:
             # Drop the schema after tests
             await conn.run_sync(Base.metadata.drop_all)
-            print(Colors.green, "***tearing down the Base's metadata")
+            print("***torn down the Base's metadata")
 
     # Use an event loop to ensure cleanup happens after tests complete
-    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup_testdb()))
-
+    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup()))
+    
     async with AsyncTestSessionLocal() as session:
-        yield session
+        try:
+            yield session
+        finally:
+            await session.close()
 
 
 @pytest.fixture(scope="function")

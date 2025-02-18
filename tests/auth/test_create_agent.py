@@ -12,7 +12,7 @@ from property_street_backend.app.controllers.auth import (
 
 
 @pytest.mark.asyncio
-async def test_create_agent(get_test_db__fixture: AsyncSession):
+async def test_create_agent(get_test_db__fixture):
     # fetch the testdb
     test_db = await get_test_db__fixture.__anext__()
 

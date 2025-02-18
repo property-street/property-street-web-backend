@@ -205,53 +205,50 @@ async def create_test_agent(db):
 
 @pytest.mark.asyncio
 async def test_controller_create_asset_feature_and_image(get_test_db__fixture: AsyncSession): 
-    try:
-        # Fetch the test DB session
-        test_db = await get_test_db__fixture
+    # Fetch the test DB session
+    test_db = await get_test_db__fixture.__anext__()
 
-        # Create a test agent/user
-        created_agent = await create_test_agent(test_db)
-        assert created_agent is not None
+    # Create a test agent/user
+    created_agent = await create_test_agent(test_db)
+    assert created_agent is not None
 
-        # Create a test asset
-        created_asset = await create_test_asset(test_db,created_agent.id)
-        assert created_asset is not None
-        assert created_asset.title == "Test Asset"
-        # direct testing of the AssetSchema schema on an asset instance 
-        AssetSchema.model_validate(created_asset)
-        
-        # Create an asset feature linked to the asset
-        created_feature = await create_test_asset_feature(test_db, created_asset.id)
-        assert created_feature is not None
-        assert created_feature.title == "Test Feature"
+    # Create a test asset
+    created_asset = await create_test_asset(test_db,created_agent.id)
+    assert created_asset is not None
+    assert created_asset.title == "Test Asset"
+    # direct testing of the AssetSchema schema on an asset instance 
+    AssetSchema.model_validate(created_asset)
+    
+    # Create an asset feature linked to the asset
+    created_feature = await create_test_asset_feature(test_db, created_asset.id)
+    assert created_feature is not None
+    assert created_feature.title == "Test Feature"
 
-        # Create a cloud image detail linked to the asset
-        created_image = await create_test_cloud_image_detail(test_db, created_asset.id)
-        assert created_image is not None
-        assert created_image.public_id == "test_image_123"
-        
-        # Verify that the asset was actually created in the database
-        result = await test_db.execute(
-            select(Asset).filter(Asset.title == "Test Asset")
-        )
-        asset = result.scalars().first()
-        assert asset is not None
-        assert asset.country == "Test Country"
+    # Create a cloud image detail linked to the asset
+    created_image = await create_test_cloud_image_detail(test_db, created_asset.id)
+    assert created_image is not None
+    assert created_image.public_id == "test_image_123"
+    
+    # Verify that the asset was actually created in the database
+    result = await test_db.execute(
+        select(Asset).filter(Asset.title == "Test Asset")
+    )
+    asset = result.scalars().first()
+    assert asset is not None
+    assert asset.country == "Test Country"
 
-        # Verify that the asset feature was actually created in the database
-        result = await test_db.execute(
-            select(AssetFeature).filter(AssetFeature.title == "Test Feature")
-        )
-        feature = result.scalars().first()
-        assert feature is not None
-        assert feature.asset_id == created_asset.id
+    # Verify that the asset feature was actually created in the database
+    result = await test_db.execute(
+        select(AssetFeature).filter(AssetFeature.title == "Test Feature")
+    )
+    feature = result.scalars().first()
+    assert feature is not None
+    assert feature.asset_id == created_asset.id
 
-        # Verify that the cloud image detail was actually created in the database
-        result = await test_db.execute(
-            select(AssetCloudImage).filter(AssetCloudImage.public_id == "test_image_123")
-        )
-        image = result.scalars().first()
-        assert image is not None
-        assert image.asset_id == created_asset.id
-    finally:
-        await test_db.close()
+    # Verify that the cloud image detail was actually created in the database
+    result = await test_db.execute(
+        select(AssetCloudImage).filter(AssetCloudImage.public_id == "test_image_123")
+    )
+    image = result.scalars().first()
+    assert image is not None
+    assert image.asset_id == created_asset.id

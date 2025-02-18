@@ -38,7 +38,6 @@ async def test_controller_create_user(
     # Call the create_user function
     created_user = await create_user(test_db, user_data)
 
-    return
     # testing the become agent method of the user
     await created_user.become_agent(
         session = test_db
