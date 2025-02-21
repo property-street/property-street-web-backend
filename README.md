@@ -70,8 +70,6 @@ docker cp /local_path/to/migration_script.sql <container_name>:/tmp/migration_sc
 ```bash
 docker exec -it <db_container> \
   bash -c 'PGPASSWORD=<password> psql -h <hostname> -U <username> -d <database> -f /tmp/migration_script.sql'
-
-
 ```
 
 ## build image to docker hub repo
