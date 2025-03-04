@@ -9,46 +9,44 @@ from property_street_backend.app.schemas.auth_schemas import UserRegistrationSch
 
 
 @pytest.mark.asyncio
-async def test_controller_authenticate_user(get_test_db__fixture: AsyncSession):
-    try:
-        # Define a test user
-        user_data = UserRegistrationSchema(
-            email="test@example.com",
-            username="testuser",
-            password="password123"
-        )
-
-        # fetch the testdb
-        test_db = await get_test_db__fixture
-        
-        # Call the create_user function
-        created_user = await create_user(test_db, user_data)
-
-        # Assertions
-        assert created_user is not None
-        assert created_user.email == user_data.email
-        assert created_user.username == user_data.username
-        assert created_user.password_hash != user_data.password  # Ensure the password is hashed
+async def test_controller_authenticate_user(client__fixture: dict):
+    # get the yield client objects
+    fixture_obj = await client__fixture.__anext__()
     
-        ## Verify that the user was actually created in the database
-        result = await test_db.execute(
-            select(User).filter(User.email == user_data.email)
-        )
-        user = result.scalars().first()
-        assert user is not None
-        assert user.username == user_data.username
+    test_db = fixture_obj.get("db")
 
-        
-        # Testing for user authentication 
-        user = await authenticate_user(
-            test_db,
-            user_data.username,
-            user_data.password
-        )
-        assert user != None
-    finally:
-        await test_db.close()
-        pass
+    # Define a test user
+    user_data = UserRegistrationSchema(
+        email="test@example.com",
+        username="testuser",
+        password="password123"
+    )
+
+    # Call the create_user function
+    created_user = await create_user(test_db, user_data)
+
+    # Assertions
+    assert created_user is not None
+    assert created_user.email == user_data.email
+    assert created_user.username == user_data.username
+    assert created_user.password_hash != user_data.password  # Ensure the password is hashed
+
+    ## Verify that the user was actually created in the database
+    result = await test_db.execute(
+        select(User).filter(User.email == user_data.email)
+    )
+    user = result.scalars().first()
+    assert user is not None
+    assert user.username == user_data.username
+
+    
+    # Testing for user authentication 
+    user = await authenticate_user(
+        test_db,
+        user_data.username,
+        user_data.password
+    )
+    assert user != None
 
 
 @pytest.mark.asyncio

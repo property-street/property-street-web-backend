@@ -20,7 +20,8 @@ from property_street_backend.app.database import (
 from property_street_backend.app.routers import (
     auth, 
     activity,
-    search
+    search,
+    settings
 )
 from property_street_backend.app.initiator import (
     app, 
@@ -45,8 +46,8 @@ async def lifespan(app: FastAPI):
     # Shutdown logic (if needed)
     # e.g., await redis_client.close()
 
-app = FastAPI(lifespan=lifespan)
 
+app = FastAPI(lifespan=lifespan)
 
 # CORS middleware
 app.add_middleware(
@@ -108,4 +109,5 @@ async def test_database(
 app.include_router(auth.router)
 app.include_router(activity.router)
 app.include_router(search.router)
+app.include_router(settings.router)
 app.include_router(home_router)

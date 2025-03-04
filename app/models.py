@@ -256,8 +256,6 @@ class User(Base):
     first_name = Column(String)
     last_name = Column(String)
     other_names = Column(String)
-    date_of_birth = Column(Date)
-    country_of_origin = Column(String)
     account_status = Column(String, default="Active")
     misc = Column(JSON, default=dict, nullable=True)
     client_type = Column(SQLAlchemyEnum(ClientTypeChoice, name='client_type_choice'), nullable=True)
@@ -336,6 +334,14 @@ class User(Base):
         lazy='selectin'
     )
 
+    # user settings relationship
+    user_settings = relationship(
+        'UserSetting',
+        back_populates = 'user',
+        lazy = 'selectin',
+        uselist = False,
+    )
+
     # method for a user to become an agent
     async def become_agent(self, session):
         """Method to convert a user into an agent."""
@@ -346,6 +352,35 @@ class User(Base):
             await session.flush()  # Ensures the new `agent` has an `id` before committing
             await session.commit()
             await session.refresh(self)  # Refresh `self` to update the `agent_profile`
+
+
+class UserSetting(Base):
+    __tablename__ = 'user_settings'
+
+    id = Column(Integer, primary_key=True, index=True)
+    date_of_birth = Column(Date)
+    country = Column(String)
+    phone_number = Column(String)
+    address = Column(String)
+    email_notification = Column(Boolean, default=True)
+    push_notification = Column(Boolean, default=True)
+
+    user_id = Column(
+        Integer, 
+        ForeignKey(
+            'users.id', 
+            name='fk_user_settings_users', 
+            use_alter=True,
+            ondelete='CASCADE'
+        ), 
+        nullable=False
+    )
+    user = relationship(
+        'User',
+        back_populates='user_settings',
+        lazy='selectin',
+        uselist = False,
+    )
 
 
 class Tag(Base):

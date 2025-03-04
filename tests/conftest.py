@@ -30,29 +30,25 @@ AsyncTestSessionLocal = sessionmaker(
 
 # Minimal Dependency structure to get async test DB session
 @pytest.fixture(scope="function")
-async def get_test_db__fixture(
-    request,
-    event_loop,
-):
+async def get_test_db__fixture(request, event_loop):
+    
     async with test_async_engine.begin() as conn:
         # Create the database schema
+        print("***Creating the Base's metadata")
         await conn.run_sync(Base.metadata.create_all)
-        print("***Created the Base's metadata")
 
-    async def cleanup():
+    # Finalizer function
+    async def cleanup_testdb():
         async with test_async_engine.begin() as conn:
             # Drop the schema after tests
             await conn.run_sync(Base.metadata.drop_all)
-            print("***torn down the Base's metadata")
+            print("***tearing down the Base's metadata")
 
     # Use an event loop to ensure cleanup happens after tests complete
-    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup()))
-    
+    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup_testdb()))
+
     async with AsyncTestSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+        return session
 
 
 @pytest.fixture(scope="function")
@@ -103,35 +99,70 @@ async def prod_redis_client__fixture(
 
 @pytest.fixture(scope="function")
 async def client__fixture(
+    request,
+    event_loop,
     get_test_db__fixture, 
     redis_client__fixture,
-    prod_redis_client__fixture
 ):
-    # Pytest will handle awaiting the fixtures; don't manually await them
-    test_db = await get_test_db__fixture.__anext__()
-    redis_client_fixture = await redis_client__fixture.__anext__()
-    prod_redis_client_fixture = await prod_redis_client__fixture.__anext__()
+    # getting the test_db fixture
+    test_db = await get_test_db__fixture
 
-    # Override dependencies with callables
-    async def override_get_db():
-        yield test_db
-    app.dependency_overrides[get_db] = override_get_db
+    # get the yield client object
+    test_redis_client = await redis_client__fixture.__anext__()
 
-    async def override_redis_client():
-        yield redis_client_fixture
-    app.dependency_overrides[redis_client] = override_redis_client
+    # overriding the client's get_db dependency
+    app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
+    app.dependency_overrides[redis_client] = lambda: test_redis_client  # Override redis_client dependency
 
-    async def override_prod_redis_client():
-        yield prod_redis_client_fixture
-    app.dependency_overrides[redis_client] = override_prod_redis_client
+    # cleanup to close the test database
+    async def cleanup():
+        await test_db.close()
+
+    # Use an event loop to ensure cleanup happens after tests complete
+    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup()))
+    
 
     # Use ASGITransport with the app
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield {
             "http_client": ac, 
-            "redis_client": redis_client_fixture,
+            "redis_client": test_redis_client,
             "db": test_db,
-            "prod_redis_client": prod_redis_client_fixture
+        }
+
+
+@pytest.fixture(scope="function")
+async def client__fixture_with_prod_redis(
+    request,
+    event_loop,
+    get_test_db__fixture, 
+    prod_redis_client__fixture,
+):
+    # getting the test_db fixture
+    test_db = await get_test_db__fixture
+
+    # get the yield client object
+    prod_redis_client = await prod_redis_client__fixture.__anext__()
+
+    # overriding the client's get_db dependency
+    app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
+    app.dependency_overrides[redis_client] = lambda: prod_redis_client  # Override redis_client dependency
+
+    # cleanup to close the test database
+    async def cleanup():
+        await test_db.close()
+
+    # Use an event loop to ensure cleanup happens after tests complete
+    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup()))
+    
+
+    # Use ASGITransport with the app
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        yield {
+            "http_client": ac, 
+            "redis_client": prod_redis_client,
+            "db": test_db,
         }
 

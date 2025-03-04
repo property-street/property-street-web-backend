@@ -48,17 +48,19 @@ async def add_created_clientId_to_payload(db,payload):
     # modify feature object to include an agent's id
     payload[0]['db_table_id'] = created_agent.id
 
+
 @pytest.mark.asyncio
 async def test_create_asset_with_feature(
-    get_test_db__fixture: AsyncSession,
-    prod_redis_client__fixture,
+    client__fixture_with_prod_redis,
 ):
+    # get the yield client objects
+    fixture_obj = await client__fixture_with_prod_redis.__anext__()
+    # extract the database entry
+    test_db = fixture_obj.get("db")
+    # fetch the client fixture
+    redis_client =  await fixture_obj.get("redis_client")
+
     try:
-        test_db = await get_test_db__fixture
-
-        # fetch the client fixture
-        redis_client =  await prod_redis_client__fixture
-
         # call the function that would add a real client id to the payload
         await add_created_clientId_to_payload(
             db = test_db,
@@ -101,25 +103,25 @@ async def test_create_asset_with_feature(
         asset_feature = result.scalars().first()
         assert asset_feature is not None
     finally:
-        await test_db.close()
         # cache finality
         await finality_after_caching(
             redis_client = redis_client,
             asset_id = created_asset.id
         )
 
+
 @pytest.mark.asyncio
 async def test_create_asset_with_no_feature(
-    get_test_db__fixture: AsyncSession,
-    prod_redis_client__fixture,
+    client__fixture_with_prod_redis,
 ):
+    # get the yield client objects
+    fixture_obj = await client__fixture_with_prod_redis.__anext__()
+    # extract the database entry
+    test_db = fixture_obj.get("db")
+    # fetch the client fixture
+    redis_client =  await fixture_obj.get("redis_client")
+
     try:
-        # fetch the database fixture
-        test_db = await get_test_db__fixture
-
-        # fetch the client fixture
-        redis_client =  await prod_redis_client__fixture
-
         # call the function that would add a real client id to the payload
         await add_created_clientId_to_payload(
             db = test_db,
@@ -163,11 +165,19 @@ async def test_create_asset_with_no_feature(
             asset_id = created_asset.id
         )
 
-@pytest.mark.asyncio
-async def test_asset_update(get_test_db__fixture: AsyncSession):
-    try:
-        test_db = await get_test_db__fixture
 
+@pytest.mark.asyncio
+async def test_asset_update(client__fixture_with_prod_redis: AsyncSession):
+    # get the yield client objects
+    fixture_obj = await client__fixture_with_prod_redis.__anext__()
+    # extract the database entry
+    test_db = fixture_obj.get("db")
+    # fetch the client fixture
+    redis_client =  await fixture_obj.get("redis_client")
+
+    
+    
+    try:
         created_asset = await create_test_asset(
             db=test_db
         )
@@ -192,7 +202,13 @@ async def test_asset_update(get_test_db__fixture: AsyncSession):
         }
 
         # Process asset for update
-        await process_asset(update_obj, test_db)
+        await process_asset(
+            data_to_be_processed = update_obj, 
+            db = test_db,
+            redis_client = redis_client,
+            newly_created = False,
+            ttl_in_seconds = 0
+        )
 
         # Fetch of updated asset
         asset_fields = update_obj[1]["fields"]
@@ -209,14 +225,19 @@ async def test_asset_update(get_test_db__fixture: AsyncSession):
         assert asset.category == asset_fields['category']
         assert asset.description == asset_fields['description']
     finally:
-        await test_db.close()
-    pass
+        pass
+
 
 @pytest.mark.asyncio
-async def test_asset_delete(get_test_db__fixture: AsyncSession):
-    try:
-        test_db = await get_test_db__fixture
+async def test_asset_delete(client__fixture_with_prod_redis: AsyncSession):
+    # get the yield client objects
+    fixture_obj = await client__fixture_with_prod_redis.__anext__()
+    # extract the database entry
+    test_db = fixture_obj.get("db")
+    # fetch the client fixture
+    redis_client =  await fixture_obj.get("redis_client")
 
+    try:
         created_asset = await create_test_asset(
             db=test_db
         )
@@ -236,7 +257,13 @@ async def test_asset_delete(get_test_db__fixture: AsyncSession):
         }
 
         # Process asset for update
-        await process_asset(delete_obj, test_db)
+        await process_asset(
+            data_to_be_processed = delete_obj, 
+            db = test_db,
+            redis_client = redis_client,
+            newly_created = False,
+            ttl_in_seconds = 0
+        )
 
         # Fetch of deleted asset
         result = await test_db.execute(
@@ -253,13 +280,16 @@ async def test_asset_delete(get_test_db__fixture: AsyncSession):
         assert asset is None
         assert asset_feature is None
     finally:
-        await test_db.close()
-    pass
+        pass
+
 
 @pytest.mark.asyncio
-async def test_tag_delete_from_asset(get_test_db__fixture: AsyncSession):
+async def test_tag_delete_from_asset(client__fixture_with_prod_redis: AsyncSession):
+    fixture_obj = await client__fixture_with_prod_redis.__anext__()
+    test_db = fixture_obj.get('db')
+    redis_client = fixture_obj.get('redis_client')
+    
     try:
-        test_db = await get_test_db__fixture
 
         # Define a test agent
         user_data = UserRegistrationSchema(
@@ -275,7 +305,13 @@ async def test_tag_delete_from_asset(get_test_db__fixture: AsyncSession):
         feature_obj[0]['db_table_id'] = created_agent.id
 
         # Process asset with features
-        await process_asset(feature_obj, test_db)
+        await process_asset(
+            data_to_be_processed = feature_obj, 
+            db = test_db,
+            redis_client = redis_client,
+            newly_created = False,
+            ttl_in_seconds = 0
+        )
 
         # Fetch the created asset from the database
         result = await test_db.execute(select(Asset).filter(Asset.title == feature_obj[4]['fields']['title']))
@@ -309,5 +345,4 @@ async def test_tag_delete_from_asset(get_test_db__fixture: AsyncSession):
         assert len(removed_tags) == 0, "Tags were not removed from the asset"
         
     finally:
-        await test_db.close()
-
+        pass

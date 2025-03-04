@@ -7,20 +7,24 @@ from property_street_backend.app.main import app
 
 @pytest.mark.asyncio
 async def test_db_connectivity(
-    get_test_db__fixture
+    get_test_db__fixture: AsyncSession
 ):
-    test_db = await get_test_db__fixture.__anext__()
-    assert isinstance(test_db, AsyncSession)
-
+    try:
+        # fetch the testdb
+        test_db = await get_test_db__fixture
+        assert isinstance(test_db, AsyncSession)
+    finally:
+        await test_db.close()
+        pass
 
 
 @pytest.mark.asyncio
 async def test_client_connectivity(client__fixture):
     # get the yield client objects
     fixture_obj = await client__fixture.__anext__()
+    
     redis_client = fixture_obj.get("redis_client")
     http_client = fixture_obj.get("http_client")
-    prod_redis_client = fixture_obj.get("prod_redis_client")
     test_db = fixture_obj.get("db")
 
     # database assertion
@@ -31,8 +35,8 @@ async def test_client_connectivity(client__fixture):
     assert redis_client.connection_pool.connection_kwargs['db'] == 3
 
     # make assertions for the development redis_client
-    assert isinstance(prod_redis_client, redis.Redis)
-    assert prod_redis_client.connection_pool.connection_kwargs['db'] == 0
+    # assert isinstance(prod_redis_client, redis.Redis)
+    # assert prod_redis_client.connection_pool.connection_kwargs['db'] == 0
     
     # assertions for client
     assert isinstance(http_client, AsyncClient)

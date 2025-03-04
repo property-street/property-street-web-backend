@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y gcc libpq-dev && rm -rf /var/lib/apt/li
 COPY ./requirements.txt /app/property_street_backend/requirements.txt
 
 # Copy Alembic configuration and migration files
-COPY alembic.ini .
+COPY alembic_production.ini ./alembic.ini
 COPY ./alembic ./alembic
 
 # Install Python dependencies

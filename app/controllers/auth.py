@@ -46,8 +46,10 @@ router = APIRouter()
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
+
 def get_password_hash(password):
     return pwd_context.hash(password)
+
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -56,6 +58,7 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+
 def fetched_access_token(user: User):
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -63,8 +66,7 @@ def fetched_access_token(user: User):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-# crud level
-# Signin
+# signin
 async def authenticate_user(db: AsyncSession, login: str, password: str):
     # Check if the login is either a username or an email
     user_query = select(User).filter((User.username == login) | (User.email == login))
@@ -81,6 +83,7 @@ async def authenticate_user(db: AsyncSession, login: str, password: str):
         return False
 
     return user
+
 
 # user existence
 async def check_username_email_availability(db: AsyncSession, user_data: ProbeUserExistenceSchema) -> dict:
@@ -107,6 +110,7 @@ async def check_username_email_availability(db: AsyncSession, user_data: ProbeUs
         result["email"] = "unavailable"
     
     return result
+
 
 # Signup
 async def create_user(
@@ -150,6 +154,7 @@ async def create_user(
     # Ensure the user instance reflects the latest state from the database
     await db.refresh(user)
     return user
+
 
 async def create_agent(
     db:AsyncSession, 
@@ -199,6 +204,7 @@ async def decode_user_from_token(
     if user is None:
         raise credentials_exception
     return user
+
 
 async def decode_user_from_token_optional(
     token: str = Depends(oauth2_scheme),
