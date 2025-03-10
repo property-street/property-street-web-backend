@@ -34,6 +34,8 @@ from property_street_backend.log_config.logger_config import (
     log_message
 )
 
+
+
 router = APIRouter(prefix="/activity", tags=["activity"])
 
 @router.post("/process_asset", status_code=status.HTTP_200_OK)
@@ -121,7 +123,6 @@ async def fetch_agent_assets(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occured on retrieval of agent data."
         )
-
 
 
 @router.get(
@@ -232,3 +233,4 @@ async def fetch_asset_by_id(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred. Please try again later."
         )
+        

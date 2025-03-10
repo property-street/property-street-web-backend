@@ -358,10 +358,10 @@ class UserSetting(Base):
     __tablename__ = 'user_settings'
 
     id = Column(Integer, primary_key=True, index=True)
-    date_of_birth = Column(Date)
-    country = Column(String)
-    phone_number = Column(String)
-    address = Column(String)
+    date_of_birth = Column(Date, nullable=True)
+    country = Column(String, nullable=True)
+    phone_number = Column(String, nullable=True)
+    address = Column(String, nullable=True)
     email_notification = Column(Boolean, default=True)
     push_notification = Column(Boolean, default=True)
 

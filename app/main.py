@@ -46,8 +46,8 @@ async def lifespan(app: FastAPI):
     # Shutdown logic (if needed)
     # e.g., await redis_client.close()
 
-
 app = FastAPI(lifespan=lifespan)
+
 
 # CORS middleware
 app.add_middleware(

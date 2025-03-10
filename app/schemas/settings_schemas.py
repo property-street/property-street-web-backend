@@ -14,7 +14,7 @@ class OptionalBaseModel(BaseModel):
 
 
 class UserSettingSchema(OptionalBaseModel):
-    id: Optional[int] = None
+    id: int = Field(..., description="Instance's id")
     phone_number: str = Field(..., description="User's phone number")
     address: str = Field(..., description="User's address")
     country: str = Field(..., description="country")
@@ -27,6 +27,8 @@ class UserSettingSchema(OptionalBaseModel):
 class UserFieldsForSettings(BaseModel):
     id: int = Field(..., description="user id")
     email: str = Field(..., description="user email")
+    first_name: str = Field(..., description="User's firstname")
+    last_name: str = Field(..., description="User's lastname")
     has_settings: bool = Field(..., description="bool to indicate if the user has had a setting instance.")
 
     model_config = ConfigDict(from_attributes=True)
