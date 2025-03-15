@@ -70,3 +70,10 @@ class TableObject(BaseModel):
 # Main schema for the entire variable data structure
 class AssetComponentSchema(RootModel[Dict[int, TableObject]]):
     pass
+
+class UserUIMetaDataSchema(BaseModel):
+    user_id: Optional[int] = None
+    first_name: Optional[str] = None
+    client_is_agent: Optional[bool] = None
+    is_authenticated: bool
+    profile_avatar_url: Optional[str] = None

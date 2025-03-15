@@ -50,11 +50,11 @@ async def test_controller_authenticate_user(client__fixture: dict):
 
 
 @pytest.mark.asyncio
-async def test_route_signin(client__fixture_with_onlyDB_fixture: tuple):
-    # fetch the client generator
-    client_gen =  client__fixture_with_onlyDB_fixture
-    # get the yield client object
-    client, test_db = await client_gen.__anext__()
+async def test_route_signin(client__fixture: dict):
+    # Extract the fixture object
+    fixture_obj = await client__fixture.__anext__()
+    test_db = fixture_obj.get("db")
+    client = fixture_obj.get("http_client")
 
     # Define a post data
     post_data = {
@@ -77,7 +77,7 @@ async def test_route_signin(client__fixture_with_onlyDB_fixture: tuple):
 
 
     signin_post_data = {
-        'email': post_data.get("email"),
+        'email': created_user.email,
         'password': post_data.get("password")
     }
     response = await client.post(
@@ -90,3 +90,4 @@ async def test_route_signin(client__fixture_with_onlyDB_fixture: tuple):
     json_response = response.json()
     assert json_response.get("token_type") == "bearer"
     assert "access_token" in json_response
+    assert json_response.get("user_id") == created_user.id

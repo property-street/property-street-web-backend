@@ -69,7 +69,7 @@ async def test_asset_upload_with_auth(
 
         # Make the request using the client provided by the fixture
         response = await client.post(
-            "/activity/process_asset",
+            "/activity/process-asset",
             json=payload,  # Use json instead of data for a JSON body
             headers=headers
         )

@@ -5,7 +5,6 @@ from property_street_backend.app.controllers.auth import (
     fetched_access_token,
     create_user,
     verify_password,
-    get_password_hash,
 )
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
 

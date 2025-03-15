@@ -110,7 +110,7 @@ class AssetFetchResponseSchema(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class LatestAssetsFetchResponseSchema(AssetFetchResponseSchema):
+class LatestAssetsFetchResponseSchema(BaseModel):
     assets: List[AssetSchema]
 
 class AssetFetchByIdResponseSchema(AssetFetchResponseSchema):

@@ -18,12 +18,17 @@ async def test_user_record_update(client__fixture):
         break  # Stop iteration after first fixture retrieval
 
     # Define a test user and create it
+    # add first_name and last_name to the user
     user_data = UserRegistrationSchema(
         email="test@example.com",
         username="testuser",
         password="password123"
     )
     created_user = await create_user(test_db, user_data)
+    created_user.first_name = 'john'
+    created_user.last_name = 'doe'
+    test_db.add(created_user)
+    await test_db.commit()
     
     # Generate an access token for authentication
     token_obj = fetched_access_token(user=created_user)
@@ -31,11 +36,25 @@ async def test_user_record_update(client__fixture):
     headers = {"Authorization": f"Bearer {token}"}
 
     # Make a request when no setting instance hasn't been associated with the user
-    # assert that the user has no settings
+    # refresh the user
+    # make assertions
     response = await client.get("/settings", headers=headers)
     assert response.status_code == 200
     json_response = response.json()
+    await test_db.refresh(created_user)
+    assert json_response.get('id') == created_user.id
+    assert json_response.get('email') == created_user.email
+    assert json_response.get('first_name') == created_user.first_name
+    assert json_response.get('last_name') == created_user.last_name
     assert not json_response.get('has_settings')
+    settings_response = json_response.get('settings_data')
+    assert settings_response.get('id') == -1
+    assert not settings_response.get('phone_number')
+    assert not settings_response.get('address')
+    assert not settings_response.get('country')
+    assert not settings_response.get('email_notification')
+    assert not settings_response.get('push_notification')
+
     
 
     # Define and create a setting instance for the user
@@ -58,6 +77,7 @@ async def test_user_record_update(client__fixture):
     response = await client.get("/settings", headers=headers)
     assert response.status_code == 200
     json_response = response.json()
+    assert json_response.get('has_settings')
     settings_details = json_response.get('settings_data')
     assert settings_details.get('phone_number') == setting_data.phone_number
     assert settings_details.get('address') == setting_data.address

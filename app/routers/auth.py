@@ -7,7 +7,7 @@ from property_street_backend.app.database import get_db
 from property_street_backend.app.schemas.auth_schemas import (
     UserRegistrationSchema, 
     UserSigninSchema, 
-    Token, 
+    SigninResponse, 
     TokenData, 
     ProbeUserExistenceSchema,
     SendEmailCodeSchema,
@@ -24,6 +24,9 @@ from property_street_backend.app.controllers.auth import (
 )
 from property_street_backend.app.utils.store import (
     email_verification_code_ttl,
+)
+from property_street_backend.log_config.logger_config import (
+    log_message
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -52,11 +55,20 @@ async def send_email_verification_code(
     redis_client: redis.Redis = Depends(redis_client),
     expiry_time_in_secs: int = Depends(email_verification_code_ttl)
 ):
-    return await controller_send_email_verification_code(
-        requester_data = requester_data,
-        redis_client = redis_client,
-        expiry_time_in_secs = expiry_time_in_secs
-    )
+    try:
+        return await controller_send_email_verification_code(
+            requester_data = requester_data,
+            redis_client = redis_client,
+            expiry_time_in_secs = expiry_time_in_secs
+        )
+    except Exception as e:
+        # log the error
+        log_message(
+            log_type='error',
+            message=f'An error occured on retrieval of agent data. Reason: {e}'
+        )
+        raise e
+
 
 # confirm email verification endpoint
 @router.post("/confirm-email-verification-code", status_code=status.HTTP_200_OK)
@@ -73,7 +85,7 @@ async def confirm_email_verification_code(
 
 
 # signin endpoint
-@router.post("/signin", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post("/signin", response_model=SigninResponse, status_code=status.HTTP_200_OK)
 async def signin_for_access_token(user_data: UserSigninSchema, db: AsyncSession = Depends(get_db)):
     user = await authenticate_user(
         db = db, 
@@ -86,7 +98,10 @@ async def signin_for_access_token(user_data: UserSigninSchema, db: AsyncSession 
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return fetched_access_token(user)
+    return {
+        **fetched_access_token(user),
+        "user_id":user.id, 
+    }
 
 
 @router.get("/retrieve-client-details")
@@ -109,6 +124,6 @@ async def fetch_agent(
         }
     else:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Agent not found"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are restricted to carry out this action!"
         )

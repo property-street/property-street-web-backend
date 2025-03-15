@@ -18,18 +18,15 @@ from property_street_backend.tests.activity.test_controller.test_asset_creation 
 import pytest
 
 @pytest.mark.asyncio
-async def test_fetch_latest_assets(client__fixture):
+async def test_latest_assets_retrieval(client__fixture):
+    # Extract the fixture object
+    fixture_obj = await client__fixture.__anext__()
+    test_db = fixture_obj.get("db")
+    client = fixture_obj.get("http_client")
     """
     Test the /activity/assets/latest endpoint to ensure it fetches
     up to 100 latest assets with the correct structure.
     """
-    # Unpack the client and test database from the fixture
-    # client_gen = client__fixture_with_onlyDB_fixture
-    # client, test_db = await client_gen.__anext__()
-    print(type(client__fixture))
-    fixture_product = await client__fixture.__anext__()
-    print(f"fixture_product_type: {type(fixture_product)}")
-    return
 
     # Common cloud image details
     test_cloud_details = {
@@ -85,15 +82,12 @@ async def test_fetch_latest_assets(client__fixture):
     headers = {"Authorization": f"Bearer {token}"}
 
     # Perform the GET request to fetch the latest assets
-    response = await client.get("/activity/assets/latest", headers=headers)
-    
     # Validate response status
+    response = await client.get("/activity/assets/latest", headers=headers)
     assert response.status_code == 200
 
     # Validate response structure
     data = response.json()
-    assert data.get('first_name') == test_user.first_name
-    assert data.get('client_is_agent')
     assets = data.get('assets')
     assert isinstance(assets, list)
     assert len(assets) <= 100  # Ensure only 100 assets are returned
@@ -124,9 +118,6 @@ async def test_fetch_latest_assets(client__fixture):
 
     # Validate response structure
     data = response.json()
-    assert data.get('first_name') == None
-    assert data.get('client_is_agent') == None
-    assert data.get('is_authenticated') == False
     assets = data.get('assets')
     assert isinstance(assets, list)
     assert len(assets) <= 100  # Ensure only 100 assets are returned

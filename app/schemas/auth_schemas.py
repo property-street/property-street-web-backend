@@ -39,6 +39,9 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+class SigninResponse(Token):
+    user_id: int
+
 class TokenData(BaseModel):
     username: str | None = None
 

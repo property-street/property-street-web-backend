@@ -2,34 +2,36 @@
 
 
 ## Starting the development server
-```
+```bash
 fastapi run --port 8080
 ```
 
 ## Starting the redis server
-```
+```bash
 sudo service redis-server start
 ```
 
 ## Running tests
+```bash
 pytest path_to_test_script
+```
 
 
 ## activate the fast api shell
-```
-    ipython -i scripts/ipython_config.py
+```bash
+  ipython -i scripts/ipython_config.py
 ``` 
 
 
 ## Configure alembic.ini and env.py for your database
 
 ### initialize alembic
-```
+```bash
 alembic init alembic
 ```
 
 ### Generate a new migration
-```
+```bash
 alembic revision --autogenerate -m "Creation of the EmailManagementModel model"
 ```
 ##### Apply migration.
