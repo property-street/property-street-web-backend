@@ -2,15 +2,15 @@ import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from httpx import AsyncClient, ASGITransport
-from pystyle import Colors
 import redis.asyncio as redis
 
 from property_street_backend.app.database import Base, get_db
 from property_street_backend.app.initiator import redis_client
 from property_street_backend.app.main import app
 from property_street_backend.config.settings import (
-    TEST_DATABASE_URL, 
     REDIS_CACHE_DB,
+    TEST_DATABASE_URL, 
+    TEST_REDIS_CACHE_DB,
 )
 from property_street_backend.app.utils.store import email_verification_code_ttl
 
@@ -60,7 +60,7 @@ async def redis_client__fixture(
     redis_client = redis.Redis(
         host='localhost',
         port=6379,
-        db=3,  # Using db3 for property street test
+        db=TEST_REDIS_CACHE_DB,  # Using db3 for property street test
     )
 
     async def cleanup():

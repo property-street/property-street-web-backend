@@ -14,6 +14,7 @@ from sqlalchemy import (
     DateTime,
     event,
     ARRAY,
+    Float,
 )
 from sqlalchemy.future import select
 from sqlalchemy import types as _types
@@ -28,6 +29,7 @@ from property_street_backend.app.enums import (
     AssetCategoryChoice,
 )
 from property_street_backend.app.database import Base
+from property_street_backend.app.controllers.cart.models import CartItem
 
 
 # abstract class dependency for models with cloud images fields
@@ -342,6 +344,14 @@ class User(Base):
         uselist = False,
     )
 
+    # google oauth details relationship
+    google_oauth_detail = relationship(
+        'GoogleOAuthDetail',
+        back_populates = 'user',
+        lazy = 'selectin',
+        uselist = False,
+    )
+
     # method for a user to become an agent
     async def become_agent(self, session):
         """Method to convert a user into an agent."""
@@ -352,6 +362,32 @@ class User(Base):
             await session.flush()  # Ensures the new `agent` has an `id` before committing
             await session.commit()
             await session.refresh(self)  # Refresh `self` to update the `agent_profile`
+
+
+class GoogleOAuthDetail(Base):
+    __tablename__ = "google_oauth_details"
+
+    id = Column(Integer, primary_key=True, index=True)
+    google_id = Column(String, nullable=True)
+    profile_picture = Column(String, nullable=True)
+    
+    user_id = Column(
+        Integer, 
+        ForeignKey(
+            'users.id', 
+            name='fk_google_oauth_details_users', 
+            use_alter=True,
+            ondelete='CASCADE'
+        ), 
+        nullable=False
+    )
+    user = relationship(
+        'User', 
+        back_populates='google_oauth_detail',
+        uselist=False,  # explicitly tell SQLAlchemy it's a one-to-one 
+        post_update=True,
+        lazy="selectin",  # Ensures relationship loads in async contexts
+    )
 
 
 class UserSetting(Base):
@@ -407,7 +443,7 @@ class Asset(Base):
     address = Column(String, nullable=False)
     currency = Column(String, nullable=False)
     status = Column(String, nullable=False)
-    amount = Column(Numeric, nullable=False)
+    price = Column(Numeric(10, 2), nullable=False)  # Up to 10 digits, 2 decimal places
     lease_duration = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     has_features = Column(Boolean, default=False)
@@ -681,11 +717,13 @@ class Message(Base):
     )
 
 
+models = [CartItem]
 
     
 
 @event.listens_for(User, 'before_insert')
 @event.listens_for(Asset, 'before_insert')
+@event.listens_for(CartItem, 'before_insert')
 @event.listens_for(AbstractCloudImage, 'before_insert')
 # Listen for the 'before_insert' event to set updated_at
 def set_updated_at_before_insert(mapper, connection, target):

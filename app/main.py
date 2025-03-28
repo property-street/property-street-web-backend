@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.middleware.cors import CORSMiddleware
 
 
+
 from property_street_backend.app.database import (
     get_db,
 )
@@ -21,7 +22,8 @@ from property_street_backend.app.routers import (
     auth, 
     activity,
     search,
-    settings
+    settings,
+    google_oauth
 )
 from property_street_backend.app.initiator import (
     app, 
@@ -29,7 +31,7 @@ from property_street_backend.app.initiator import (
 )
 from property_street_backend.config.settings import (
     environment,
-    CORS_ORIGINS
+    CORS_ORIGINS,
 )
 from property_street_backend.app.controllers.activity.asset_routine_methods import (
     asset_auto_category_expiry
@@ -47,6 +49,7 @@ async def lifespan(app: FastAPI):
     # e.g., await redis_client.close()
 
 app = FastAPI(lifespan=lifespan)
+
 
 
 # CORS middleware
@@ -110,4 +113,5 @@ app.include_router(auth.router)
 app.include_router(activity.router)
 app.include_router(search.router)
 app.include_router(settings.router)
+app.include_router(google_oauth.router)
 app.include_router(home_router)

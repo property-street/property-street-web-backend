@@ -32,7 +32,7 @@ alembic init alembic
 
 ### Generate a new migration
 ```bash
-alembic revision --autogenerate -m "Creation of the EmailManagementModel model"
+alembic revision --autogenerate -m "<migration_summary>"
 ```
 ##### Apply migration.
 ```
@@ -78,3 +78,19 @@ docker exec -it <db_container> \
 docker build -t crankgig/property_street_docker_hub_fastapi_repo:latest .
 ### push the image to docker hub
 docker push crankgig/property_street_docker_hub_fastapi_repo:latest
+
+## Set Usage & Parameters
+```
+await redis_client.set(name, value, ex=None, px=None, nx=False, xx=False)
+name → The Redis key
+
+value → The string value to store
+
+ex → Expiry time in seconds (optional)
+
+px → Expiry time in milliseconds (optional)
+
+nx → Only set if the key does not exist (SETNX behavior)
+
+xx → Only set if the key already exists (SETXX behavior)
+```
