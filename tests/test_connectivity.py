@@ -71,10 +71,11 @@ async def test_client_connectivity(client__fixture):
 async def test_redis_connectivity(redis_client__fixture):
     
     # fetch the client fixture
-    redis_client =  await redis_client__fixture.__anext__()
+    async for redis_client in redis_client__fixture:
+        break
 
-    # assertionss
-    assert redis_client.connection_pool.connection_kwargs['db'] == 3
+    # assertions
+    assert redis_client.connection_pool.connection_kwargs['db'] == 1
     assert isinstance(redis_client, redis.Redis)
 
 @pytest.mark.asyncio

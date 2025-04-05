@@ -7,9 +7,6 @@ ENVIRONMENT = config("ENVIRONMENT")
 # Base directory of the project
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Secret key for cryptographic operations
-SECRET_KEY = config('SECRET_KEY')
-
 # Debug mode
 DEBUG = True if ENVIRONMENT == 'development' else False
 
@@ -22,12 +19,19 @@ DATABASE_URL = config('DATABASE_URL')
 TEST_DATABASE_URL = config('TEST_DATABASE_URL')
 
 # REDIS settings
-REDIS_CACHE_DB = int(config('REDIS_CACHE_DB'))
+REDIS_HOST = config('TEST_REDIS_HOST') if DEBUG else config('REDIS_HOST')
 TEST_REDIS_CACHE_DB = int(config('TEST_REDIS_CACHE_DB'))
+PROD_REDIS_CACHE_DB = int(config('PROD_REDIS_CACHE_DB'))
+REDIS_CACHE_DB = TEST_REDIS_CACHE_DB if DEBUG else PROD_REDIS_CACHE_DB
 NEWLY_CREATED_ASSET_TTL = int(config('NEWLY_CREATED_ASSET_TTL'))
 SEARCH_UNIT_TTL = int(config('SEARCH_UNIT_TTL'))
-REDIS_HOST = config('TEST_REDIS_HOST') if DEBUG else config('REDIS_HOST')
-CART_OFFLOAD_SCHEDULE =  config('TEST_CART_OFFLOAD_SCHEDULE') if DEBUG else config('CART_OFFLOAD_SCHEDULE')
+
+TEST_CART_OFFLOAD_SCHEDULE =  int(config('TEST_CART_OFFLOAD_SCHEDULE')) 
+PROD_CART_OFFLOAD_SCHEDULE = int(config('PROD_CART_OFFLOAD_SCHEDULE'))
+CART_OFFLOAD_SCHEDULE = TEST_CART_OFFLOAD_SCHEDULE if DEBUG else PROD_CART_OFFLOAD_SCHEDULE
+
+TEST_CART_TTL = int(config('TEST_CART_TTL'))
+PROD_CART_TTL = int(config('PROD_CART_TTL'))
 
 # CORS settings
 CORS_ORIGINS = config('CORS_ORIGINS').split(',')

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, DateTime, func
+from sqlalchemy import Column, ForeignKey, Integer, DateTime, func, CheckConstraint
 from sqlalchemy.orm import relationship
 from property_street_backend.app.database import Base
 
@@ -6,7 +6,7 @@ class CartItem(Base):
     __tablename__ = "cart_items"
 
     id = Column(Integer, primary_key=True, index=True)
-    quantity = Column(Integer, default=1, max=1)
+    quantity = Column(Integer, default=1)
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -43,4 +43,8 @@ class CartItem(Base):
         back_populates="cart_items",
         lazy="selectin",
         uselist=False
+    )
+
+    __table_args__ = (
+        CheckConstraint("quantity <= 1", name="check_quantity_max"),
     )

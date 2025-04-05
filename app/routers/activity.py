@@ -130,10 +130,7 @@ async def fetch_agent_assets(
         )
 
 
-@router.get(
-    "/user-ui-metadata",
-    response_model=UserUIMetaDataSchema,
-)
+@router.get("/user-ui-metadata",response_model=UserUIMetaDataSchema)
 async def fetch_user_ui_metadata(
     current_user: Optional[TokenData] = Depends(decode_user_from_token_optional)
 ):
@@ -172,10 +169,7 @@ async def fetch_user_ui_metadata(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get(
-    "/assets/latest",
-    response_model=LatestAssetsFetchResponseSchema,
-)
+@router.get("/assets/latest",response_model=LatestAssetsFetchResponseSchema)
 async def fetch_latest_assets(
     session: AsyncSession = Depends(get_db),
 ):
@@ -206,10 +200,7 @@ async def fetch_latest_assets(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get(
-    "/assets/{asset_id}",
-    response_model=AssetFetchByIdResponseSchema,
-)
+@router.get("/assets/{asset_id}",response_model=AssetFetchByIdResponseSchema)
 async def fetch_asset_by_id(
     asset_id: int,  # Accept asset ID as a path parameter
     session: AsyncSession = Depends(get_db),

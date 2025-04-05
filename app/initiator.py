@@ -1,6 +1,6 @@
-from fastapi import FastAPI
 import logging
-import redis.asyncio as redis
+from fastapi import FastAPI
+from redis.asyncio import Redis
 
 from property_street_backend.config.settings import (
     REDIS_CACHE_DB,
@@ -29,7 +29,7 @@ oauth.register(
 )
 
 async def redis_client():
-    client = await redis.Redis(
+    client = await Redis(
         host=REDIS_HOST, 
         port=6379, 
         db=REDIS_CACHE_DB, #db1 for property street dev cache; 0 should be for production
@@ -39,4 +39,3 @@ async def redis_client():
         yield client
     finally:
         await client.aclose()
-

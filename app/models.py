@@ -352,6 +352,16 @@ class User(Base):
         uselist = False,
     )
 
+        # Reverse relationship to the CartItem
+    
+    # relationship to CartItem
+    cart_items = relationship(
+        'CartItem', 
+        back_populates='user',
+        cascade="all, delete-orphan", # cascade from User to CartItem
+        lazy="selectin",  # Ensures relationship loads in async contexts
+    )
+
     # method for a user to become an agent
     async def become_agent(self, session):
         """Method to convert a user into an agent."""
@@ -443,7 +453,7 @@ class Asset(Base):
     address = Column(String, nullable=False)
     currency = Column(String, nullable=False)
     status = Column(String, nullable=False)
-    price = Column(Numeric(10, 2), nullable=False)  # Up to 10 digits, 2 decimal places
+    price = Column(Numeric(10, 2), nullable=False)  # Up to 10 digits, 2 decimal places; returns a Decimal type
     lease_duration = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     has_features = Column(Boolean, default=False)
@@ -514,6 +524,14 @@ class Asset(Base):
         'AssetCloudImage', 
         back_populates='asset',
         cascade="all, delete-orphan", # cascade from Asset to AssetCloudImage
+        lazy="selectin",  # Ensures relationship loads in async contexts
+    )
+
+    # relationship to CartItem
+    cart_items = relationship(
+        'CartItem', 
+        back_populates='asset',
+        cascade="all, delete-orphan", # cascade from Asset to CartItem
         lazy="selectin",  # Ensures relationship loads in async contexts
     )
 

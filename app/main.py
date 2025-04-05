@@ -30,20 +30,17 @@ from property_street_backend.app.initiator import (
     redis_client
 )
 from property_street_backend.config.settings import (
-    environment,
+    ENVIRONMENT as environment,
     CORS_ORIGINS,
 )
-from property_street_backend.app.controllers.activity.asset_routine_methods import (
-    asset_auto_category_expiry
-)
+from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
-    redis = await redis_client().__anext__()
-    await asset_auto_category_expiry(
-        redis_client=redis
-    )
+    redis_client = await redis_client().__anext__()
+    await cache_expiry_initializer(redis_client)
     yield  # Application runs here
     # Shutdown logic (if needed)
     # e.g., await redis_client.close()

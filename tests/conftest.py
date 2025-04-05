@@ -4,15 +4,19 @@ from sqlalchemy.orm import sessionmaker
 from httpx import AsyncClient, ASGITransport
 import redis.asyncio as redis
 
+from property_street_backend.app.main import app
 from property_street_backend.app.database import Base, get_db
 from property_street_backend.app.initiator import redis_client
-from property_street_backend.app.main import app
 from property_street_backend.config.settings import (
-    REDIS_CACHE_DB,
     TEST_DATABASE_URL, 
     TEST_REDIS_CACHE_DB,
+    PROD_REDIS_CACHE_DB,
 )
-from property_street_backend.app.utils.store import email_verification_code_ttl
+from property_street_backend.config.connection_manager import (
+    _redis_instances,
+    get_redis_instance,
+)
+
 
 # Async SQLAlchemy engine and session for testing
 # async_engine: An asynchronous SQLAlchemy engine created using create_async_engine for the test database.
@@ -28,27 +32,66 @@ AsyncTestSessionLocal = sessionmaker(
     autoflush=False
 )
 
-# Minimal Dependency structure to get async test DB session
-@pytest.fixture(scope="function")
-async def get_test_db__fixture(request, event_loop):
-    
+async def get_test_db():
     async with test_async_engine.begin() as conn:
-        # Create the database schema
-        print("***Creating the Base's metadata")
-        await conn.run_sync(Base.metadata.create_all)
+        try:
+            # Create the database schema
+            print("***Creating the Base's metadata")
+            await conn.run_sync(Base.metadata.create_all)
 
-    # Finalizer function
-    async def cleanup_testdb():
-        async with test_async_engine.begin() as conn:
+            async with AsyncTestSessionLocal() as session:
+                try:
+                    yield session
+                finally:
+                    await session.close()
+        finally:
             # Drop the schema after tests
             await conn.run_sync(Base.metadata.drop_all)
             print("***tearing down the Base's metadata")
 
-    # Use an event loop to ensure cleanup happens after tests complete
-    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup_testdb()))
 
-    async with AsyncTestSessionLocal() as session:
-        return session
+async def get_test_redis():
+    global _redis_instances
+    env = "test"
+    key = f"{env}_{TEST_REDIS_CACHE_DB}"
+    
+    cleanup_on_exit=True
+    existing_instance = _redis_instances.get(key)
+
+    if existing_instance:
+        cleanup_on_exit = False
+    
+    redis_client = await get_redis_instance(env)
+    try:
+        yield redis_client
+    finally:
+        if cleanup_on_exit:
+            await redis_client.aclose()
+            _redis_instances.pop(key, None)
+            print("\nClosed redis")
+
+
+# Minimal Dependency structure to get async test DB session
+@pytest.fixture(scope="function")
+async def get_test_db__fixture(request, event_loop):
+        
+        async with test_async_engine.begin() as conn:
+            # Create the database schema
+            print("***Creating the Base's metadata")
+            await conn.run_sync(Base.metadata.create_all)
+
+        # Finalizer function
+        async def cleanup_testdb():
+            async with test_async_engine.begin() as conn:
+                # Drop the schema after tests
+                await conn.run_sync(Base.metadata.drop_all)
+                print("***tearing down the Base's metadata")
+
+        # Use an event loop to ensure cleanup happens after tests complete
+        request.addfinalizer(lambda: event_loop.run_until_complete(cleanup_testdb()))
+
+        async with AsyncTestSessionLocal() as session:
+            return session
 
 
 @pytest.fixture(scope="function")
@@ -57,16 +100,15 @@ async def redis_client__fixture(
     event_loop,
 ):
     # Initialize Redis client
-    redis_client = redis.Redis(
-        host='localhost',
-        port=6379,
-        db=TEST_REDIS_CACHE_DB,  # Using db3 for property street test
-    )
+    async for redis_client in get_test_redis():
+        break
 
+    # cleanup function
     async def cleanup():
-        print("**closing redis")
-        await redis_client.aclose()
-        await redis_client.flushdb()
+        # finally block of get_test_redis() runs here
+        # await redis_client.flushdb()
+        print("\n**Cleaned up fixture!")
+        pass
 
     # Use an event loop to ensure cleanup happens after tests complete
     request.addfinalizer(lambda: event_loop.run_until_complete(cleanup()))
@@ -83,7 +125,7 @@ async def prod_redis_client__fixture(
     redis_client = redis.Redis(
         host='localhost',
         port=6379,
-        db=REDIS_CACHE_DB,  # Using db3 for property street test
+        db=PROD_REDIS_CACHE_DB,  # Using db3 for property street test
         decode_responses=True,
     )
 
@@ -108,7 +150,8 @@ async def client__fixture(
     test_db = await get_test_db__fixture
 
     # get the yield client object
-    test_redis_client = await redis_client__fixture.__anext__()
+    async for test_redis_client in redis_client__fixture:
+        break
 
     # overriding the client's get_db dependency
     app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session

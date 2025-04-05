@@ -30,7 +30,7 @@
 
 ## add_to_cart functionality logic
 - Check the cart_pre_deletion set; if the asset is set for deletion off the user's record, but not actually deleted.
-    - If it is, it's moved to the cart set, and the ttl updated and the function is returned.
+    - If it is, it's removed from the pre_delete set, moved to the cart set, the ttl updated, and the function is returned.
 - The `cart` set is checked
     - If the asset_id to add does not exist, add the asset and update the expiry.
     - return the function.
@@ -44,8 +44,8 @@
         - If it's present in the cart set, the data is removed, the ttl updated, then the item is added to the cart_pre_delete set(then later offloaded).
 
 ## clear cart
-- All cart_pre_offload asset_id is added to the cart_pre_deletion set, then deleted
-- All cart items is added to the cart_pre_deletion set, deleted
+- All cart_pre_offload asset_id is added to the cart_pre_deletion set, then the set deleted
+- All cart items is added to the cart_pre_deletion set, then the set deleted
 
 ## offload mechanism
 At offload_time, a cron-job is ran to move all items from cart_pre_offload to the database, and then to the cart.

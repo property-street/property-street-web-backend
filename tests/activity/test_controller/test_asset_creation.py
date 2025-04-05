@@ -35,7 +35,7 @@ async def create_asset(
         country=asset_data.country,
         address=asset_data.address,
         currency=asset_data.currency,
-        amount=asset_data.amount,
+        price=asset_data.price,
         description=asset_data.description,
         category=asset_data.category,
         availability=asset_data.availability,
@@ -126,7 +126,7 @@ async def create_test_data(agent_id=None):
         country="Test Country",
         address="123 Test St",
         currency="USD",
-        amount=100000.00,
+        price=100000.00,
         description="Test description",
         category="House",
         status="auction",
@@ -148,6 +148,7 @@ async def create_test_data(agent_id=None):
     ]
 
     return asset_data, cloud_images
+
 
 async def create_test_asset(db, agent_id=None):
     """
@@ -204,9 +205,11 @@ async def create_test_agent(db):
 
 
 @pytest.mark.asyncio
-async def test_controller_create_asset_feature_and_image(get_test_db__fixture: AsyncSession): 
-    # Fetch the test DB session
-    test_db = await get_test_db__fixture.__anext__()
+async def test_controller_create_asset_feature_and_image(client__fixture): 
+    # get the yield client objects
+    fixture_obj = await client__fixture.__anext__()
+    # extract the database entry
+    test_db = fixture_obj.get("db")
 
     # Create a test agent/user
     created_agent = await create_test_agent(test_db)

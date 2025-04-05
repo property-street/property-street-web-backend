@@ -9,7 +9,7 @@ from .dispatch_expiry_case import dispatch_expiry_case
 
 async def run_pubsub_listener(
     pubsub: redis.client.PubSub, 
-    stop_event: asyncio.events.Event,
+    stop_event,
     redis_client: redis.Redis,
 ):
     """This function subscribes to a redis expiry event

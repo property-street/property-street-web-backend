@@ -1,7 +1,6 @@
-import time
-import pytest
 import json
-import redis.asyncio as redis
+import pytest
+import asyncio
 
 from property_street_backend.config.settings import REDIS_CACHE_DB
 
@@ -25,7 +24,7 @@ async def test_redis_expiry(client__fixture_with_prod_redis):
     await redis_client.expire('newly_created_asset:1', 1)
 
     # Step 5: Wait for 2 seconds to ensure the key expires
-    time.sleep(2)
+    await asyncio.sleep(2)
 
     # Verify if the key `newly_created_asset:1` has expired
     assert not await redis_client.exists('newly_created_asset:1')

@@ -8,13 +8,22 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from property_street_backend.config.settings import (
     REDIS_HOST,
-    CART_OFFLOAD_SCHEDULE,
+    TEST_REDIS_CACHE_DB,
+    PROD_REDIS_CACHE_DB,
+    TEST_CART_OFFLOAD_SCHEDULE,
+    PROD_CART_OFFLOAD_SCHEDULE
 )
+TEST_ENV = os.getenv("TEST_ENV")
+env = 'test' if TEST_ENV else 'prod'
+redis_db = TEST_REDIS_CACHE_DB if TEST_ENV else PROD_REDIS_CACHE_DB
+
+# cart routine time
+cart_offload_schedule_secs = TEST_CART_OFFLOAD_SCHEDULE if TEST_ENV else PROD_CART_OFFLOAD_SCHEDULE
 
 celery_app = Celery(
     'celery_config',
-    broker=f'redis://{REDIS_HOST}:6379/0',
-    backend=f'redis://{REDIS_HOST}:6379/0'
+    broker=f'redis://{REDIS_HOST}:6379/{redis_db}',
+    backend=f'redis://{REDIS_HOST}:6379/{redis_db}'
 )
 
 celery_app.conf.update(
@@ -26,13 +35,16 @@ celery_app.conf.update(
     enable_utc=True,
     beat_schedule={
         'offload-cart-items-to-db': {
-            'task': 'bot.tasks.routine',
-            'schedule': CART_OFFLOAD_SCHEDULE,  # Runs every expiry seconds
-            'args': (),  # Arguments for the task
+            'task': 'property_street_backend.app.controllers.cart.routines.offload_task.routine',
+            'schedule': cart_offload_schedule_secs,  # Runs every expiry seconds
+            'args': (env,),  # Arguments for the task
         },
         #...
     },
 )
 
 # Ensure tasks are discovered
-celery_app.autodiscover_tasks(['property_street_backend.app.controllers.cart.tasks'])
+celery_app.autodiscover_tasks([
+    'property_street_backend.app.controllers.cart.routines.offload_task',
+    #...
+])

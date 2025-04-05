@@ -79,6 +79,24 @@ docker build -t crankgig/property_street_docker_hub_fastapi_repo:latest .
 ### push the image to docker hub
 docker push crankgig/property_street_docker_hub_fastapi_repo:latest
 
+## start the celery worker
+```bash
+celery -A app.celery_config worker --pool=solo --loglevel=info -E
+```
+## Start the Celery Beat Scheduler
+```bash
+celery -A app.celery_config beat --loglevel=info
+```
+
+## start the test celery worker
+```bash
+TEST_ENV=True celery -A property_street_backend.app.celery_config worker --pool=solo --loglevel=info -E
+```
+## Start the test elery Beat Scheduler
+```bash
+TEST_ENV=True celery -A property_street_backend.app.celery_config beat --loglevel=info
+```
+
 ## Set Usage & Parameters
 ```
 await redis_client.set(name, value, ex=None, px=None, nx=False, xx=False)
