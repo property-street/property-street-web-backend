@@ -28,7 +28,7 @@ async def create_asset_and_component(db, agent):
             country="USA",
             address="123 Main St",
             currency="USD",
-            amount=500000,
+            price=500000,
             status="For Sale",
             description="Test description for asset 1",
             has_features=True,
@@ -40,7 +40,7 @@ async def create_asset_and_component(db, agent):
             country="Germany",
             address="456 Main St",
             currency="EUR",
-            amount=30000,
+            price=30000,
             status="For Rent",
             description="Test description for asset 2",
             has_features=False

@@ -4,42 +4,32 @@ from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
+from property_street_backend.app.models import Asset
 from property_street_backend.app.database import get_db
 from property_street_backend.config.settings import (
+    DEBUG,
     NEWLY_CREATED_ASSET_TTL,
-    DEBUG
 )
 from property_street_backend.app.controllers.auth import (
     decode_user_from_token,
     decode_user_from_token_optional,
 )
-from property_street_backend.app.initiator import redis_client
+from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.schemas.auth_schemas import (
     TokenData, 
-)
-from property_street_backend.app.models import (
-    Asset, 
 )
 from property_street_backend.app.schemas.asset_schemas import (
     LatestAssetsFetchResponseSchema,
     AssetFetchByIdResponseSchema 
 )
-from property_street_backend.app.schemas.route_based_asset_schemas import (
-    UserUIMetaDataSchema
-)
+from property_street_backend.log_config.logger_config import log_message
+from property_street_backend.app.controllers.settings.user_update import user_record_update
+from property_street_backend.app.schemas.route_based_asset_schemas import UserUIMetaDataSchema
 from property_street_backend.app.controllers.activity.agent_crud_processing import (
     process_asset as controller_process_asset,
     remove_tags_from_asset,
 )
-from property_street_backend.app.controllers.activity.agent_assets_retrieval import (
-    get_agent_assets
-)
-from property_street_backend.log_config.logger_config import (
-    log_message
-)
-from property_street_backend.app.controllers.settings.user_update import user_record_update
-
-
+from property_street_backend.app.controllers.activity.agent_assets_retrieval import get_agent_assets
 
 router = APIRouter(prefix="/activity", tags=["activity"])
 
@@ -47,7 +37,7 @@ router = APIRouter(prefix="/activity", tags=["activity"])
 async def process_asset(
     data: Dict, 
     db: AsyncSession = Depends(get_db),
-    redis_client: redis.Redis = Depends(redis_client),
+    redis_client: redis.Redis = Depends(get_redis),
     _: TokenData = Depends(decode_user_from_token)
 ):
     try:

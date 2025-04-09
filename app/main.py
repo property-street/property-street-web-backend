@@ -27,7 +27,7 @@ from property_street_backend.app.routers import (
 )
 from property_street_backend.app.initiator import (
     app, 
-    redis_client
+    get_redis,
 )
 from property_street_backend.config.settings import (
     ENVIRONMENT as environment,
@@ -39,7 +39,9 @@ from property_street_backend.app.controllers.cache_expiration import cache_expir
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
-    redis_client = await redis_client().__anext__()
+    async for redis_client in get_redis():
+        break
+
     await cache_expiry_initializer(redis_client)
     yield  # Application runs here
     # Shutdown logic (if needed)
@@ -71,7 +73,7 @@ def read_root():
 
 @home_router.get("/test-redis")
 async def test_redis(
-    redis_client: redis.Redis = Depends(redis_client),
+    redis_client: redis.Redis = Depends(get_redis),
 ):
     await redis_client.set("test_key", "value")
     value = await redis_client.get("test_key")

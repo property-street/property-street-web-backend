@@ -8,9 +8,10 @@ from property_street_backend.app.controllers.cart.cart_methods import CartServic
 @pytest.mark.asyncio
 async def test_clear_cart(client__fixture):
     # get the yield client objects
-    fixture_obj = await client__fixture.__anext__()
-    # extract the database entry
-    redis_client = fixture_obj.get("redis_client")
+    async for fixture_obj in client__fixture:
+        # extract the redis entry
+        redis_client = fixture_obj.get("redis_client")
+        break
 
     test_user_id = 1
     cart_key = f"cart_{test_user_id}"

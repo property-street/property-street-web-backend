@@ -4,8 +4,8 @@ from fastapi import (
     APIRouter,
 )
 from typing import Dict
-from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, status, HTTPException
 
 
 from property_street_backend.app.database import get_db
@@ -14,15 +14,9 @@ from property_street_backend.app.controllers.auth import (
     get_password_hash,
     verify_password,
 )
-from property_street_backend.config.settings import (
-    DEBUG
-)
-from property_street_backend.log_config.logger_config import (
-    log_message
-)
-from property_street_backend.app.schemas.auth_schemas import (
-    TokenData, 
-)
+from property_street_backend.config.settings import DEBUG
+from property_street_backend.app.schemas.auth_schemas import TokenData 
+from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.schemas.settings_schemas import SettingsSchema
 from property_street_backend.app.controllers.settings.user_update import user_record_update
 

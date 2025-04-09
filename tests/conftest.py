@@ -1,120 +1,52 @@
+import os
+import time
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from httpx import AsyncClient, ASGITransport
+import signal
+import pytest
+import platform
+import subprocess
 import redis.asyncio as redis
+from httpx import AsyncClient, ASGITransport
 
 from property_street_backend.app.main import app
-from property_street_backend.app.database import Base, get_db
-from property_street_backend.app.initiator import redis_client
+from property_street_backend.app.database import get_db
+from property_street_backend.app.initiator import get_redis
 from property_street_backend.config.settings import (
-    TEST_DATABASE_URL, 
-    TEST_REDIS_CACHE_DB,
     PROD_REDIS_CACHE_DB,
 )
-from property_street_backend.config.connection_manager import (
-    _redis_instances,
+from property_street_backend.config.redis_connection_manager import (
     get_redis_instance,
 )
+from property_street_backend.config.postgres_connection_manager import get_postgres_instance
 
-
-# Async SQLAlchemy engine and session for testing
-# async_engine: An asynchronous SQLAlchemy engine created using create_async_engine for the test database.
-# TestingSessionLocal: An asynchronous session factory created using sessionmaker with AsyncSession.
-
-test_async_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-# Async SQLAlchemy session for testing
-AsyncTestSessionLocal = sessionmaker(
-    bind=test_async_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False
-)
-
-async def get_test_db():
-    async with test_async_engine.begin() as conn:
-        try:
-            # Create the database schema
-            print("***Creating the Base's metadata")
-            await conn.run_sync(Base.metadata.create_all)
-
-            async with AsyncTestSessionLocal() as session:
-                try:
-                    yield session
-                finally:
-                    await session.close()
-        finally:
-            # Drop the schema after tests
-            await conn.run_sync(Base.metadata.drop_all)
-            print("***tearing down the Base's metadata")
+async def get_test_db(**kwargs):
+    env = 'test'
+    async for test_db in get_postgres_instance(env,**kwargs):
+        yield test_db
 
 
 async def get_test_redis():
-    global _redis_instances
     env = "test"
-    key = f"{env}_{TEST_REDIS_CACHE_DB}"
-    
-    cleanup_on_exit=True
-    existing_instance = _redis_instances.get(key)
-
-    if existing_instance:
-        cleanup_on_exit = False
-    
-    redis_client = await get_redis_instance(env)
-    try:
+    async for redis_client in get_redis_instance(env):
         yield redis_client
-    finally:
-        if cleanup_on_exit:
-            await redis_client.aclose()
-            _redis_instances.pop(key, None)
-            print("\nClosed redis")
 
 
-# Minimal Dependency structure to get async test DB session
 @pytest.fixture(scope="function")
-async def get_test_db__fixture(request, event_loop):
+async def get_test_db__fixture():
         
-        async with test_async_engine.begin() as conn:
-            # Create the database schema
-            print("***Creating the Base's metadata")
-            await conn.run_sync(Base.metadata.create_all)
-
-        # Finalizer function
-        async def cleanup_testdb():
-            async with test_async_engine.begin() as conn:
-                # Drop the schema after tests
-                await conn.run_sync(Base.metadata.drop_all)
-                print("***tearing down the Base's metadata")
-
-        # Use an event loop to ensure cleanup happens after tests complete
-        request.addfinalizer(lambda: event_loop.run_until_complete(cleanup_testdb()))
-
-        async with AsyncTestSessionLocal() as session:
-            return session
-
-
-@pytest.fixture(scope="function")
-async def redis_client__fixture(
-    request,
-    event_loop,
-):
-    # Initialize Redis client
-    async for redis_client in get_test_redis():
-        break
-
-    # cleanup function
-    async def cleanup():
-        # finally block of get_test_redis() runs here
-        # await redis_client.flushdb()
-        print("\n**Cleaned up fixture!")
-        pass
+    async for session in get_test_db():
+        yield session
 
     # Use an event loop to ensure cleanup happens after tests complete
-    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup()))
-    
-    yield redis_client
+    # request.addfinalizer(lambda: event_loop.run_until_complete(cleanup_testdb()))
 
+
+
+@pytest.fixture(scope="function")
+async def redis_client__fixture():
+    # Initialize Redis client
+    async for redis_client in get_test_redis():
+        yield redis_client
 
 @pytest.fixture(scope="function")
 async def prod_redis_client__fixture(
@@ -141,13 +73,12 @@ async def prod_redis_client__fixture(
 
 @pytest.fixture(scope="function")
 async def client__fixture(
-    request,
-    event_loop,
     get_test_db__fixture, 
     redis_client__fixture,
 ):
     # getting the test_db fixture
-    test_db = await get_test_db__fixture
+    async for test_db in get_test_db__fixture:
+        break
 
     # get the yield client object
     async for test_redis_client in redis_client__fixture:
@@ -155,15 +86,7 @@ async def client__fixture(
 
     # overriding the client's get_db dependency
     app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
-    app.dependency_overrides[redis_client] = lambda: test_redis_client  # Override redis_client dependency
-
-    # cleanup to close the test database
-    async def cleanup():
-        await test_db.close()
-
-    # Use an event loop to ensure cleanup happens after tests complete
-    request.addfinalizer(lambda: event_loop.run_until_complete(cleanup()))
-    
+    app.dependency_overrides[get_redis] = lambda: test_redis_client  # Override redis_client dependency
 
     # Use ASGITransport with the app
     transport = ASGITransport(app=app)
@@ -190,7 +113,7 @@ async def client__fixture_with_prod_redis(
 
     # overriding the client's get_db dependency
     app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
-    app.dependency_overrides[redis_client] = lambda: prod_redis_client  # Override redis_client dependency
+    app.dependency_overrides[get_redis] = lambda: prod_redis_client  # Override redis_client dependency
 
     # cleanup to close the test database
     async def cleanup():
@@ -209,3 +132,63 @@ async def client__fixture_with_prod_redis(
             "db": test_db,
         }
 
+@pytest.fixture(scope="function")
+def celery_worker_and_beat():
+    env = os.environ.copy()
+    env["TEST_ENV"] = "True"
+
+    is_windows = platform.system() == "Windows"
+
+    if is_windows:
+        # On Windows, use creationflags to create a new process group
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+        worker = subprocess.Popen(
+            [
+                "celery", "-A", "property_street_backend.app.celery_config", "worker",
+                "--pool=solo", "--loglevel=info", "-E"
+            ],
+            env=env,
+            creationflags=creationflags
+        )
+        beat = subprocess.Popen(
+            [
+                "celery", "-A", "property_street_backend.app.celery_config", "beat",
+                "--loglevel=info"
+            ],
+            env=env,
+            creationflags=creationflags
+        )
+    else:
+        # On Unix, use preexec_fn to set new process group
+        worker = subprocess.Popen(
+            [
+                "celery", "-A", "property_street_backend.app.celery_config", "worker",
+                "--pool=solo", "--loglevel=info", "-E"
+            ],
+            env=env,
+            preexec_fn=os.setsid
+        )
+        beat = subprocess.Popen(
+            [
+                "celery", "-A", "property_street_backend.app.celery_config", "beat",
+                "--loglevel=info"
+            ],
+            env=env,
+            preexec_fn=os.setsid
+        )
+
+    # Give them time to start
+    time.sleep(5)
+
+    yield
+
+    # Graceful shutdown
+    if is_windows:
+        worker.send_signal(signal.CTRL_BREAK_EVENT)
+        beat.send_signal(signal.CTRL_BREAK_EVENT)
+    else:
+        os.killpg(os.getpgid(worker.pid), signal.SIGTERM)
+        os.killpg(os.getpgid(beat.pid), signal.SIGTERM)
+
+    worker.wait()
+    beat.wait()

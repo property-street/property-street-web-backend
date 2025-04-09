@@ -1,6 +1,6 @@
 from sqlalchemy import Column, ForeignKey, Integer, DateTime, func, CheckConstraint
 from sqlalchemy.orm import relationship
-from property_street_backend.app.database import Base
+from property_street_backend.config.postgres_connection_manager import Base
 
 class CartItem(Base):
     __tablename__ = "cart_items"

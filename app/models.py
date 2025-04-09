@@ -28,7 +28,7 @@ from property_street_backend.app.enums import (
     ClientTypeChoice,
     AssetCategoryChoice,
 )
-from property_street_backend.app.database import Base
+from property_street_backend.config.postgres_connection_manager import Base
 from property_street_backend.app.controllers.cart.models import CartItem
 
 

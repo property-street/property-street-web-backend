@@ -7,8 +7,13 @@ from property_street_backend.config.settings import (
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
     REDIS_HOST,
+    PROD_REDIS_CACHE_DB,
 )
 from authlib.integrations.starlette_client import OAuth
+from property_street_backend.config.settings import DEBUG
+from property_street_backend.config.redis_connection_manager import (
+    get_redis_instance,
+)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +33,7 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
-async def redis_client():
+async def get_redis_client():
     client = await Redis(
         host=REDIS_HOST, 
         port=6379, 
@@ -39,3 +44,7 @@ async def redis_client():
         yield client
     finally:
         await client.aclose()
+
+async def get_redis():
+    async for redis_client in get_redis_instance():
+        yield redis_client

@@ -12,7 +12,9 @@ async def test_user_record_update(
     client__fixture
 ):
     # get the yield client objects
-    fixture_obj = await client__fixture.__anext__()
+    async for fixture_obj in client__fixture:
+        break
+    
     # extract the database entry
     test_db = fixture_obj.get("db")
 

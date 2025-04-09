@@ -13,10 +13,12 @@ from property_street_backend.config.settings import (
     TEST_CART_OFFLOAD_SCHEDULE,
     PROD_CART_OFFLOAD_SCHEDULE
 )
+
+# environment retrieval based on context
 TEST_ENV = os.getenv("TEST_ENV")
 env = 'test' if TEST_ENV else 'prod'
+# db based on context
 redis_db = TEST_REDIS_CACHE_DB if TEST_ENV else PROD_REDIS_CACHE_DB
-
 # cart routine time
 cart_offload_schedule_secs = TEST_CART_OFFLOAD_SCHEDULE if TEST_ENV else PROD_CART_OFFLOAD_SCHEDULE
 
