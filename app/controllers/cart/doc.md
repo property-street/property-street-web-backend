@@ -1,4 +1,4 @@
-# Cart documentation
+# 🛒 Cart documentation
 <!--This implementation is programmed to reduce database writes by utilizing redis for cache functionalities, and celery for periodic offload to the database-->
 
 ## set keys 

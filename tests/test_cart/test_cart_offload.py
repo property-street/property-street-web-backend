@@ -79,13 +79,15 @@ async def test_cart_offload(client__fixture,celery_worker_and_beat):
     # add items to the pre_offload set
     await redis_client.set(cart_pre_offload_key, json.dumps(cart_object_proto))
     
-    # wait for offload seconds
+    # wait until the data has been propagated
     for _ in range(TEST_CART_OFFLOAD_SCHEDULE+10):
         cart_data_exists = await redis_client.get(cart_key)
         if cart_data_exists:
             break
         await asyncio.sleep(1)
 
+    # Confirm pre-offload is deleted
+    assert not await redis_client.exists(cart_pre_offload_key)
     # check that those items are in the cart set
     # wait for ttl seconds to confirm expiration
     cart_data = json.loads(await redis_client.get(cart_key))
@@ -98,5 +100,6 @@ async def test_cart_offload(client__fixture,celery_worker_and_beat):
     query = await test_db.execute(
         select(CartItem).where(CartItem.user_id == test_user_id)
     )
-    result = query.scalars().all()
-    assert len(result) == 2
+    results = query.scalars().all()
+    assert len(results) == 2
+    assert {item.asset_id for item in results} == {asset_id1, asset_id2}

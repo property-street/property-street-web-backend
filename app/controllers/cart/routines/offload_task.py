@@ -171,9 +171,3 @@ async def handle_cart_offload(
 
 if __name__ == "__main__":
     pass
-#    async def check_redis():
-#        async for redis_client in get_redis_client():
-#            break
-#        # await redis_client.flushdb()
-#        print(isinstance(redis_client,Redis))
-#    asyncio.run(check_redis())

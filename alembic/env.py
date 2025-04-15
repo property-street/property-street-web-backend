@@ -6,7 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 
 
-from property_street_backend.app.database import Base  # Adjust this import as needed
+from property_street_backend.config.postgres_connection_manager import Base  # Adjust this import as needed
 from property_street_backend.app.models import *  # Import all models to ensure they're registered
 
 

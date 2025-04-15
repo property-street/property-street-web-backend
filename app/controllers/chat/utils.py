@@ -1,62 +1,128 @@
 import logging, json, time
-import redis.asyncio as redis
+from redis.asyncio import Redis
+from typing import Optional
 from fastapi import (
     WebSocket, 
 )
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import update
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis.exceptions import RedisError, ConnectionError, TimeoutError
 
 
+from .schemas import ChatObjectSchema
 from property_street_backend.app.models import (
     User,
     Thread,
     Message,
 )
 from property_street_backend.config.settings import (
-    DEBUG
+    DEBUG,
+    CHAT_TTL,
+    CHAT_LAZY_OFFLOAD_SCHEDULE,
 )
 from property_street_backend.log_config.logger_config import (
     log_message
 )
+from property_street_backend.config.websocket_factory import (
+    connected_ws
+)
+
 websocket_logger = logging.getLogger("websocket")
 
 
+async def get_or_create_cached_chat(recipient_id:int, sender_id:int, /, redis_client: Redis) -> dict:
+    """Attempts to retrieve a chat object between two users if it exists, else
+    returns and empty object
 
+    Args:
+        recipient_id (int): id of the chat recipient
+        sender_id (int): id of the chat sender
+        redis_client (Redis): redis session client
+
+    Returns:
+        dict: hash map of timestamp in milliseconds or an empty one
+    """
+    cached_hset_key = f'chat_{min(sender_id, recipient_id)}{max(sender_id, recipient_id)}'
+    cached_chat = redis_client.hget(cached_hset_key, 'chat_object')
+    return json.loads(cached_chat) if cached_chat else {}           
+
+def get_client_socket_from_factory(*,client_id:int) -> Optional[WebSocket]:
+    return connected_ws.get(client_id, None)
+
+async def update_cached_hset(
+    chat_lazy_offload_schedule:int, 
+    redis_client:Redis,
+    cached_hset_key: str,
+    chat_object: dict,
+    ttl: int,
+):
+    lazy_timestamp = datetime.now(timezone.utc) + timedelta(seconds=chat_lazy_offload_schedule)
+    await redis_client.hset(cached_hset_key, mapping={
+        "chat_object": json.dumps(chat_object),
+        "lazy_timestamp": lazy_timestamp
+    })
+    await redis_client.expire(cached_hset_key, ttl)
 
 async def handle_chat(
-    chat_obj: dict,
-    websocket: WebSocket,
-    redis_client: redis.Redis,
+    data: ChatObjectSchema,
+    redis_client: Redis,
+    chat_lazy_offload_schedule: int = CHAT_LAZY_OFFLOAD_SCHEDULE, 
+    chat_ttl: int = CHAT_TTL,
 ):
     """Handles a chat object on a channel
 
     Args:
-        websocket (WebSocket): _description_
-        redis_client (redis.Redis): _description_
-        chat_obj (dict): contains data like the message_type, recipient and sender id, etc,.
+        websocket (WebSocket): sends a message back to a client
+        redis_client (redis.Redis): writes to a channel
+        chat_obj (dict): contains chat metadata like the message_type, recipient and sender id, etc,.
     """
-    message_type = chat_obj['type']
+    chat_obj = vars(data)
+    message_type = chat_obj['msg_type']
     recipient_id = chat_obj['recipient_id']
-    
+    sender_id = chat_obj['sender_id']
+
+    sender_ws = get_client_socket_from_factory(client_id=sender_id)
+    recipient_ws = get_client_socket_from_factory(client_id=recipient_id)
+
+    cached_hset_key = f'chat_{min(sender_id, recipient_id)}{max(sender_id, recipient_id)}'
     
     if message_type=='incoming_message':
         try:
             # send the data to the recipient
             # update the status of the message to delivered
-            recipient_id = chat_obj['recipient_id']
-            await websocket.send_text(chat_obj)
-            chat_obj['status'] = 'delivered'
+            if recipient_ws:
+                await recipient_ws.send_text(chat_obj)
+            else:
+                raise ConnectionError
             
             if DEBUG:
                 websocket_logger.info(f"Message sent successfully to {recipient_id}!")
             
+            # add a timestamp in milli_seconds
+            # update the status to delivered
+            # check that the hset exists
+            # add the chat_obj under the timestamp
+            unix_timestamp_ms = int(time.time() * 1000)
+            chat_obj['unix_timestamp_ms'] = unix_timestamp_ms
+            chat_obj['status'] = 'delivered'
+            loaded_cached_chat = await get_or_create_cached_chat(recipient_id, sender_id, redis_client=redis_client)           
+            loaded_cached_chat[unix_timestamp_ms] = chat_obj
+            
+            # update the lazy timestamp, ttl and chat_object of the hset
+            lazy_timestamp = datetime.now(timezone.utc) + timedelta(seconds=chat_lazy_offload_schedule)
+            await redis_client.hset(cached_hset_key, mapping={
+                "chat_object": json.dumps(chat_obj),
+                "lazy_timestamp": lazy_timestamp
+            })
+            
             try:          
-                # update the sender's channel with the new chat-object
-                sender_id = chat_obj['sender_id']
-                await redis_client.publish(sender_id,chat_obj)
+                # update the sender's socket with the new chat-object
+                if sender_ws:
+                    await sender_ws.send_text(chat_obj)
+                else:
+                    raise ConnectionError
             except (ConnectionError, TimeoutError, RedisError) as e:
                 await add_pending_msg_to_pool(
                     message_obj=chat_obj,
@@ -84,18 +150,32 @@ async def handle_chat(
                 log_type = 'error',
                 message = f"Failed to recipient-read to sender: {e}"
             )
-    elif message_type=='message_read':
+    elif message_type=='read_message':
         try:
-            # send the read notification to sender
             # update the data structure as message is sent/delivered
-            await websocket.send_text(chat_obj)
+            # send the read notification to sender
             chat_obj['status'] = 'read'
-            
+            if sender_ws:
+                await sender_ws.send_text(chat_obj)
+            else: 
+                raise ConnectionError
             if DEBUG:
                 websocket_logger.info("Message read sent successfully to sender!")
+
+            # get the cached chat if it exist else the empty object
+            # update the status to sent
+            # re-update the hset
+            loaded_cached_chat = await get_or_create_cached_chat(recipient_id, sender_id, redis_client=redis_client) 
+            unix_timestamp_ms = chat_obj['unix_timestamp_ms']
+            loaded_cached_chat[str(unix_timestamp_ms)]['status'] = chat_obj
+            lazy_timestamp = datetime.now(timezone.utc) + timedelta(seconds=chat_lazy_offload_schedule)
+            await redis_client.hset(cached_hset_key, mapping={
+                "chat_object": json.dumps(loaded_cached_chat),
+                "lazy_timestamp": lazy_timestamp
+            })
+            await redis_client.expire(cached_hset_key, chat_ttl)
         except Exception as e:
-            sender_id = chat_obj['sender_id']
-            # when message fails to reach the recipient
+            # when message fails to reach the sender
             await add_pending_msg_to_pool(
                 message_obj=chat_obj,
                 redis_client=redis_client,
@@ -115,7 +195,7 @@ async def handle_chat(
 async def add_pending_msg_to_pool(
     user_id: int,
     message_obj: dict,
-    redis_client: redis.Redis,
+    redis_client: Redis,
 ):
     user_gen_pool_key = f'gen_pool_{user_id}'
     user_gen_pool = await redis_client.get(user_gen_pool_key)
@@ -137,7 +217,7 @@ async def add_pending_msg_to_pool(
 
 async def handle_pending_trx(
     client_id: int,
-    redis_client: redis.Redis,
+    redis_client: Redis,
     websocket: WebSocket,
 ):
     gen_pool_exists = await redis_client.exists(gen_pool_key)
@@ -164,7 +244,7 @@ async def handle_pending_trx(
 async def clear_user_entry_off_pool(
     client_id: int,
     gen_pool: dict,
-    redis_client: redis.Redis
+    redis_client: Redis
 ):
     try:
         # check if any transaction belongs to the user
@@ -187,7 +267,7 @@ async def clear_user_entry_off_pool(
 
 
 async def cache_message(
-    redis_client: redis.Redis, 
+    redis_client: Redis, 
     sender_id: int, 
     recipient_id: int, 
     message_obj: dict,
@@ -216,7 +296,7 @@ async def cache_message(
 
 
 async def offload_messages(
-    redis_client: redis.Redis,
+    redis_client: Redis,
     sender_id: int,
     recipient_id: int,
     db: AsyncSession,
@@ -243,7 +323,7 @@ async def offload_messages(
     thread = thread_result.scalars().first()
 
     if not thread:
-        thread = Thread(participants=[sender_id, recipient_id], created_at=datetime.utcnow())
+        thread = Thread(participants=[sender_id, recipient_id])
         db.add(thread)
         await db.commit()
         await db.refresh(thread)

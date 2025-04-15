@@ -14,7 +14,6 @@ from sqlalchemy import (
     DateTime,
     event,
     ARRAY,
-    Float,
 )
 from sqlalchemy.future import select
 from sqlalchemy import types as _types
@@ -30,6 +29,12 @@ from property_street_backend.app.enums import (
 )
 from property_street_backend.config.postgres_connection_manager import Base
 from property_street_backend.app.controllers.cart.models import CartItem
+from property_street_backend.app.controllers.chat.models import (
+    Thread,
+    ChatSession,
+    Message,
+) 
+
 
 
 # abstract class dependency for models with cloud images fields
@@ -247,6 +252,13 @@ class Agent(Base):
 
     )
    
+   # many-to-many relationship to AssetRequest
+    resolved_requests = relationship(
+        'AssetRequest',
+        secondary='request_agent_association',
+        lazy='selectin',
+        back_populates = 'resolvers'
+    )
 
 class User(Base):
     __tablename__ = 'users'
@@ -362,6 +374,13 @@ class User(Base):
         lazy="selectin",  # Ensures relationship loads in async contexts
     )
 
+    # relationship to AssetRequest
+    asset_requests = relationship(
+        'AssetRequest',
+        back_populates = 'requester',
+        lazy = 'selectin'
+    )
+
     # method for a user to become an agent
     async def become_agent(self, session):
         """Method to convert a user into an agent."""
@@ -444,13 +463,56 @@ class Tag(Base):
     )
 
 
+class Area(Base):
+    __tablename__ = 'areas'
+
+    # For international usage, consider using a library like pycountry or geopy for validating country/state/city combinations.
+    id = Column(Integer, primary_key=True, index=True)
+    country = Column(String, nullable=False) # e.g., Nigeria
+    state_or_province = Column(String, nullable=False) # e.g., "California" or "Lagos"
+    county = Column(String) # US-based e.g., "Los Angeles County"
+    city_or_town = Column(String, nullable=False) # e.g., "San Francisco" or "Ikeja"
+    street = Column(String, nullable=False) # e.g., "Market Street", "Ahmadu Bello Way"
+    building_name_or_suite = Column(String, nullable=False) # e.g., "Apt 402"
+    zip_or_postal_code = Column(String, nullable=True) # e.g., 500102
+
+
+    asset = relationship(
+        'Asset',
+        back_populates='area',
+        lazy = 'selectin',
+        uselist=False
+    )
+    asset_request = relationship(
+        'AssetRequest',
+        back_populates='asset_request',
+        lazy='selectin',
+        uselist=False
+    )
+
+
 class Asset(Base):
     __tablename__ = 'assets'
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
-    country = Column(String, nullable=False)
-    address = Column(String, nullable=False)
+    
+    # area
+    area_id = Column(
+        Integer,
+        ForeignKey(
+            'areas.id',
+            name = 'fk_assets_areas',
+            ondelete = 'CASCADDE',
+            use_alter = True,
+        )
+    )
+    area = relationship(
+        'Area',
+        back_populates='asset',
+        lazy='selectin'
+    )
+
     currency = Column(String, nullable=False)
     status = Column(String, nullable=False)
     price = Column(Numeric(10, 2), nullable=False)  # Up to 10 digits, 2 decimal places; returns a Decimal type
@@ -535,6 +597,13 @@ class Asset(Base):
         lazy="selectin",  # Ensures relationship loads in async contexts
     )
 
+    # many-to-many relationship to AssetRequst
+    requests = relationship(
+        'AssetRequest',
+        secondary = 'request_asset_association',
+        lazy='selectin',
+        back_populates='assets'
+    )
 
 class AssetFeature(Base):
     __tablename__ = 'asset_features'
@@ -607,7 +676,6 @@ class AssetCloudImage(AbstractCloudImage):
         back_populates='cloud_images',
         foreign_keys=[asset_feature_id],
         lazy="selectin",  # Ensures relationship loads in async contexts
-
     )
 
 
@@ -618,124 +686,12 @@ class AddOn(Base):
     tag_list = Column(ARRAY(String))  # Or JSON, based on your preference
 
 
-class ChatSession(Base):
-    __tablename__ = "chat_sessions"
-
-    id = Column(Integer, primary_key=True, index=True)
-
-    # Foreign key relationship to User
-    user_id = Column(
-        Integer, 
-        ForeignKey(
-            'users.id', 
-            name='fk_chat_sessions_user_id', 
-            ondelete='CASCADE'
-        )
-    )
-    user = relationship(
-        'User', 
-        back_populates='chat_session',
-        lazy="selectin",  # Ensures relationship loads in async contexts
-        uselist=False, # many to one relationship, restricts it to associating with only one User instance.
-    )
-
-    # relationship to threads
-    threads = relationship(
-        'Thread',
-        secondary='thread_chat_session_association',
-        back_populates='chat_sessions',
-        lazy='selectin', # Ensures relationship loads in async contexts
-    )
-
-
-class Thread(Base):
-    __tablename__ = "threads"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # relationship with messages
-    messages = relationship(
-        'Message', 
-        back_populates='thread',
-        lazy="selectin",  # Ensures relationship loads in async contexts
-    )
-
-    # Many-to-many relationship to chat_session
-    chat_sessions = relationship(
-        'ChatSession',
-        secondary='thread_chat_session_association',
-        back_populates='threads',
-        lazy='selectin', # Ensures relationship loads in async contexts
-    )
-
-    # Many to many relationship to User
-    participants = relationship(
-        'User',
-        secondary='threads_participants_association',
-        back_populates='threads',
-        lazy='selectin'
-    )
-
-
-class Message(Base):
-    __tablename__ = "messages"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    text_content = Column(String, nullable=True)
-    status = Column(String, nullable=False)
-    timestamp = Column(Integer, nullable=False)
-    updated_timestamp = Column(Integer, nullable=True)
-
-    # Foreign key relationship to Thread
-    thread_id = Column(
-        Integer, 
-        ForeignKey(
-            'threads.id', 
-            name='fk_messages_thread_id', 
-            ondelete='CASCADE'
-        )
-    )
-    thread = relationship(
-        'Thread',
-        back_populates='messages',
-        lazy='selectin'
-    )
-
-    # Foreign key relationship to sender
-    sender_id = Column(
-        Integer, 
-        ForeignKey(
-            'users.id', 
-            name='fk_messages_sender_id', 
-            ondelete='CASCADE'
-        )
-    )
-    sender = relationship(
-        'User',
-        foreign_keys=[sender_id],
-        back_populates='sent_messages',
-        lazy='selectin'
-    )
-
-    # Foreign key relationship to recipient
-    recipient_id = Column(
-        Integer, 
-        ForeignKey(
-            'users.id', 
-            name='fk_messages_recipient_id', 
-            ondelete='CASCADE'
-        )
-    )
-    recipient = relationship(
-        'User',
-        foreign_keys=[recipient_id],
-        back_populates='received_messages',
-        lazy='selectin'
-    )
-
-
-models = [CartItem]
+models = [
+    CartItem,
+    Thread,
+    ChatSession,
+    Message,
+]
 
     
 

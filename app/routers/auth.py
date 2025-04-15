@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, status, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 import redis.asyncio as redis
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, status, Depends, WebSocket
 
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
@@ -18,8 +19,9 @@ from property_street_backend.app.utils.store import email_verification_code_ttl
 from property_street_backend.app.controllers.auth import (
     create_user, 
     authenticate_user, 
-    decode_user_from_token, 
     fetched_access_token, 
+    decode_user_from_token, 
+    decode_user_from_token_optional, 
     check_username_email_availability,
     send_email_verification_code as controller_send_email_verification_code,
     confirm_email_verification_code_and_sign_user_up as controller_confirm_email_verification_code_and_sign_user_up
@@ -27,6 +29,14 @@ from property_street_backend.app.controllers.auth import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+
+@router.websocket("/ws/{client_id}")
+async def websocket_endpoint(
+    websocket: WebSocket, 
+    post_id: int, 
+    current_user: Optional[TokenData] = Depends(decode_user_from_token_optional)
+):
+    pass
 
 # user registeration endpoint
 @router.post("/register", status_code=status.HTTP_201_CREATED)

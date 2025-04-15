@@ -13,6 +13,11 @@ from property_street_backend.log_config.logger_config import (
     log_message
 )
 from property_street_backend.app.controllers.chat.utils import handle_chat
+from property_street_backend.config.websocket_factory import (
+    connected_ws,
+    connected_agents_ws,
+    unauthenticated_ws,
+)
 
 
 websocket_logger = logging.getLogger("websocket")
@@ -20,7 +25,8 @@ websocket_logger = logging.getLogger("websocket")
 
 async def websocket_endpoint(
     websocket: WebSocket, 
-    client_id: int, 
+    client_id: int,
+    is_agent: True, 
     redis_client: redis.Redis,
 ):
     """websocket endpoint handler for real time functionality of the application
@@ -32,6 +38,19 @@ async def websocket_endpoint(
         redis_client (redis.Redis): _description_
     """
     await websocket.accept()
+
+    # add the websocket to the connected_ws dict
+    # else add to the unauthenticated_ws set
+    if client_id:
+        connected_ws[client_id] = websocket
+        # check the client is an agent and add the websocket to the connnected_agents_ws dict
+        if is_agent:
+            connected_agents_ws[client_id] = websocket
+    else:
+        unauthenticated_ws.add(websocket)
+    
+    
+    # create a pubsub object
     pubsub = redis_client.pubsub()
 
     try:
@@ -56,10 +75,10 @@ async def websocket_endpoint(
         # and optionally sends an acknowledgment back to the client.
         while True: 
             # data received
-            data = await websocket.receive_text()
+            data = await websocket.receive_text() # keep alive
 
             # sends data to a channel according to the message structure
-            await publish_to_channel(
+            await ws_reception_handler(
                 data = data,
                 redis_client = redis_client,
             )
@@ -70,16 +89,26 @@ async def websocket_endpoint(
     except WebSocketDisconnect:
         await pubsub.unsubscribe(client_id)
         channel_listener_task.cancel()
+
+        # take off the websocket object from the connected_websockets and connected_agent_websocket dict
+        if client_id:
+            connected_ws.pop(websocket, None)
+            if is_agent:
+                connected_agents_ws.pop(websocket,None)
+        else:
+            unauthenticated_ws.discard(websocket)
+
         if DEBUG:
-            websocket_logger.error(f"Client #{client_id} disconnected", exc_info=True)
+            websocket_logger.error(f"Client disconnected", exc_info=True)
     
     finally:
+        pass
         # handle pending transactions
-        await handle_pending_trx(
-            client_id=client_id,
-            redis_client=redis_client,
-            websocket=websocket,
-        )
+        # await handle_pending_trx(
+        #     client_id=client_id,
+        #     redis_client=redis_client,
+        #     websocket=websocket,
+        # )
 
 
 async def channel_recipient(
@@ -111,17 +140,23 @@ async def channel_recipient(
         await asyncio.sleep(0.01)
 
 
+async def ws_reception_handler(
+    data: str,
+    redis_client: redis.Redis,
+):
+    loaded_data = json.loads(data)
+    data_category = loaded_data.get('category',None)
+
+    if data_category == 'chat':
+        handle_chat(
+            data = loaded_data,
+            redis_client = redis_client,
+            chat_lazy_offload_schedule = None
+        )
+
 async def publish_to_channel(
     data: dict,
     redis_client: redis.Redis,
 ):
     loaded_data = json.loads(data)
-
-    if loaded_data['type'] == 'incoming_message':
-        recipient_id = data['recipient_id']
-        # publish the data to the recipient 
-        await redis_client.publish(str(recipient_id), data)
-    elif loaded_data['type'] == 'message_read':
-        sender_id = data['sender_id']
-        # publish the data to the sender 
-        await redis_client.publish(str(sender_id), data)
+    await redis_client.publish('channel_name', data)
