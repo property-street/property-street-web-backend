@@ -19,6 +19,17 @@ from property_street_backend.config.redis_connection_manager import (
 )
 from property_street_backend.config.postgres_connection_manager import get_postgres_instance
 
+def test_with_monkeypatch(monkeypatch):
+    monkeypatch.setenv("MY_ENV_VAR", "from_monkey")
+    
+@pytest.fixture
+def set_env_var():
+    def _set(key, value):
+        os.environ[key] = value
+        yield
+        os.environ.pop(key, None)
+    return _set
+
 async def get_test_db(**kwargs):
     env = 'test'
     async for test_db in get_postgres_instance(env,**kwargs):

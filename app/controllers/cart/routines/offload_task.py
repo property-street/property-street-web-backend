@@ -5,37 +5,20 @@ from sqlalchemy.sql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from property_street_backend.app.database import get_db
 from property_street_backend.app.celery_config import (
     redis_db,
     celery_app,
     cart_offload_schedule_secs, 
 )
+from property_street_backend.config.context_sessions import (
+    get_db_based_on_context,
+    get_redis_based_on_context
+)
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.cart.models import CartItem
 from property_street_backend.config.settings import TEST_CART_TTL, PROD_CART_TTL
-from property_street_backend.app.initiator import get_redis, get_redis_client
-from property_street_backend.tests.conftest import get_test_db, get_test_redis
 from property_street_backend.config.redis_connection_manager import _redis_instances
 
-
-async def get_db_based_on_context(env):
-    if env == 'test':
-        async for db in get_test_db(metadata_test_routine=False):
-            pass
-    else:
-        async for db in get_db():
-            pass
-    return db
-
-async def get_redis_based_on_context(env):
-    if env == 'test':
-        async for redis_client in get_test_redis():
-            break
-    else:
-        async for redis_client in get_redis():
-            break
-    return redis_client
 
 
 LOCK_KEY = "cart_offload_lock"

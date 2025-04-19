@@ -1,23 +1,23 @@
 import json
-import asyncio
 import logging
 from fastapi import (
     WebSocket, 
     WebSocketDisconnect, 
 )
-import redis.asyncio as redis
+from redis.asyncio import Redis, client
 
 
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.log_config.logger_config import (
     log_message
 )
-from property_street_backend.app.controllers.chat.utils import handle_chat
 from property_street_backend.config.websocket_factory import (
     connected_ws,
     connected_agents_ws,
     unauthenticated_ws,
 )
+from property_street_backend.app.controllers.chat.utils import handle_chat
+from property_street_backend.app.controllers.asset_request.utils import asset_request_chanel_handler
 
 
 websocket_logger = logging.getLogger("websocket")
@@ -27,7 +27,7 @@ async def websocket_endpoint(
     websocket: WebSocket, 
     client_id: int,
     is_agent: True, 
-    redis_client: redis.Redis,
+    redis_client: Redis,
 ):
     """websocket endpoint handler for real time functionality of the application
     independent of each user
@@ -48,26 +48,13 @@ async def websocket_endpoint(
             connected_agents_ws[client_id] = websocket
     else:
         unauthenticated_ws.add(websocket)
-    
-    
-    # create a pubsub object
-    pubsub = redis_client.pubsub()
+
+    # register channels
+    await register_channels(redis_client)
+
+    # handle pending notifications
 
     try:
-        # Subscribe to a client_id channel.
-        await pubsub.subscribe(str(client_id))
-       
-        # Runs continuously in the background, 
-        # fetching messages from the Redis Pub/Sub channel 
-        channel_listener_task = asyncio.create_task(channel_recipient(
-            websocket=websocket,
-            redis_client=redis_client,
-            pubsub=pubsub,
-        ))
-
-        await channel_listener_task # Keep task alive
-
-
         # Socket.send recipient that continuously waits for messages 
         # from the WebSocket client.
         # Handles incoming messages from the WebSocket client, 
@@ -87,8 +74,6 @@ async def websocket_endpoint(
             # await websocket.send_text(f"Message received: {data}") 
     
     except WebSocketDisconnect:
-        await pubsub.unsubscribe(client_id)
-        channel_listener_task.cancel()
 
         # take off the websocket object from the connected_websockets and connected_agent_websocket dict
         if client_id:
@@ -111,38 +96,16 @@ async def websocket_endpoint(
         # )
 
 
-async def channel_recipient(
-    websocket: WebSocket,
-    redis_client: redis.Redis,
-    pubsub: redis.client.PubSub,
-): # pubsub channel recipient
-    """Listens to a messge on a channel
-
-    Args:
-        pubsub (redis.client.PubSub): _description_
-        websocket (WebSocket): _description_
-        redis_client (redis.Redis): _description_
-    """
-    while True:
-        message = await pubsub.get_message(ignore_subscribe_messages=True) # Read a message
-
-        if message:
-            message_obj = json.loads(message['data'].decode('utf-8'))
-            msg_category = message_obj['data']['category']
-
-            if msg_category == 'chat':
-                handle_chat(
-                    chat_obj=message_obj,
-                    websocket=websocket,
-                    redis_client=redis_client
-                )
-
-        await asyncio.sleep(0.01)
+async def register_channels(redis_client: Redis):
+    pubsub = redis_client.pubsub()
+    pubsub.subscribe(**{
+        'asset-request-channel': asset_request_chanel_handler
+    })
 
 
 async def ws_reception_handler(
     data: str,
-    redis_client: redis.Redis,
+    redis_client: Redis,
 ):
     loaded_data = json.loads(data)
     data_category = loaded_data.get('category',None)
@@ -154,9 +117,7 @@ async def ws_reception_handler(
             chat_lazy_offload_schedule = None
         )
 
-async def publish_to_channel(
-    data: dict,
-    redis_client: redis.Redis,
-):
-    loaded_data = json.loads(data)
-    await redis_client.publish('channel_name', data)
+
+async def handle_pending_trx():
+    # handle pending notification
+    pass

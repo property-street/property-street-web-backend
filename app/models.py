@@ -34,6 +34,8 @@ from property_street_backend.app.controllers.chat.models import (
     ChatSession,
     Message,
 ) 
+from property_street_backend.app.controllers.notification.models import Notification
+from property_street_backend.app.controllers.asset_request.models import AssetRequest
 
 
 
@@ -260,6 +262,7 @@ class Agent(Base):
         back_populates = 'resolvers'
     )
 
+
 class User(Base):
     __tablename__ = 'users'
 
@@ -466,8 +469,9 @@ class Tag(Base):
 class Area(Base):
     __tablename__ = 'areas'
 
-    # For international usage, consider using a library like pycountry or geopy for validating country/state/city combinations.
     id = Column(Integer, primary_key=True, index=True)
+    
+    # For international usage, consider using a library like pycountry or geopy for validating country/state/city combinations.
     country = Column(String, nullable=False) # e.g., Nigeria
     state_or_province = Column(String, nullable=False) # e.g., "California" or "Lagos"
     county = Column(String) # US-based e.g., "Los Angeles County"
@@ -503,7 +507,7 @@ class Asset(Base):
         ForeignKey(
             'areas.id',
             name = 'fk_assets_areas',
-            ondelete = 'CASCADDE',
+            ondelete = 'CASCADE',
             use_alter = True,
         )
     )
@@ -605,6 +609,7 @@ class Asset(Base):
         back_populates='assets'
     )
 
+
 class AssetFeature(Base):
     __tablename__ = 'asset_features'
 
@@ -687,10 +692,12 @@ class AddOn(Base):
 
 
 models = [
-    CartItem,
     Thread,
-    ChatSession,
     Message,
+    CartItem,
+    ChatSession,
+    AssetRequest,
+    Notification,
 ]
 
     
