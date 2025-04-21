@@ -23,7 +23,7 @@ from property_street_backend.app.controllers.asset_request.utils import asset_re
 websocket_logger = logging.getLogger("websocket")
 
 
-async def websocket_endpoint(
+async def websocket_initialiazer(
     websocket: WebSocket, 
     client_id: int,
     is_agent: True, 
@@ -119,5 +119,4 @@ async def ws_reception_handler(
 
 
 async def handle_pending_trx():
-    # handle pending notification
     pass

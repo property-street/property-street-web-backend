@@ -4,13 +4,15 @@ from redis.asyncio import Redis
 from sqlalchemy.sql import update, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .models import Message, Thread
+from ..models import Message, Thread
 from property_street_backend.app.models import User
+from property_street_backend.config.context_sessions import (
+    acquire_redis_lock,
+    release_redis_lock,
+)
 
-async def acquire_lock(redis: Redis, lock_key: str, ttl: int = 60) -> bool:
-    return await redis.set(lock_key, 1, nx=True, ex=ttl)
 
-async def get_or_create_thread_id(db: AsyncSession, sender_id: int, recipient_id: int) -> int:
+async def get_or_create_thread_id(db: AsyncSession, min_id: int, max_id: int) -> int:
     """gets or creates a thread id for the sender and recipient's id
 
     Args:
@@ -24,36 +26,38 @@ async def get_or_create_thread_id(db: AsyncSession, sender_id: int, recipient_id
     thread_stmt = (
         select(Thread)
         .where(
-            (Thread.participants.any(User.id == sender_id))
-            & (Thread.participants.any(User.id == recipient_id))
+            (Thread.participants.any(User.id == min_id))
+            & (Thread.participants.any(User.id == max_id))
         )
     )
     thread_result = await db.execute(thread_stmt)
     thread = thread_result.scalars().first()
 
     if not thread:
-        thread = Thread(participants=[sender_id, recipient_id])
+        thread = Thread(participants=[min_id, max_id])
         db.add(thread)
         await db.commit()
         await db.refresh(thread)
 
     return thread.id
 
+
 async def offload_chat_data(
+    *,
     redis_client: Redis,
     db: AsyncSession,
-    chat_key: str,
-    sender_id: int,
-    recipient_id: int,
+    min_id: int,
+    max_id: int,
     chat_lazy_offload_schedule: int,
 ):
+    chat_key = f'chat_{min_id}_{max_id}'
     lock_key = f"offloading:{chat_key}"
-    if not await acquire_lock(redis_client, lock_key):
+    if not await acquire_redis_lock(redis_client, lock_key, ex = chat_lazy_offload_schedule):
         return  # Another offload in progress
 
     chat_obj = await redis_client.hget(chat_key, "chat_object")
     if not chat_obj:
-        await redis_client.delete(lock_key)
+        await release_redis_lock(redis_client,lock_key)
         return  # Nothing to offload
 
     # Optimistically delete to avoid race conditions
@@ -61,7 +65,7 @@ async def offload_chat_data(
 
     try:
         # Get the thread ID (or create it)
-        thread_id = await get_or_create_thread_id(sender_id, recipient_id, db)
+        thread_id = await get_or_create_thread_id(min_id, max_id, db)
 
         # Load and prepare chat data
         loaded_chat_obj = json.loads(chat_obj)

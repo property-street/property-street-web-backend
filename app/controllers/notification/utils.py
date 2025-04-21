@@ -1,10 +1,12 @@
 import json
-from redis.asyncio import Redis
 from fastapi import WebSocket
+from redis.asyncio import Redis
+from sqlalchemy import select, desc, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sqlalchemy import select, desc, update
 from property_street_backend.app.models import Notification
+from property_street_backend.app.controllers.ws_init import agent_pend_pool_key
+from property_street_backend.app.controllers.ws_init import user_pend_pool_key
 
 async def dispatch_pending_notification(
     last_timestamp: int,
@@ -32,8 +34,6 @@ async def dispatch_pending_notification(
         if last_db_entry:
             last_timestamp = last_db_entry.timestamp
 
-    agent_pend_pool_key = "pend_pool_agent_notification"
-
     if last_timestamp:
         # === Agent Lazy Notifications (ZSET) ===
         if is_agent:
@@ -47,8 +47,8 @@ async def dispatch_pending_notification(
                 })
 
         # === User DB-based Notifications (HSET of notification IDs) ===
-        user_pend_pool_key = f'pend_pool_{user_id}'
-        pending_ids_field = 'pending_notifications'
+        user_pend_pool_key = user_pend_pool_key(user_id)
+        pending_ids_field = 'notifications'
         pending_data = await redis_client.hget(user_pend_pool_key, pending_ids_field)
 
         if pending_data:
@@ -69,7 +69,7 @@ async def dispatch_pending_notification(
                             {
                                 'category': 'notification',
                                 'timestamp': inst.timestamp,
-                                'db_table_id': inst.id
+                                'db_id': inst.id
                             } for inst in notifications
                         ]
                     })
