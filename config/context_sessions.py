@@ -3,7 +3,7 @@ from redis.asyncio import Redis
 
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
-from property_street_backend.tests.conftest import get_test_db, get_test_redis
+from property_street_backend.tests.initiator import get_test_db, get_test_redis
 
 def get_env():
     # environment retrieval based on context
@@ -15,10 +15,10 @@ async def get_db_based_on_context():
     env = get_env()
     if env == 'test':
         async for db in get_test_db(metadata_test_routine=False):
-            pass
+            break
     else:
         async for db in get_db():
-            pass
+            break
     return db
 
 async def get_redis_based_on_context():

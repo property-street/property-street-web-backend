@@ -9,6 +9,7 @@ from property_street_backend.app.controllers.ws_init import agent_pend_pool_key
 from property_street_backend.app.controllers.ws_init import user_pend_pool_key
 
 async def dispatch_pending_notification(
+    *,
     last_timestamp: int,
     redis_client: Redis,
     db: AsyncSession,

@@ -1,4 +1,4 @@
-"""Creation of AssetRequest, Rating model and modification of User model to include state, city, address, building, postal code fields
+"""Creation of Area model and addition of the area field to assets and asset_requests table
 
 Revision ID: 7865e576688d
 Revises: dd9e23f0c285

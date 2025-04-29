@@ -14,6 +14,8 @@ from sqlalchemy.orm import relationship
 class Rating(Base):
     __tablename__ = 'ratings'
 
+    id = Column(Integer, primary_key=  True, index=True) 
+
     comment = Column(String, nullable=False)
     score = Column(Integer, default=0)
 
@@ -50,12 +52,13 @@ class Rating(Base):
     area = relationship(
         'Area',
         lazy='selectin',
-        back_populates='ratings'
+        back_populates='ratings',
+        uselist = False
     )
 
     
     __table_args__ = (
-        CheckConstraint("quantity <= 5", name="check_score_max"),
+        CheckConstraint("score <= 5", name="check_score_max"),
     )
 
 

@@ -3,7 +3,8 @@ import json
 
 
 from property_street_backend.config.context_sessions import get_redis_based_on_context
-from property_street_backend.config.websocket_factory import connected_agents_ws
+from property_street_backend.config.websocket_factory import agents_ws
+
 
 async def asset_request_channel_handler(message: str):
     """
@@ -39,7 +40,7 @@ async def asset_request_channel_handler(message: str):
     await redis_client.zadd(key, {json.dumps(payload): timestamp_ms})
 
     # Broadcast to all active agent WebSocket connections
-    for agent_ws in connected_agents_ws:
+    for agent_ws in agent_ws:
         if agent_ws and not agent_ws.client_state.name == "DISCONNECTED":
             try:
                 await agent_ws.send_json({

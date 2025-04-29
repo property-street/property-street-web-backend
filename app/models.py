@@ -36,6 +36,7 @@ from property_street_backend.app.controllers.chat.models import (
 ) 
 from property_street_backend.app.controllers.notification.models import Notification
 from property_street_backend.app.controllers.asset_request.models import AssetRequest
+from property_street_backend.app.controllers.ratings.models import Rating
 
 
 
@@ -255,11 +256,18 @@ class Agent(Base):
     )
    
    # many-to-many relationship to AssetRequest
-    resolved_requests = relationship(
+    resolved_asset_requests = relationship(
         'AssetRequest',
         secondary='request_agent_association',
         lazy='selectin',
         back_populates = 'resolvers'
+    )
+
+    # relationship to ratings
+    ratings = relationship(
+        'Rating',
+        lazy='selectin',
+        back_populates = 'agent'
     )
 
 
@@ -378,10 +386,17 @@ class User(Base):
     )
 
     # relationship to AssetRequest
-    asset_requests = relationship(
+    requested_assets = relationship(
         'AssetRequest',
         back_populates = 'requester',
         lazy = 'selectin'
+    )
+
+    # relationship to notification
+    notifications = relationship(
+        'Notification',
+        lazy='selectin',
+        back_populates = 'user'
     )
 
     # method for a user to become an agent
@@ -487,11 +502,17 @@ class Area(Base):
         lazy = 'selectin',
         uselist=False
     )
-    asset_request = relationship(
+    requested_asset = relationship(
         'AssetRequest',
-        back_populates='asset_request',
+        back_populates='area',
         lazy='selectin',
         uselist=False
+    )
+
+    ratings = relationship(
+        'Rating',
+        lazy='selectin',
+        back_populates = 'area'
     )
 
 
@@ -514,7 +535,8 @@ class Asset(Base):
     area = relationship(
         'Area',
         back_populates='asset',
-        lazy='selectin'
+        lazy='selectin',
+        uselist = False
     )
 
     currency = Column(String, nullable=False)
@@ -693,6 +715,7 @@ class AddOn(Base):
 
 models = [
     Thread,
+    Rating,
     Message,
     CartItem,
     ChatSession,

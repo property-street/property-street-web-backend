@@ -1,4 +1,4 @@
-from property_street_backend.app.database import Base
+from property_street_backend.config.postgres_connection_manager import Base
 from sqlalchemy import (
     Integer,
     Column,
@@ -7,6 +7,7 @@ from sqlalchemy import (
     BigInteger,
     Enum as SQLAlchemyEnum
 )
+from sqlalchemy.orm import relationship
 
 from .enum import NotificationStateChoice
 
@@ -34,9 +35,9 @@ class Notification(Base):
         ),
         nullable=False
     )
-    user = Column(
+    user = relationship(
         'User',
         lazy = 'selectin',
-        useList = False,
+        uselist = False,
         back_populates = 'notifications'
     )

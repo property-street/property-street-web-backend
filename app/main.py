@@ -19,11 +19,12 @@ from property_street_backend.app.database import (
     get_db,
 )
 from property_street_backend.app.routers import (
+    ws,
     auth, 
     activity,
     search,
     settings,
-    google_oauth
+    google_oauth,
 )
 from property_street_backend.app.initiator import (
     app, 
@@ -113,4 +114,5 @@ app.include_router(activity.router)
 app.include_router(search.router)
 app.include_router(settings.router)
 app.include_router(google_oauth.router)
+app.include_router(ws.router)
 app.include_router(home_router)

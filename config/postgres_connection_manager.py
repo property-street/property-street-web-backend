@@ -1,5 +1,6 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
 from property_street_backend.config.settings import DATABASE_URL, TEST_DATABASE_URL
 
@@ -29,10 +30,12 @@ async def get_postgres_instance(env: str = None, **kwargs):
 
         if env_is_test and metadata_test_routine:
             async with async_engine.begin() as conn:
-                await conn.run_sync(Base.metadata.drop_all)
-                print("***Torn down the previous Base's metadata")
+                await conn.execute(text("DROP SCHEMA public CASCADE"))
+                await conn.execute(text("CREATE SCHEMA public"))
+                print("***Dropped and recreated public schema")
                 await conn.run_sync(Base.metadata.create_all)
-                print("***Created the Base's metadata")
+                print("***Created a new Base metadata")
+
 
     # Increment connection count
     _postgres_instances["active_connections"][key] = (

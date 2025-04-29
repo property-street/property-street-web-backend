@@ -79,14 +79,14 @@ class AssetRequest(Base):
         ForeignKey(
             'users.id',
             name='fk_asset_requests_users',
-            ondelete='CASADE'
+            ondelete='CASCADE'
         ),
         nullable = False
     )
     requester = relationship(
         'User',
-        back_populates = 'asset_requests',
-        uselist = False, # one to one relationship
+        back_populates = 'requested_assets',
+        uselist = False, # many to one relationship
         lazy = 'selectin'
     )
 
@@ -118,7 +118,7 @@ class AssetRequest(Base):
     )
     area = relationship(
         'Area',
-        back_populates='asset_request',
+        back_populates='requested_asset',
         uselist=False,
         lazy='selectin'
     )

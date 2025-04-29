@@ -1,9 +1,13 @@
+import os
 import pytest
-import asyncio
+import websockets
 import redis.asyncio as redis
 from httpx import AsyncClient
+from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from property_street_backend.app.main import app
+from .auth.test_user_creation import create_test_user
 
 @pytest.mark.asyncio
 async def test_db_connectivity(
@@ -36,6 +40,9 @@ async def test_client_connectivity(client__fixture):
         http_client = fixture_obj.get("http_client")
         test_db = fixture_obj.get("db")
         break
+
+    # environment varible assertion
+    assert os.getenv("TEST_ENV") == "true"
 
     # database assertion
     assert isinstance(test_db, AsyncSession)
@@ -72,16 +79,26 @@ async def test_client_connectivity(client__fixture):
     assert response.json().get("test_key") == "value"
 
 
-
 @pytest.mark.asyncio
-async def test_prod_redis_connectivity(prod_redis_client__fixture):
-    # retrieve the redis instance
-    redis_client =  await prod_redis_client__fixture.__anext__()
+async def test_websocket_client(client__fixture):
+    client = TestClient(app)
+    # get the yield client objects
+    async for fixture_obj in client__fixture:
+        http_client = fixture_obj.get("http_client")
+        test_db = fixture_obj.get("db")
+        break
 
-    # assertions
-    assert int(redis_client.connection_pool.connection_kwargs['db']) == 0
-    assert isinstance(redis_client, redis.Redis)
+    token = "Bearer testtoken123"
+    test_user = await create_test_user(test_db)
+    # uri = f"ws://testserver:8001/ws/{test_user.id}?last_n_timestamp=1516790"
 
+    with client.websocket_connect(
+        f'/ws/{test_user.id}?last_n_timestamp=1516790',
+        headers={"Authorization": token}
+    ) as websocket:
+        websocket.send_json({"type": "ping"})
+        response = websocket.receive_json()
+        assert response["type"] == "pong"
 
 # Adding a pseudo endpoint to the FastAPI app for testing
 @app.get("/pseudo-url")

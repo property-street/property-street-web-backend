@@ -33,17 +33,17 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
-async def get_redis_client():
-    client = await Redis(
-        host=REDIS_HOST, 
-        port=6379, 
-        db=REDIS_CACHE_DB, #db1 for property street dev cache; 0 should be for production
-    )
-    try:
-        await client.config_set('notify-keyspace-events', 'Ex')
-        yield client
-    finally:
-        await client.aclose()
+# async def get_redis_client():
+#     client = await Redis(
+#         host=REDIS_HOST, 
+#         port=6379, 
+#         db=REDIS_CACHE_DB, #db1 for property street dev cache; 0 should be for production
+#     )
+#     try:
+#         await client.config_set('notify-keyspace-events', 'Ex')
+#         yield client
+#     finally:
+#         await client.aclose()
 
 async def get_redis():
     async for redis_client in get_redis_instance():

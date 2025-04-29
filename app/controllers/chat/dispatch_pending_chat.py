@@ -13,6 +13,7 @@ from property_street_backend.app.controllers.ws_init import user_pend_pool_key
 
 
 async def dispatch_pending_chat(
+    *,
     redis_client: Redis,
     user_id: int,
     db: AsyncSession,
@@ -42,6 +43,6 @@ async def dispatch_pending_chat(
         )
     except Exception as e:
         log_message(
-            'success',
+            'error',
             f'Error offloading User:{user_id} pending chats! Reason: {e}'
         )

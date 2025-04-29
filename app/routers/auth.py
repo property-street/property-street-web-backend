@@ -30,14 +30,6 @@ from property_street_backend.app.controllers.auth import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.websocket("/ws/{client_id}")
-async def websocket_endpoint(
-    websocket: WebSocket, 
-    post_id: int, 
-    current_user: Optional[TokenData] = Depends(decode_user_from_token_optional)
-):
-    pass
-
 # user registeration endpoint
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_user(user_data: UserRegistrationSchema, db: AsyncSession = Depends(get_db)):

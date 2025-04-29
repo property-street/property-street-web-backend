@@ -7,9 +7,9 @@ from property_street_backend.log_config.logger_config import (
 from .dispatch_expiry_case import dispatch_expiry_case
 
 
-async def run_pubsub_listener(
+async def run_cache_db_expiry_listener(
     pubsub: redis.client.PubSub, 
-    stop_event,
+    stop_event: asyncio.Event,
     redis_client: redis.Redis,
 ):
     """This function subscribes to a redis expiry event
