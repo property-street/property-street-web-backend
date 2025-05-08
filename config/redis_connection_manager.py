@@ -9,12 +9,15 @@ from property_street_backend.config.settings import (
 _redis_instances = {"active_connections": {}}
 
 # Redis Factory
-async def get_redis_instance(env: str = None):
+async def get_redis_instance(env: str = None, **kwargs):
     global _redis_instances
 
-    db = TEST_REDIS_CACHE_DB if env == "test" else PROD_REDIS_CACHE_DB
+    env_is_test = env == 'test'
+    db = TEST_REDIS_CACHE_DB if env_is_test else PROD_REDIS_CACHE_DB
     key = f"{env}_{db}"
     redis_client = _redis_instances.get(key)
+    skip_session_close = kwargs.get('skip_session_close',False)
+
 
     try:
         # Increment active connection counter
@@ -30,11 +33,14 @@ async def get_redis_instance(env: str = None):
             _redis_instances[key] = redis_client
             yield redis_client
     finally:
+        # variable to determine if the session should be closed
+        skip_close = skip_session_close and env_is_test
+
         # Decrement and possibly close connection
         _redis_instances["active_connections"][key] -= 1
 
         if _redis_instances["active_connections"][key] == 0:
             redis_to_close = _redis_instances.pop(key, None)
-            if redis_to_close:
+            if redis_to_close and not skip_close:
                 await redis_to_close.aclose()
             _redis_instances["active_connections"].pop(key, None)

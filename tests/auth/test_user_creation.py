@@ -1,22 +1,23 @@
 import pytest
 import asyncio
 
+from httpx import AsyncClient
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from httpx import AsyncClient
 
 from property_street_backend.app.models import User
 from property_street_backend.app.controllers.auth import create_user
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
 
 
-async def create_test_user(db):
-    # Define a test user
+async def create_test_user(
+    db: AsyncSession,
     user_data = UserRegistrationSchema(
         email="test@example.com",
         username="testuser",
         password="password123"
     )
+):
 
     return await create_user(db, user_data)
 

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from property_street_backend.app.models import Notification
 from property_street_backend.app.controllers.ws_init import agent_pend_pool_key
 from property_street_backend.app.controllers.ws_init import user_pend_pool_key
+from property_street_backend.log_config.logger_config import log_message
 
 async def dispatch_pending_notification(
     *,
@@ -46,16 +47,18 @@ async def dispatch_pending_notification(
                     'event': 'agent_pending_lazy_notifications',
                     'data': [json.loads(obj) for obj in lazy_notifications]
                 })
+                log_message('success', f"Successfully pinged pending lazy agent messages to user id {user_id}")
 
         # === User DB-based Notifications (HSET of notification IDs) ===
         user_pend_pool_key = user_pend_pool_key(user_id)
         pending_ids_field = 'notifications'
-        pending_data = await redis_client.hget(user_pend_pool_key, pending_ids_field)
+        pending_notification_data = await redis_client.hget(user_pend_pool_key, pending_ids_field)
 
-        if pending_data:
+        if pending_notification_data:
             try:
-                loaded_ids = json.loads(pending_data)
+                loaded_ids = json.loads(pending_notification_data)
             except json.JSONDecodeError:
+                log_message('error', "Error 'json-desearializing' pending notification for user {user_id}")
                 loaded_ids = []
 
             if isinstance(loaded_ids, list) and loaded_ids:
@@ -74,6 +77,7 @@ async def dispatch_pending_notification(
                             } for inst in notifications
                         ]
                     })
+                    log_message('success', f"Successfully pinged pending notifications to user_id {user_id}")
 
                     # Mark as delivered in DB
                     for inst in notifications:
@@ -93,5 +97,7 @@ async def dispatch_pending_notification(
         if entries:
             await ws.send_json({
                 'event': 'agent_pending_lazy_notifications',
-                'data': [json.loads(obj) for obj in entries]
+                'data': [obj for obj in entries]
             })
+            log_message('success', f"Successfully pinged pending lazy agent notification to agent with user_id {user_id}")
+

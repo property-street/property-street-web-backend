@@ -1,16 +1,11 @@
 from typing import Optional
 from fastapi import WebSocket
 
-authenticated_ws = {}  # dictionary of connected WebSocket clients
+client_authenticated_ws = None 
 
 agents_ws = {}  # Set of connected WebSocket clients
 
-unauthenticated_ws = set()
+unauthenticated_ws = None
 
-async def broadcast_to_clients(connected_websockets:set, data:str):
-    # Broadcast to all clients
-    for ws in connected_websockets:
-        await ws.send_text(data.decode())
-
-def get_client_socket_from_factory(*,client_id:int) -> Optional[WebSocket]:
-    return authenticated_ws.get(client_id, None)
+def get_instance_ws() -> Optional[WebSocket]:
+    return client_authenticated_ws if client_authenticated_ws and not client_authenticated_ws.client_state.name == "DISCONNECTED" else None

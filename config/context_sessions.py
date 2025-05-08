@@ -1,9 +1,8 @@
 import os
 from redis.asyncio import Redis
 
-from property_street_backend.app.database import get_db
-from property_street_backend.app.initiator import get_redis
-from property_street_backend.tests.initiator import get_test_db, get_test_redis
+from .postgres_connection_manager import get_postgres_instance
+from .redis_connection_manager import get_redis_instance
 
 def get_env():
     # environment retrieval based on context
@@ -11,25 +10,15 @@ def get_env():
     env = 'test' if TEST_ENV else 'prod'
     return env
 
-async def get_db_based_on_context():
+async def get_db_based_on_context(**kwargs):
     env = get_env()
-    if env == 'test':
-        async for db in get_test_db(metadata_test_routine=False):
-            break
-    else:
-        async for db in get_db():
-            break
-    return db
+    async for test_db in get_postgres_instance(env,**kwargs):
+        yield test_db
 
-async def get_redis_based_on_context():
+async def get_redis_based_on_context(**kwargs):
     env = get_env()
-    if env == 'test':
-        async for redis_client in get_test_redis():
-            break
-    else:
-        async for redis_client in get_redis():
-            break
-    return redis_client
+    async for redis_client in get_redis_instance(env, **kwargs):
+        yield redis_client
 
 async def acquire_redis_lock(redis_client: Redis, lock_key: str, ex: int):
     """Acquire a lock to ensure only one instance runs."""

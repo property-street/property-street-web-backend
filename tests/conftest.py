@@ -3,15 +3,18 @@ import time
 import pytest
 import signal
 import pytest
+import requests
 import platform
 import subprocess
 import redis.asyncio as redis
+from fastapi.testclient import TestClient
 from httpx import AsyncClient, ASGITransport
 
+
 from property_street_backend.app.main import app
-from .initiator import get_test_db, get_test_redis
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
+from property_street_backend.config.context_sessions import get_db_based_on_context, get_redis_based_on_context
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
 
 
@@ -25,7 +28,7 @@ def test_env_var():
 @pytest.fixture(scope="function")
 async def get_test_db__fixture(test_env_var):
         
-    async for session in get_test_db():
+    async for session in get_db_based_on_context():
         yield session
 
     # Use an event loop to ensure cleanup happens after tests complete
@@ -35,9 +38,8 @@ async def get_test_db__fixture(test_env_var):
 @pytest.fixture(scope="function")
 async def redis_client__fixture(test_env_var):
     # Initialize Redis client
-    async for redis_client in get_test_redis():
+    async for redis_client in get_redis_based_on_context():
         yield redis_client
-
 
 
 @pytest.fixture(scope="function")
@@ -62,12 +64,29 @@ async def client__fixture(
 
     # Use ASGITransport with the app
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://testserver:8001") as ac:
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield {
             "http_client": ac, 
             "redis_client": test_redis_client,
             "db": test_db,
         }
+
+
+@pytest.fixture(scope='function')
+async def websocket_client_fixture(get_test_db__fixture, redis_client__fixture):
+    # Override dependencies as before
+    async for test_db in get_test_db__fixture:
+        break
+    async for test_redis_client in redis_client__fixture:
+        break
+
+    app.dependency_overrides[get_db] = lambda: test_db
+    app.dependency_overrides[get_redis] = lambda: test_redis_client
+
+    yield {
+        "redis_client": test_redis_client,
+        "db": test_db,
+    }
 
 
 @pytest.fixture(scope="function")
@@ -130,3 +149,31 @@ def celery_worker_and_beat():
 
     worker.wait()
     beat.wait()
+
+
+@pytest.fixture(scope="function")
+def app_subprocess(test_env_var):
+    # On Windows, use creationflags to create a new process group
+    creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+    app = subprocess.Popen(
+        [
+            "uvicorn", "app.main:app", "--port",
+            "8001",
+        ],
+        creationflags=creationflags
+    )
+
+    # Give time to start
+    for _ in range(20):
+        try:
+            requests.get(f'http://localhost:8001/?session={int(time.time())}')
+            break
+        except Exception:
+            time.sleep(1)  # ← not asyncio.sleep here
+    
+    yield
+
+    # Graceful shutdown
+    app.send_signal(signal.CTRL_BREAK_EVENT)
+
+    app.wait()

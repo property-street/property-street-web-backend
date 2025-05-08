@@ -1,4 +1,8 @@
+import logging
+
 agent_pend_pool_key = "pend_pool_agent_notification"
+
+websocket_logger = logging.getLogger("websocket")
 
 def user_pend_pool_key(user_id:int,/)->str:
     """Accepts a user id and returns a proposed zset key 
@@ -12,3 +16,6 @@ def user_pend_pool_key(user_id:int,/)->str:
         str: a string used to query the redis cache for a specific user's data.
     """
     return f'pend_pool_{user_id}'
+
+def get_client_channel_key(client_id):
+    return f'channel_{client_id}'

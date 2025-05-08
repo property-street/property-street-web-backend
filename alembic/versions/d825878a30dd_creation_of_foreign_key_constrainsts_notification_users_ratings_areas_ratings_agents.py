@@ -1,4 +1,4 @@
-"""whatchamacallit
+"""creation of foreign key constrainsts notification_users, ratings_areas, ratings_agents
 
 Revision ID: d825878a30dd
 Revises: bae45f807597

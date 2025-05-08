@@ -1,13 +1,15 @@
 import os
+import time
+import json
 import pytest
 import websockets
-import redis.asyncio as redis
+from redis.asyncio import Redis
 from httpx import AsyncClient
-from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.main import app
 from .auth.test_user_creation import create_test_user
+from property_street_backend.app.controllers.auth import fetched_access_token
 
 @pytest.mark.asyncio
 async def test_db_connectivity(
@@ -28,7 +30,7 @@ async def test_redis_connectivity(redis_client__fixture):
 
     # assertions
     assert redis_client.connection_pool.connection_kwargs['db'] == 1
-    assert isinstance(redis_client, redis.Redis)
+    assert isinstance(redis_client, Redis)
 
 
 @pytest.mark.asyncio
@@ -48,7 +50,7 @@ async def test_client_connectivity(client__fixture):
     assert isinstance(test_db, AsyncSession)
 
     # make assertions for the test redis_client
-    assert isinstance(redis_client, redis.Redis)
+    assert isinstance(redis_client, Redis)
     assert redis_client.connection_pool.connection_kwargs['db'] == 1
     
     # assertions for client
@@ -80,25 +82,36 @@ async def test_client_connectivity(client__fixture):
 
 
 @pytest.mark.asyncio
-async def test_websocket_client(client__fixture):
-    client = TestClient(app)
+async def test_websocket_client(app_subprocess, websocket_client_fixture):
     # get the yield client objects
-    async for fixture_obj in client__fixture:
-        http_client = fixture_obj.get("http_client")
-        test_db = fixture_obj.get("db")
+    async for fixture_obj in websocket_client_fixture:
+        test_db: AsyncSession = fixture_obj.get('db')
+        redis_client: Redis = fixture_obj.get('redis_client')
         break
 
-    token = "Bearer testtoken123"
     test_user = await create_test_user(test_db)
-    # uri = f"ws://testserver:8001/ws/{test_user.id}?last_n_timestamp=1516790"
+    token_obj = fetched_access_token(test_user)
+    token = token_obj['access_token']
+    headers = {
+        'Authorization' : f"Bearer {token}"
+    }
+    timestamp = int(time.time())
+    uri = f'ws://localhost:8001/ws/{test_user.id}?last_n_timestamp={timestamp}&sesion_ts={timestamp}&test_ping=true'
 
-    with client.websocket_connect(
-        f'/ws/{test_user.id}?last_n_timestamp=1516790',
-        headers={"Authorization": token}
+    async with websockets.connect(
+        uri,
+        extra_headers = headers
     ) as websocket:
-        websocket.send_json({"type": "ping"})
-        response = websocket.receive_json()
+        await websocket.send(json.dumps({"type": "ping"}))
+        response = json.loads(await websocket.recv())
         assert response["type"] == "pong"
+        assert response["token"] == token
+        assert response["username"] == test_user.username
+        assert int(response["last_n_timestamp"]) == timestamp
+
+    # test redis_client publishing and channel listener callback
+    await redis_client.publish(f'test_channel_{test_user.id}',json.dumps({'greetings': 'hi'}))
+    
 
 # Adding a pseudo endpoint to the FastAPI app for testing
 @app.get("/pseudo-url")

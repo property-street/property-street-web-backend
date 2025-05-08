@@ -10,6 +10,7 @@ _postgres_instances = {"engines": {}, "session_makers": {}, "active_connections"
 async def get_postgres_instance(env: str = None, **kwargs):
     env_is_test = env == "test"
     metadata_test_routine = kwargs.get("metadata_test_routine", True)
+    skip_session_close = kwargs.get('skip_session_close',False)
 
     database_url = TEST_DATABASE_URL if env_is_test else DATABASE_URL
     key = f"{env}_{database_url}"
@@ -46,7 +47,10 @@ async def get_postgres_instance(env: str = None, **kwargs):
     try:
         yield session
     finally:
-        await session.close()
+        # Leave the session open if skip_session_close is True and the environment is 'test'
+        skip_close = skip_session_close and env_is_test
+        if not skip_close:
+            await session.close()
 
         _postgres_instances["active_connections"][key] -= 1
 

@@ -37,10 +37,11 @@ async def dispatch_pending_chat(
                     max_id=max_id,
                     chat_lazy_offload_schedule = chat_lazy_offload_schedule
                 )
-        log_message(
-            'success',
-            f'User:{user_id} pending chats successfully offloaded!'
-        )
+                
+            log_message(
+                'success',
+                f'User:{user_id} pending chats successfully offloaded!'
+            )
     except Exception as e:
         log_message(
             'error',

@@ -24,6 +24,7 @@ from property_street_backend.app.routers import (
     activity,
     search,
     settings,
+    deep_chat,
     google_oauth,
 )
 from property_street_backend.app.initiator import (
@@ -114,5 +115,6 @@ app.include_router(activity.router)
 app.include_router(search.router)
 app.include_router(settings.router)
 app.include_router(google_oauth.router)
+app.include_router(deep_chat.router)
 app.include_router(ws.router)
 app.include_router(home_router)

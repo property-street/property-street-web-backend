@@ -4,7 +4,10 @@ import asyncio
 from fastapi import (
     WebSocket, 
     WebSocketDisconnect, 
+    WebSocketException,
+    status,
 )
+from typing import Dict
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,12 +17,13 @@ from property_street_backend.log_config.logger_config import (
     log_message
 )
 from property_street_backend.config.websocket_factory import (
-    authenticated_ws,
-    agents_ws,
     unauthenticated_ws,
+    client_authenticated_ws,
 )
+from .utils import test_channel_handler
+from .ws_manager import ConnectionManager
 from .schemas import SocketInitializerKwargsSchema
-from property_street_backend.app.controllers.chat.store import handle_chat
+from property_street_backend.app.controllers.chat.core import handle_chat
 from property_street_backend.app.controllers.asset_request.utils import asset_request_channel_handler
 from property_street_backend.app.controllers.notification.utils import dispatch_pending_notification
 from property_street_backend.app.controllers.chat.dispatch_pending_chat import dispatch_pending_chat
@@ -38,7 +42,6 @@ async def websocket_initialiazer(
 ):
     """
     Websocket endpoint handler for real time functionality of the application
-    independent of each user
 
     Args:
         websocket (WebSocket): client's websocket
@@ -50,28 +53,35 @@ async def websocket_initialiazer(
     Optional Keyword Args:
         last_n_timestamp (int): Timestamp of the last notification the client/client socket received 
     """
-    # add the websocket to the connected_ws dict
-    # else add to the unauthenticated_ws set
-    if client_id:
-        authenticated_ws[client_id] = websocket
-        # check the client is an agent and add the websocket to the connnected_agents_ws dict
-        if is_agent:
-            agents_ws[client_id] = websocket
-    else:
-        unauthenticated_ws.add(websocket)
 
-    # register channels
-    await register_channels(redis_client)
+    pubsub = redis_client.pubsub()
+    client_channel = f"channel_{client_id}"
+    await pubsub.subscribe(client_channel)
 
     # handle pending transactions
-    asyncio.create_task(handle_pending_trx(
-        user_id=client_id,
-        redis_client=redis_client,
-        ws=websocket,
-        last_n_timestamp = kwargs.pop('last_timestamp',None),
-        is_agent = is_agent,
-        db = db
-    ))
+    # asyncio.create_task(handle_pending_trx(
+    #     user_id=client_id,
+    #     redis_client=redis_client,
+    #     ws=websocket,
+    #     last_n_timestamp = kwargs.pop('last_timestamp',None),
+    #     is_agent = is_agent,
+    #     db = db
+    # ))
+
+    # Background listener for incoming messages to this user's channel
+    async def listen_to_channel():
+        async for message in pubsub.listen():
+            if message["type"] == "message":
+                data = message["data"]
+                if isinstance(data, bytes):
+                    data = data.decode()
+                try:
+                    await websocket.send_text(data)
+                except Exception as e:
+                    websocket_logger.error(f"Failed to send message to client {client_id}: {e}")
+
+    # Start listening
+    asyncio.create_task(listen_to_channel())
 
     try:
         # Socket.send recipient that continuously waits for messages 
@@ -93,42 +103,31 @@ async def websocket_initialiazer(
             # await websocket.send_text(f"Message received: {data}") 
     
     except WebSocketDisconnect:
-
-        # take off the websocket object from the connected_websockets and connected_agent_websocket dict
-        if client_id:
-            authenticated_ws.pop(client_id, None)
-            if is_agent:
-                agents_ws.pop(websocket,None)
-        else:
-            unauthenticated_ws.discard(websocket)
-
+        await pubsub.unsubscribe(client_channel)
+    except Exception as e:
+        websocket_logger.error(f"Unexpected error on websocket for {client_id}: {e}")
+        await pubsub.unsubscribe(client_channel)
         if DEBUG:
-            websocket_logger.error(f"Client disconnected", exc_info=True)
-    
-    finally:
-        pass
-
-
-async def register_channels(redis_client: Redis):
-    pubsub = redis_client.pubsub()
-    pubsub.subscribe(**{
-        'asset-request-channel': asset_request_channel_handler
-    })
-
+            websocket_logger.error(f"An error occured. reason:{e}", exc_info=True)
 
 async def ws_reception_handler(
     data: str,
-    redis_client: Redis,
+    manager: ConnectionManager,
 ):
-    loaded_data = json.loads(data)
-    data_category = loaded_data.get('category',None)
+    """Called when a message is sent from a socket client
 
-    if data_category == 'chat':
-        handle_chat(
-            data = loaded_data,
-            redis_client = redis_client,
-            chat_lazy_offload_schedule = None
-        )
+    Args:
+        data (str): serialized object holding the message
+        redis_client (Redis): redis client session
+        client_id (int): client's id 
+    """
+    try:
+        parsed_data = json.loads(data)
+    except json.JSONDecodeError:
+        raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA)
+
+    if parsed_data.get("category") == "chat":
+        await handle_chat(parsed_data, manager)
 
 
 async def handle_pending_trx(
