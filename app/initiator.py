@@ -3,11 +3,8 @@ from fastapi import FastAPI
 from redis.asyncio import Redis
 
 from property_street_backend.config.settings import (
-    REDIS_CACHE_DB,
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
-    REDIS_HOST,
-    PROD_REDIS_CACHE_DB,
 )
 from authlib.integrations.starlette_client import OAuth
 from property_street_backend.config.settings import DEBUG

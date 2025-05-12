@@ -1,5 +1,5 @@
 import asyncio
-import redis.asyncio as redis
+from redis.asyncio import Redis, client, ConnectionError
 
 from property_street_backend.log_config.logger_config import (
     log_message
@@ -8,9 +8,9 @@ from .dispatch_expiry_case import dispatch_expiry_case
 
 
 async def run_cache_db_expiry_listener(
-    pubsub: redis.client.PubSub, 
+    pubsub: client.PubSub, 
     stop_event: asyncio.Event,
-    redis_client: redis.Redis,
+    redis_client: Redis,
 ):
     """This function subscribes to a redis expiry event
         and calls a custom dispatcher function when one occurs
@@ -37,7 +37,7 @@ async def run_cache_db_expiry_listener(
                 # Optional: sleep for cooperative multitasking
                 await asyncio.sleep(0.1)
 
-            except redis.ConnectionError as e:
+            except ConnectionError as e:
                 log_message(
                     log_type='error',
                     message=f"Redis connection error: {e}. Retrying..."

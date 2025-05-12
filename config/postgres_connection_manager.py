@@ -2,12 +2,15 @@ from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
+from . import get_env
 from property_street_backend.config.settings import DATABASE_URL, TEST_DATABASE_URL
 
 Base = declarative_base()
 _postgres_instances = {"engines": {}, "session_makers": {}, "active_connections": {}}
 
-async def get_postgres_instance(env: str = None, **kwargs):
+
+async def get_postgres_instance(**kwargs):
+    env = get_env()
     env_is_test = env == "test"
     metadata_test_routine = kwargs.get("metadata_test_routine", True)
     skip_session_close = kwargs.get('skip_session_close',False)

@@ -25,6 +25,7 @@ from .ws_manager import ConnectionManager
 from .schemas import SocketInitializerKwargsSchema
 from property_street_backend.app.controllers.chat.core import handle_chat
 from property_street_backend.app.controllers.asset_request.utils import asset_request_channel_handler
+from property_street_backend.app.database import get_db
 from property_street_backend.app.controllers.notification.utils import dispatch_pending_notification
 from property_street_backend.app.controllers.chat.dispatch_pending_chat import dispatch_pending_chat
 
@@ -118,8 +119,7 @@ async def ws_reception_handler(
 
     Args:
         data (str): serialized object holding the message
-        redis_client (Redis): redis client session
-        client_id (int): client's id 
+        manager (ConnectionManager): class object managing socket connection 
     """
     try:
         parsed_data = json.loads(data)
@@ -133,24 +133,24 @@ async def ws_reception_handler(
 async def handle_pending_trx(
     redis_client: Redis,
     user_id: int,
-    db: AsyncSession,
     last_n_timestamp: int,
     is_agent: bool,
-    ws: WebSocket
+    websocket: WebSocket
 ):
-    # dispatch pending notification
-    await dispatch_pending_notification(
-        last_timestamp=last_n_timestamp,
-        redis_client = redis_client,
-        db = db,
-        is_agent = is_agent,
-        ws = ws,
-        user_id = user_id
-    )
+    async for db in get_db():
+        # dispatch pending notification
+        await dispatch_pending_notification(
+            last_timestamp=last_n_timestamp,
+            redis_client = redis_client,
+            db = db,
+            is_agent = is_agent,
+            ws = websocket,
+            user_id = user_id
+        )
 
-    # dispatch pending chat
-    await dispatch_pending_chat(
-        redis_client = redis_client,
-        user_id = user_id,
-        db = db
-    )
+        # dispatch pending chat
+        await dispatch_pending_chat(
+            redis_client = redis_client,
+            user_id = user_id,
+            db = db
+        )

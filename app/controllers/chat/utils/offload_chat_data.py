@@ -1,10 +1,11 @@
 import json
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from redis.asyncio import Redis
 from sqlalchemy.sql import update, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Message, Thread
+from .store import get_chat_next_offload_schedule
 from property_street_backend.app.models import User
 from property_street_backend.config.context_sessions import (
     acquire_redis_lock,
@@ -48,20 +49,35 @@ async def offload_chat_data(
     db: AsyncSession,
     min_id: int,
     max_id: int,
-    chat_lazy_offload_schedule: int,
 ):
-    chat_key = f'chat_{min_id}_{max_id}'
-    lock_key = f"offloading:{chat_key}"
+    """Items in the `chat_object` field of hset key created from `min_id` and `max_id` is offloaded to the database
+
+    Args:
+        redis_client (Redis): redis instance
+        db (AsyncSession): database instance
+        min_id (int): minimum id between the sender's and receiver
+        max_id (int): maximum id between the sender's and receiver
+        chat_lazy_offload_schedule (int): a timestamp which tells when the hset should be lazily offloaded
+
+    Raises:
+        e: _description_
+
+    Returns:
+        None: None
+    """
+    chat_lazy_offload_schedule = get_chat_next_offload_schedule()
+    dialogue_key = f'chat_{min_id}_{max_id}'
+    lock_key = f"offloading:{dialogue_key}"
     if not await acquire_redis_lock(redis_client, lock_key, ex = chat_lazy_offload_schedule):
         return  # Another offload in progress
 
-    chat_obj = await redis_client.hget(chat_key, "chat_object")
+    chat_obj = await redis_client.hget(dialogue_key, "chat_object")
     if not chat_obj:
         await release_redis_lock(redis_client,lock_key)
         return  # Nothing to offload
 
     # Optimistically delete to avoid race conditions
-    await redis_client.hdel(chat_key, 'chat_object')
+    await redis_client.hdel(dialogue_key, 'chat_object')
 
     try:
         # Get the thread ID (or create it)
@@ -120,16 +136,15 @@ async def offload_chat_data(
                 loaded_chat_obj[ts]['thread_id'] = thread_id
 
         # Final Redis updates
-        lazy_timestamp = datetime.now(timezone.utc) + timedelta(seconds=chat_lazy_offload_schedule)
-        await redis_client.hset(chat_key, mapping={
+        await redis_client.hset(dialogue_key, mapping={
             'offloaded': json.dumps(loaded_chat_obj),
-            'lazy_timestamp': int(lazy_timestamp.timestamp()),
+            'lazy_timestamp': chat_lazy_offload_schedule,
         })
-        await redis_client.hdel(chat_key, 'offloading')
+        await redis_client.hdel(dialogue_key, 'offloading')
 
     except Exception as e:
         # On failure, return chat object to Redis
-        await redis_client.hset(chat_key, 'chat_object', chat_obj)
+        await redis_client.hset(dialogue_key, 'chat_object', chat_obj)
         raise e  # Optionally re-raise or log
 
     finally:

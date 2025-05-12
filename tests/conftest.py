@@ -6,15 +6,13 @@ import pytest
 import requests
 import platform
 import subprocess
-import redis.asyncio as redis
-from fastapi.testclient import TestClient
 from httpx import AsyncClient, ASGITransport
 
 
 from property_street_backend.app.main import app
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
-from property_street_backend.config.context_sessions import get_db_based_on_context, get_redis_based_on_context
+from property_street_backend.config.context_sessions import get_db_based_on_context
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
 
 
@@ -38,7 +36,7 @@ async def get_test_db__fixture(test_env_var):
 @pytest.fixture(scope="function")
 async def redis_client__fixture(test_env_var):
     # Initialize Redis client
-    async for redis_client in get_redis_based_on_context():
+    async for redis_client in get_redis():
         yield redis_client
 
 

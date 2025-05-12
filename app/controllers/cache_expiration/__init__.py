@@ -15,6 +15,9 @@ async def cache_expiry_initializer(redis_client: Redis):
     if DEBUG:
         print("**Cache expiry invoked")
 
+    stop_event = None
+    pubsub = None
+    listener_task = None
     try:
         # Initialize Pub/Sub and a stop event
         # create a task with the pubsub listener
@@ -36,6 +39,9 @@ async def cache_expiry_initializer(redis_client: Redis):
         )
     finally:
         # Stop the Pub/Sub listener and cleanup
-        stop_event.set() # signal the listener to shutdown
-        await listener_task # wait for it to finish
-        await pubsub.aclose() # close the pubsub connection
+        if stop_event:
+            stop_event.set() # signal the listener to shutdown
+        if listener_task:
+            await listener_task # wait for it to finish
+        if pubsub:
+            await pubsub.aclose() # close the pubsub connection

@@ -1,33 +1,41 @@
 import json
 import asyncio
 from typing import Dict
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketException, status
 from redis.asyncio import Redis, client
 
 
+from .real_time_initiator import handle_pending_trx
 from property_street_backend.app.controllers.ws_init import websocket_logger
+from property_street_backend.config.redis_connection_manager import redis_pool_instance
 from property_street_backend.app.controllers.chat.pubsub_chat_handler import pubsub_chat_handler
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[int, WebSocket] = {}
-        self.redis = Redis(host="localhost", port=6379, db=1, decode_responses=True)
+        self.redis: Redis = redis_pool_instance()
         self.user_pubsubs: Dict[int, client.PubSub] = {}
         self.listener_tasks: Dict[int, asyncio.Task] = {}
-
-    async def connect(self, websocket: WebSocket, user_id: int, chat_id: int):
+        
+    async def connect(self, websocket: WebSocket, user_id: int, chat_id: int, is_agent: bool = False, last_n_timestamp: int = None):
         await websocket.accept()
         self.active_connections[user_id] = websocket
 
         # Create unique pubsub instance per user
         pubsub = self.redis.pubsub()
-        await pubsub.subscribe(f"user:{user_id}", f"chat:{chat_id}")
         self.user_pubsubs[user_id] = pubsub
+        
+        # generic subscription can be done o'er here
 
-        # Start listening task
+        if user_id != -1: # for authenticated users
+            await pubsub.subscribe(f"user:{user_id}", f"chat:{chat_id}")
+
+            # start pending transaction task
+            await asyncio.create_task(handle_pending_trx(self.redis, user_id, last_n_timestamp, is_agent, websocket))
+
+        # Start channel listening task
         listener_task = asyncio.create_task(self._pubsub_listener(user_id, pubsub))
         self.listener_tasks[user_id] = listener_task
-
     async def disconnect(self, user_id: int):
         # Cleanup WebSocket
         self.active_connections.pop(user_id, None)
@@ -73,6 +81,8 @@ class ConnectionManager:
         await self.redis.publish(f"chat:{chat_id}", json.dumps(message))
 
     async def send_to_user(self, user_id: int, message: dict):
+        if user_id == -1:
+            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
         await self.redis.publish(f"user:{user_id}", json.dumps(message))
 
     async def pubsub_message_dispatcher(self, websocket: WebSocket, data: str):

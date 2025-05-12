@@ -1,51 +1,22 @@
-import logging, json, time
+import json, time
 from redis.asyncio import Redis
-from datetime import datetime, timedelta, timezone
-from redis.exceptions import RedisError, ConnectionError, TimeoutError
 
-from . import (
-    chat_dialogue_hset_key, 
-    get_or_create_cached_chat,
-)
 from .schemas import ChatObjectSchema
 from property_street_backend.config.settings import (
     DEBUG,
-    CHAT_TTL,
-    CHAT_LAZY_OFFLOAD_SCHEDULE,
 )
-from property_street_backend.log_config.logger_config import (
-    log_message
+from property_street_backend.app.controllers.chat.utils.store import (
+    chat_exception_handler,
 )
-from property_street_backend.app.controllers.ws_init import user_pend_pool_key
-from property_street_backend.app.controllers.ws_init import get_client_channel_key
-from property_street_backend.app.controllers.chat.utils.store import add_pending_msg_key_to_pool, chat_exception_handler
+from property_street_backend.app.controllers.ws_init import websocket_logger
 from property_street_backend.app.controllers.ws_init.ws_manager import ConnectionManager
+from property_street_backend.app.controllers.chat.utils.store import chat_exception_handler
 
-
-websocket_logger = logging.getLogger("websocket")
-
-
-
-async def update_cached_hset(
-    chat_lazy_offload_schedule:int, 
-    redis_client:Redis,
-    cached_hset_key: str,
-    chat_object: dict,
-    ttl: int,
-):
-    lazy_timestamp = datetime.now(timezone.utc) + timedelta(seconds=chat_lazy_offload_schedule)
-    await redis_client.hset(cached_hset_key, mapping={
-        "chat_object": json.dumps(chat_object),
-        "lazy_timestamp": lazy_timestamp
-    })
-    await redis_client.expire(cached_hset_key, ttl)
 
 
 async def handle_chat(
     chat_obj: ChatObjectSchema,
     manager: ConnectionManager,
-    chat_lazy_offload_schedule: int = CHAT_LAZY_OFFLOAD_SCHEDULE, 
-    chat_ttl: int = CHAT_TTL,
 ):
     """Called when a chat object is sent to the server socket.
 
@@ -59,65 +30,45 @@ async def handle_chat(
     recipient_id = chat_obj['recipient_id']
     sender_id = chat_obj['sender_id']
 
-    sender_ws = None
+    unix_timestamp_ms = chat_obj.get('unix_timestamp_ms',None)
+    if not unix_timestamp_ms:
+        unix_timestamp_ms = int(time.time() * 1000)
+        chat_obj['unix_timestamp_ms'] = unix_timestamp_ms
 
-    cached_hset_key = chat_dialogue_hset_key(sender_id, recipient_id)
-    
     if message_type=='incoming_message':
         try:
             # send the data to the recipient
             await manager.send_to_user(recipient_id, chat_obj)
-            websocket_logger.info('**published to recipient\'s channel')
+            if DEBUG:
+                websocket_logger.info('**published to recipient\'s channel')
             
         except Exception as e:
             # when message fails to reach the recipient
             exc_msg = f"Failed to send message to user_{recipient_id}: {e}"
             await chat_exception_handler(
-                chat_key_to_cache=cached_hset_key,
-                redis_client=manager.redis,
-                cache_for_user_id=recipient_id,
-                exc_msg=exc_msg
+                redis_client = manager.redis,
+                cache_for_user_id = recipient_id,
+                exc_msg = exc_msg,
+                chat_obj = chat_obj
             )
     elif message_type=='read_message':
         try:
-            # update the data structure as message is sent/delivered
+            # update the status to read
             # send the read notification to sender
             chat_obj['status'] = 'read'
-            if sender_ws:
-                await sender_ws.send_text(chat_obj)
-            else: 
-                raise ConnectionError
+            await manager.send_to_user(sender_id, chat_obj)
             if DEBUG:
-                websocket_logger.info("Message read sent successfully to sender!")
-
-            # get the cached chat if it exist else the empty object
-            # update the status to sent
-            # re-update the hset
-            loaded_cached_chat = await get_or_create_cached_chat(recipient_id, sender_id, redis_client=redis_client) 
-            unix_timestamp_ms = chat_obj['unix_timestamp_ms']
-            loaded_cached_chat[str(unix_timestamp_ms)]['status'] = chat_obj
-            lazy_timestamp = datetime.now(timezone.utc) + timedelta(seconds=chat_lazy_offload_schedule)
-            await manager.redis.hset(cached_hset_key, mapping={
-                "chat_object": json.dumps(loaded_cached_chat),
-                "lazy_timestamp": lazy_timestamp
-            })
-            await manager.redis.expire(cached_hset_key, chat_ttl)
+                websocket_logger.info("**published to sender\'s channel!")
         except Exception as e:
             # when message fails to reach the sender
-            await add_pending_msg_key_to_pool(
-                chat_key=cached_hset_key,
-                redis_client=manager.redis,
-                user_id=sender_id,
+            exc_msg = f"Failed to notify sender of message read: {e}"
+            await chat_exception_handler(
+                redis_client = manager.redis,
+                cache_for_user_id = sender_id,
+                exc_msg = exc_msg,
+                chat_obj = chat_obj
             )
-            
-            if DEBUG:
-                websocket_logger.error(f"Failed to notify sender of message read: {e}", exc_info=True)
-            
-            # log the message
-            log_message(
-                log_type = 'error',
-                message = f"Failed to notify sender_{sender_id} of message read: {e}"
-            )
+
 
 
 async def cache_message(
