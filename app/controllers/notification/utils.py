@@ -4,10 +4,12 @@ from redis.asyncio import Redis
 from sqlalchemy import select, desc, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
+from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.models import Notification
-from property_street_backend.app.controllers.ws_init import agent_pend_pool_key
-from property_street_backend.app.controllers.ws_init import user_pend_pool_key
 from property_street_backend.log_config.logger_config import log_message
+from property_street_backend.app.controllers.ws_init import user_pend_pool_key
+from property_street_backend.app.controllers.ws_init import agent_pend_pool_key, websocket_logger
 
 async def dispatch_pending_notification(
     *,
@@ -40,19 +42,22 @@ async def dispatch_pending_notification(
         # === Agent Lazy Notifications (ZSET) ===
         if is_agent:
             lazy_notifications = await redis_client.zrangebyscore(
-                agent_pend_pool_key, min=last_timestamp + 1, max="+inf"
+                agent_pend_pool_key, min = last_timestamp + 1, max ="+inf"
             )
             if lazy_notifications:
                 await ws.send_json({
                     'event': 'agent_pending_lazy_notifications',
                     'data': [json.loads(obj) for obj in lazy_notifications]
                 })
-                log_message('success', f"Successfully pinged pending lazy agent messages to user id {user_id}")
+                msg = f"Successfully pinged pending lazy agent messages to user id {user_id}"
+                log_message('success', msg)
+                if DEBUG:
+                    websocket_logger.info(f"**{msg}")
 
         # === User DB-based Notifications (HSET of notification IDs) ===
-        user_pend_pool_key = user_pend_pool_key(user_id)
+        _user_pend_pool_key = user_pend_pool_key(user_id)
         pending_ids_field = 'notifications'
-        pending_notification_data = await redis_client.hget(user_pend_pool_key, pending_ids_field)
+        pending_notification_data = await redis_client.hget(_user_pend_pool_key, pending_ids_field)
 
         if pending_notification_data:
             try:
@@ -77,7 +82,10 @@ async def dispatch_pending_notification(
                             } for inst in notifications
                         ]
                     })
-                    log_message('success', f"Successfully pinged pending notifications to user_id {user_id}")
+                    msg = f"Successfully pinged pending notifications to user_id {user_id}"
+                    log_message('success', msg)
+                    if DEBUG:
+                        websocket_logger.info("**{msg}")
 
                     # Mark as delivered in DB
                     for inst in notifications:
@@ -89,7 +97,7 @@ async def dispatch_pending_notification(
                         await db.execute(stmt)
 
                     await db.commit()
-                    await redis_client.hdel(user_pend_pool_key, pending_ids_field)
+                    await redis_client.hdel(_user_pend_pool_key, pending_ids_field)
 
     # === No timestamp + Agent fallback ===
     elif is_agent:
@@ -99,5 +107,8 @@ async def dispatch_pending_notification(
                 'event': 'agent_pending_lazy_notifications',
                 'data': [obj for obj in entries]
             })
-            log_message('success', f"Successfully pinged pending lazy agent notification to agent with user_id {user_id}")
+            msg = f"Successfully pinged pending lazy agent notification to agent with user_id {user_id}"
+            log_message('success', msg)
+            if DEBUG:
+                websocket_logger.info(f"**{msg}")
 

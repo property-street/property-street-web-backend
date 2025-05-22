@@ -37,7 +37,7 @@ from property_street_backend.app.controllers.chat.models import (
 from property_street_backend.app.controllers.notification.models import Notification
 from property_street_backend.app.controllers.asset_request.models import AssetRequest
 from property_street_backend.app.controllers.ratings.models import Rating
-
+from property_street_backend.app.controllers.roommate_finder.models import RoomieApplication, RoommateFinder
 
 
 # abstract class dependency for models with cloud images fields
@@ -61,8 +61,6 @@ class AbstractCloudImage(Base):
     @declared_attr
     def __tablename__(cls):
         return cls.__name__.lower()  # Use class name as table name
-
-
 
 
 # asset-tag Association Table for many-to-many relationship
@@ -226,6 +224,14 @@ class CloudImageDetail(AbstractCloudImage):  # Inherit the abstract base
         uselist=False,  # explicitly tell SQLAlchemy it's a one-to-one 
         post_update=True,
         lazy="selectin",  # Ensures relationship loads in async contexts
+    )
+
+    # relationship to roommate finder
+    roommate_finder = relationship(
+        'RoommateFinder',
+        lazy = 'selectin',
+        back_populates= 'room_images',
+        uselist=False
     )
 
 
@@ -399,6 +405,13 @@ class User(Base):
         back_populates = 'user'
     )
 
+    # relationship to rooommate finder
+    rooommate_finder = relationship(
+        'RoommateFinder',
+        lazy='selectin',
+        back_populates = 'requester',
+    )
+
     # method for a user to become an agent
     async def become_agent(self, session):
         """Method to convert a user into an agent."""
@@ -489,11 +502,11 @@ class Area(Base):
     # For international usage, consider using a library like pycountry or geopy for validating country/state/city combinations.
     country = Column(String, nullable=False) # e.g., Nigeria
     state_or_province = Column(String, nullable=False) # e.g., "California" or "Lagos"
-    county = Column(String) # US-based e.g., "Los Angeles County"
     city_or_town = Column(String, nullable=False) # e.g., "San Francisco" or "Ikeja"
-    street = Column(String, nullable=False) # e.g., "Market Street", "Ahmadu Bello Way"
-    building_name_or_suite = Column(String, nullable=False) # e.g., "Apt 402"
-    zip_or_postal_code = Column(String, nullable=True) # e.g., 500102
+    county = Column(String) # US-based e.g., "Los Angeles County"
+    street = Column(String) # e.g., "Market Street", "Ahmadu Bello Way"
+    building_name_or_suite = Column(String) # e.g., "Apt 402"
+    zip_or_postal_code = Column(String) # e.g., 500102
 
 
     asset = relationship(
@@ -513,6 +526,14 @@ class Area(Base):
         'Rating',
         lazy='selectin',
         back_populates = 'area'
+    )
+
+    # relationship to roommate finder
+    roommate_finder = relationship(
+        'RoommateFinder',
+        lazy='selectin',
+        back_populates = 'area',
+        uselist = False
     )
 
 
@@ -721,6 +742,8 @@ models = [
     ChatSession,
     AssetRequest,
     Notification,
+    RoommateFinder, 
+    RoomieApplication, 
 ]
 
     

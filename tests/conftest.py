@@ -26,11 +26,8 @@ def test_env_var():
 @pytest.fixture(scope="function")
 async def get_test_db__fixture(test_env_var):
         
-    async for session in get_db_based_on_context():
+    async for session in get_db():
         yield session
-
-    # Use an event loop to ensure cleanup happens after tests complete
-    # request.addfinalizer(lambda: event_loop.run_until_complete(cleanup_testdb()))
 
 
 @pytest.fixture(scope="function")
@@ -46,12 +43,10 @@ async def client__fixture(
     redis_client__fixture,
 ):
     # getting the test_db fixture
-    async for test_db in get_test_db__fixture:
-        break
+    test_db = await anext(get_test_db__fixture)
 
     # get the yield client object
-    async for test_redis_client in redis_client__fixture:
-        break
+    test_redis_client = await anext(redis_client__fixture)
 
     # overriding the client's get_db dependency
     app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
@@ -167,7 +162,7 @@ def app_subprocess(test_env_var):
             requests.get(f'http://localhost:8001/?session={int(time.time())}')
             break
         except Exception:
-            time.sleep(1)  # ← not asyncio.sleep here
+            time.sleep(1)  # ←
     
     yield
 

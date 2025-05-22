@@ -6,7 +6,8 @@ from sqlalchemy import (
     Table,
     DateTime,
     func,
-    event
+    event,
+    CheckConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -121,6 +122,10 @@ class AssetRequest(Base):
         back_populates='requested_asset',
         uselist=False,
         lazy='selectin'
+    )
+
+    __table_args__ = (
+        CheckConstraint("length(description) <= 500", name="check_description_max"),
     )
 
 

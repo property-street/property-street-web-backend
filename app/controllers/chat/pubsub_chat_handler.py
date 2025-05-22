@@ -12,8 +12,6 @@ from property_street_backend.app.controllers.chat.utils.store import (
     cache_dialogue,
     chat_exception_handler,
 )
-from property_street_backend.app.controllers.chat import get_or_create_cached_chat
-
 
 
 async def pubsub_chat_handler(websocket: WebSocket, chat_obj: dict, redis_client: Redis, send_to_user: Callable[[int, dict], Awaitable[None]]):
@@ -42,8 +40,8 @@ async def pubsub_chat_handler(websocket: WebSocket, chat_obj: dict, redis_client
                 'event': message_type,
                 'data': chat_obj
             })
-        if DEBUG:
-            websocket_logger.info(f"Message sent successfully to receiver!")
+            if DEBUG:
+                websocket_logger.info(f"Message sent successfully to receiver!")
         else: 
             if DEBUG:
                 websocket_logger.info(f"Instance's socket disconnected at the moment!")

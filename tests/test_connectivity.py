@@ -2,22 +2,57 @@ import os
 import time
 import json
 import pytest
+import asyncio
 import websockets
-from redis.asyncio import Redis
+from sqlalchemy import select
 from httpx import AsyncClient
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.main import app
+from property_street_backend.app.models import User
 from .auth.test_user_creation import create_test_user
+from property_street_backend.app.database import get_db
 from property_street_backend.app.controllers.auth import fetched_access_token
+
 
 @pytest.mark.asyncio
 async def test_db_connectivity(
     get_test_db__fixture
 ):
     # fetch the testdb
-    async for test_db in get_test_db__fixture:
-        break
+    test_db = await anext(get_test_db__fixture)
+    
+    assert isinstance(test_db, AsyncSession)
+
+@pytest.mark.asyncio
+async def test_db_persistence_multi_session(
+    get_test_db__fixture
+):
+    try:
+        test_db = await anext(get_test_db__fixture)
+        assert isinstance(test_db, AsyncSession)
+        test_user: User = await create_test_user(test_db)
+        
+        test_db2 = await anext( get_db( 
+            metadata_test_routine = False,
+            skip_session_close = True,
+        ))
+        stmt = await test_db2.execute(
+            select(User).filter(User.email == test_user.email)
+        )
+        result = stmt.scalars().first()
+        assert result
+    finally:
+        await test_db2.close()
+        await test_db.close() # explicitly close; it's finally hasn't been called
+
+@pytest.mark.asyncio
+async def test_db_connectivity(
+    get_test_db__fixture
+):
+    # fetch the testdb
+    test_db = await anext(get_test_db__fixture)
     
     assert isinstance(test_db, AsyncSession)
 
@@ -82,36 +117,30 @@ async def test_client_connectivity(client__fixture):
 
 
 @pytest.mark.asyncio
-async def test_websocket_client(app_subprocess, websocket_client_fixture):
+async def test_websocket_client(app_subprocess, get_test_db__fixture):
     # get the yield client objects
-    async for fixture_obj in websocket_client_fixture:
-        test_db: AsyncSession = fixture_obj.get('db')
-        redis_client: Redis = fixture_obj.get('redis_client')
-        break
-
+    test_db = await anext(get_test_db__fixture)
     test_user = await create_test_user(test_db)
+    await test_user.become_agent(test_db)
+
     token_obj = fetched_access_token(test_user)
     token = token_obj['access_token']
-    headers = {
-        'Authorization' : f"Bearer {token}"
-    }
     timestamp = int(time.time())
-    uri = f'ws://localhost:8001/ws/{test_user.id}?last_n_timestamp={timestamp}&sesion_ts={timestamp}&test_ping=true'
-
-    async with websockets.connect(
-        uri,
-        extra_headers = headers
-    ) as websocket:
-        await websocket.send(json.dumps({"type": "ping"}))
-        response = json.loads(await websocket.recv())
-        assert response["type"] == "pong"
+    uri = f'ws://localhost:8001/ws?last_n_timestamp={timestamp}&sesion_ts={timestamp}&test_ping=true&access_token={token}'
+    test_ws = await websockets.connect(uri)
+    
+    try:
+        response = json.loads( 
+            await asyncio.wait_for( test_ws.recv(), timeout = 60 )
+        )
         assert response["token"] == token
         assert response["username"] == test_user.username
         assert int(response["last_n_timestamp"]) == timestamp
-
-    # test redis_client publishing and channel listener callback
-    await redis_client.publish(f'test_channel_{test_user.id}',json.dumps({'greetings': 'hi'}))
-    
+        assert response["is_agent"]
+    finally:
+        await test_db.close()
+        if test_ws:
+            await test_ws.close()
 
 # Adding a pseudo endpoint to the FastAPI app for testing
 @app.get("/pseudo-url")

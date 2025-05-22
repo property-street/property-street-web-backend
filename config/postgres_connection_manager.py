@@ -1,6 +1,6 @@
 from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, AsyncEngine
 
 from . import get_env
 from property_street_backend.config.settings import DATABASE_URL, TEST_DATABASE_URL
@@ -46,7 +46,7 @@ async def get_postgres_instance(**kwargs):
         _postgres_instances["active_connections"].get(key, 0) + 1
     )
 
-    session = _postgres_instances["session_makers"][key]()
+    session: AsyncSession = _postgres_instances["session_makers"][key]()
     try:
         yield session
     finally:
@@ -59,7 +59,7 @@ async def get_postgres_instance(**kwargs):
 
         # Cleanup if no more connections
         if _postgres_instances["active_connections"][key] == 0:
-            engine = _postgres_instances["engines"].pop(key, None)
+            engine: AsyncEngine = _postgres_instances["engines"].pop(key, None)
             _postgres_instances["session_makers"].pop(key, None)
             _postgres_instances["active_connections"].pop(key, None)
 

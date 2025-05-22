@@ -1,24 +1,23 @@
-import time
 import json
+import time
 import pytest
 import asyncio
 import websockets
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.controllers.auth import fetched_access_token
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
 
-def get_user_ws_endpoint(user_id):
+def get_user_ws_endpoint(client_id):
     timestamp = int(time.time()*1000)
-    return  f'ws://localhost:8001/ws/{user_id}?sesion_ts={timestamp}'
+    return  f'ws://localhost:8001/deep-chat/{client_id}?sesion_ts={timestamp}'
 
 @pytest.mark.asyncio
-async def test_dialogue(app_subprocess, websocket_client_fixture):
+async def test_dialogue(app_subprocess, get_test_db__fixture):
     
     # get the yield client objects
-    fixture_obj = await anext(websocket_client_fixture())
-    test_db = fixture_obj.get('db')
-    redis_client = fixture_obj.get('redis_client')
+    test_db: AsyncSession = await anext(get_test_db__fixture)
 
     sender = await create_test_user(test_db)
     recipient = await create_test_user(test_db, UserRegistrationSchema(
@@ -26,17 +25,13 @@ async def test_dialogue(app_subprocess, websocket_client_fixture):
         email='recipient@example.com',
         password='strongpassword'
     ))
-
-    token1 = fetched_access_token(sender)['access_token']
-    token2 = fetched_access_token(recipient)['access_token']
-    headers1 = {'Authorization': f'Bearer {token1}'}
-    headers2 = {'Authorization': f'Bearer {token2}'}
+    await test_db.close()
 
     uri1 = get_user_ws_endpoint(sender.id)
     uri2 = get_user_ws_endpoint(recipient.id)
 
-    ws1 = await websockets.connect(uri1, extra_headers=headers1)
-    ws2 = await websockets.connect(uri2, extra_headers=headers2)
+    ws1 = await websockets.connect(uri1)
+    ws2 = await websockets.connect(uri2)
 
     try:
         message = {
@@ -54,10 +49,13 @@ async def test_dialogue(app_subprocess, websocket_client_fixture):
         received_data = await asyncio.wait_for(ws2.recv(), timeout=60)
         received_json = json.loads(received_data)
 
-        assert received_json["sender_id"] == sender.id
-        assert received_json["recipient_id"] == recipient.id
-        assert received_json["fmt_msg_txt"] == "Hello recipient!"
+        assert received_json['event'] == message['msg_type']
+        data = received_json['data'] 
+        assert data["sender_id"] == sender.id
+        assert data["recipient_id"] == recipient.id
+        assert data["fmt_msg_txt"] == message['fmt_msg_txt']
         # assert "unix_timestamp_ms" in received_json
     finally:
+        await test_db.close()
         await ws1.close()
         await ws2.close()

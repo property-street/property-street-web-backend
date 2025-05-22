@@ -57,4 +57,10 @@ async def get_redis_instance(**kwargs):
             redis_to_close: Redis = _redis_instances.pop(key, None)
             if redis_to_close and not skip_close:
                 await redis_to_close.aclose()
+
+                #- ⚠️ delicate -#
+                #❗ Do not touch unless you know what you're doing.
+                # if env_is_test: # flush the database if a test environment
+                #     await redis_to_close.flushdb()
+            
             _redis_instances["active_connections"].pop(key, None)

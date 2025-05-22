@@ -1,34 +1,46 @@
 import time
 import json
-from fastapi import WebSocket
 import pytest
 import asyncio
 import websockets
-from redis.asyncio import Redis
 
+from ..utils import get_user_ws_endpoint
+from property_street_backend.app.database import get_db
+from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.controllers.auth import fetched_access_token
+from property_street_backend.app.controllers.chat import chat_dialogue_hset_key
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
-from property_street_backend.app.initiator import get_redis
-from property_street_backend.app.controllers.chat import chat_dialogue_hset_key
 
 
-def get_user_ws_endpoint(user_id):
-    timestamp = int(time.time())
-    return  f'ws://localhost:8001/deep-chat/{user_id}?sesion_ts={timestamp}'
 
 @pytest.mark.asyncio
-async def test_dialogue(app_subprocess):
+async def test_dialogue( app_subprocess, get_test_db__fixture ):
+    test_db = await anext(get_test_db__fixture)
+    sender = await create_test_user(test_db)
+    recipient = await create_test_user(test_db, UserRegistrationSchema(
+        username='recipient',
+        email='recipient@example.com',
+        password='strongpassword'
+    ))
 
-    sender_id = 3
-    recipient_id = 2
+    sender_token = fetched_access_token(sender)['access_token']
+    recipient_token = fetched_access_token(recipient)['access_token']
+
+    sender_id = sender.id
+    recipient_id = recipient.id
     dialogue_hset_key = chat_dialogue_hset_key(sender_id, recipient_id)
 
-    uri1 = get_user_ws_endpoint(sender_id)
-    uri2 = get_user_ws_endpoint(recipient_id)
+    sender_ws = await websockets.connect( 
+        get_user_ws_endpoint( sender_token )
+    )
+    recipient_ws = await websockets.connect(
+        get_user_ws_endpoint( recipient_token )
+    )
 
-    ws1 = await websockets.connect(uri1)
-    ws2 = await websockets.connect(uri2)
+    # This delay allows both websocket be fully 
+    # connected and running listener tasks; especially the recipient's ws
+    await asyncio.sleep(5)
 
     try:
         message = {
@@ -40,13 +52,13 @@ async def test_dialogue(app_subprocess):
             'status': 'unsent'
         }
 
-        await ws1.send(json.dumps(message))
+        await sender_ws.send(json.dumps(message))
 
         unix_timestamp_ms = None
 
         async def recipient_receipt_check():
             nonlocal unix_timestamp_ms
-            received_data = await ws2.recv()
+            received_data = await recipient_ws.recv()
             loaded_received_data: dict = json.loads(received_data)
 
             assert loaded_received_data.get('event') == 'incoming_message'
@@ -58,7 +70,7 @@ async def test_dialogue(app_subprocess):
         chat_obj = None
         async def sender_receipt_check():
             nonlocal chat_obj
-            received_data = await ws1.recv()
+            received_data = await sender_ws.recv()
             loaded_received_data: dict = json.loads(received_data)
 
             assert loaded_received_data.get('event') == 'delivered_message'
@@ -88,8 +100,8 @@ async def test_dialogue(app_subprocess):
         # receive the message on the sender's socket to verify the status
         # make assertions on the chat hset to verify sync of change
         chat_obj['msg_type'] = 'read_message'
-        await ws2.send(json.dumps(chat_obj))
-        recv_data:dict = json.loads(await asyncio.wait_for(ws1.recv(), timeout = 60))
+        await recipient_ws.send(json.dumps(chat_obj))
+        recv_data:dict = json.loads(await asyncio.wait_for(sender_ws.recv(), timeout = 60))
         assert recv_data['event'] == 'read_message'
         mod_chat_obj = recv_data.get('data')
         assert mod_chat_obj['status'] == 'read'
@@ -102,7 +114,8 @@ async def test_dialogue(app_subprocess):
             assert current_chat_obj['msg_type'] == 'read_message'
             break
     finally:
+        await test_db.close()
         async for redis_client in get_redis():
             await redis_client.delete(dialogue_hset_key)
-        await ws1.close()
-        await ws2.close()
+        await sender_ws.close()
+        await recipient_ws.close()

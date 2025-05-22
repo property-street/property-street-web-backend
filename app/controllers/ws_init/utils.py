@@ -1,28 +1,33 @@
+from fastapi import WebSocket
 from redis.asyncio import Redis
 
+from property_street_backend.app.database import get_db
+from property_street_backend.app.controllers.asset_request.utils import asset_request_channel_handler
+from property_street_backend.app.controllers.notification.utils import dispatch_pending_notification
+from property_street_backend.app.controllers.chat.dispatch_pending_chat import dispatch_pending_chat
 
-from property_street_backend.log_config.logger_config import log_message
-from property_street_backend.config.websocket_factory import get_instance_ws
-from property_street_backend.app.controllers.ws_init import (
-    websocket_logger,
-    get_client_channel_key,
-)
-from property_street_backend.config import get_env
-from property_street_backend.app.controllers.chat import get_or_create_cached_chat
-from property_street_backend.app.controllers.chat.utils.store import chat_exception_handler
-from property_street_backend.config.context_sessions import get_redis_based_on_context
-
-
-async def delete_pend_pool_when_empty(
+async def handle_pending_trx(
     redis_client: Redis,
-    pend_pool_key: str
+    user_id: int,
+    last_n_timestamp: int,
+    is_agent: bool,
+    websocket: WebSocket
 ):
-    if await redis_client.exists(pend_pool_key):
-        messages = await redis_client.hget(pend_pool_key, 'messages')
-        notifications = await redis_client.hget(pend_pool_key, 'notifications')
-        if not messages and not notifications:    
-            await redis_client.delete(pend_pool_key)
+    async for db in get_db():
+        # dispatch pending notification
+        await dispatch_pending_notification(
+            last_timestamp=last_n_timestamp,
+            redis_client = redis_client,
+            db = db,
+            is_agent = is_agent,
+            ws = websocket,
+            user_id = user_id
+        )
 
-
-async def test_channel_handler(message):
-    websocket_logger.info(f'Channel handler executed with message {message}')
+        # dispatch pending chat
+        await dispatch_pending_chat(
+            redis_client = redis_client,
+            user_id = user_id,
+            db = db,
+            websocket = websocket
+        )

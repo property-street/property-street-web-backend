@@ -1,6 +1,14 @@
 import logging
 
 agent_pend_pool_key = "pend_pool_agent_notification"
+# score -> unix-timestamp in milliseconds
+
+agent_specific_channels = {
+    'asset_request':'asset-request'
+}
+generic_channels = {
+    'latest_assets': 'latest-assets'
+}
 
 websocket_logger = logging.getLogger("websocket")
 
