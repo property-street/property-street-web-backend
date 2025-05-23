@@ -38,8 +38,8 @@ async def handle_asset_request(
 
         # publish the request to the asset_request channel
         await db.refresh(request_instance)
+        request_data['db_id'] = request_instance.id,
         data_to_publish = {
-            'db_id': request_instance.id,
             'request_data': request_data,
             'category': 'asset_request'
         }

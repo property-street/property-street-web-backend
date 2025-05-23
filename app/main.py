@@ -27,6 +27,7 @@ from property_street_backend.app.routers import (
     deep_chat,
     google_oauth,
     asset_request,
+    roommates_finder
 )
 from property_street_backend.app.initiator import (
     app, 
@@ -119,4 +120,5 @@ app.include_router(google_oauth.router)
 app.include_router(deep_chat.router)
 app.include_router(ws.router)
 app.include_router(asset_request.router)
+app.include_router(roommates_finder.router)
 app.include_router(home_router)

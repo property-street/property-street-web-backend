@@ -7,11 +7,38 @@ from sqlalchemy import (
     ForeignKey,
     Enum as SqlalchemyEnum,
     CheckConstraint,
+    Table
 )
 from sqlalchemy.orm import relationship
 
 from .enums import RoomiesApplicationEnumChoice
 from property_street_backend.config.postgres_connection_manager import Base
+
+# message-thread Association Table for many-to-many relationship
+roomies_application_roomies_applicants_association = Table(
+    'roomies_application_roomies_applicants_association',
+    Base.metadata,
+    Column(
+        'roomies_application_id', 
+        Integer, 
+        ForeignKey(
+            'roomies_application.id', 
+            name='fk_roomies_application_users',
+            ondelete='RESTRICT'
+        ), 
+        primary_key=True
+    ),
+    Column(
+        'user_id', 
+        Integer, 
+        ForeignKey(
+            'users.id', 
+            name='fk_users_roomies_application',
+            ondelete='CASCADE'
+        ), 
+        primary_key=True
+    ),
+)
 
 
 class RoomieApplication(Base):
@@ -26,32 +53,24 @@ class RoomieApplication(Base):
         nullable = False
     )
 
-    # relationship to user
-    user_id = Column(
-        Integer,
-        ForeignKey(
-            'users.id',
-            name='fk_roomies_application_users',
-            ondelete = 'CASCADE'
-        )
-    )
-    users = relationship(
+    # relationship to user/applicants
+    roomie_applicants = relationship(
         'User',
-        back_populates = 'roomie_application',
+        secondary='roomies_application_roomies_applicants_association',
+        back_populates = 'roomies_application',
         lazy = 'selectin',
-        uselist = False
     )
 
     # relationship to Roommate finder
     roommate_finder_id = Column(
         Integer,
         ForeignKey(
-            'roommate_finders.id',
+            'roommates_finder.id',
             name='fk_roommate_applications',
             ondelete = 'RESTRICT'
         )
     )
-    roommate_finder = relationship(
+    roommates_finder = relationship(
         'RoommateFinder',
         lazy = 'selectin',
         back_populates='roomies_application',
@@ -60,25 +79,17 @@ class RoomieApplication(Base):
 
 
 class RoommateFinder(Base):
-    __tablename__ = 'roommate_finders'
+    __tablename__ = 'roommates_finder'
 
     id = Column(Integer, index=True, primary_key=True)
     max_roomies = Column(Integer, default=1, nullable=False)
     extra_conditions = Column(Text)
 
-    room_images_id = Column(
-        Integer,
-        ForeignKey(
-            'cloud_image_details.id',
-            name = "fk_roommate_finders_cloud_image_details",
-            ondelete='RESTRICT' 
-        ),
-        nullable = False
-    )
+    # one-to-many relationship to cloud_image_details
     room_images = relationship(
         'CloudImageDetail',
         lazy='selectin',
-        back_populates= 'roommate_finder'
+        back_populates= 'roommates_finder'
     )
 
     # requester info
@@ -86,7 +97,7 @@ class RoommateFinder(Base):
         Integer,
         ForeignKey(
             'users.id',
-            name='fk_roommate_finders_users',
+            name='fk_roommates_finder_users',
             use_alter = True,
             ondelete='CASCADE'
         ),
@@ -95,7 +106,7 @@ class RoommateFinder(Base):
     requester = relationship(
         'User',
         lazy='selectin',
-        back_populates='roomate_finder',
+        back_populates='roommates_finder',
         uselist = False
     )
     
@@ -104,7 +115,7 @@ class RoommateFinder(Base):
         Integer,
         ForeignKey(
             'areas.id',
-            name = 'fk_roommate_finders_area',
+            name = 'fk_roommates_finder_area',
             ondelete = 'RESTRICT'
         ),
         nullable = False
@@ -112,7 +123,7 @@ class RoommateFinder(Base):
     area = relationship(
         'Area',
         lazy = 'selectin',
-        back_populates='roommate_finder',
+        back_populates='roommates_finder',
         uselist=False,   
     )
 
@@ -120,7 +131,7 @@ class RoommateFinder(Base):
     roomies_application = relationship(
         'RoomieApplication',
         lazy='selectin',
-        back_populates='roommate_finder'
+        back_populates='roommates_finder'
     )
 
 

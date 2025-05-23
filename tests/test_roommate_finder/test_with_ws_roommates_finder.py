@@ -2,23 +2,26 @@ import json
 import pytest
 import asyncio
 import websockets
+from httpx import AsyncClient
 from fastapi import HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..utils import get_user_ws_endpoint
+from property_street_backend.app.models import User
+from property_street_backend.app.initiator import logger
 from property_street_backend.app.controllers.auth import fetched_access_token
 from property_street_backend.tests.auth.test_user_creation import create_test_user
-from property_street_backend.app.initiator import logger
+from property_street_backend.app.controllers.roommate_finder.models import RoommateFinder
 
 @pytest.mark.asyncio
-async def test_asset_request_creation(app_subprocess, client__fixture):
+async def test_roommates_finder_request(app_subprocess, client__fixture):
     try:
-        fixture_obj = await anext(client__fixture)
-        test_db = fixture_obj.get('db') 
-        http_client = fixture_obj.get('http_client') 
+        fixture_obj: dict = await anext(client__fixture)
+        test_db: AsyncSession = fixture_obj.get('db') 
+        http_client: AsyncClient = fixture_obj.get('http_client') 
 
         # create test_user and make user agent
         test_user = await create_test_user(test_db)
-        await test_user.become_agent(test_db)
 
         # retrieve access token for requests
         token = fetched_access_token(test_user)['access_token']
@@ -28,13 +31,25 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
         }
         # construct payload
         payload = {
-            'description': 'I need a 1 bedroom flat in the maldives!',
             'area': {
                 'country':'Sri-lanka',
                 'state_or_province': 'Mogadishu',
                 'city_or_town': 'Pisque Central', 
                 'street': 'No 11 Jokey street',
-            }
+            },
+            'max_roomies': 4,
+            'room_images': [
+                {
+                    "cloud_asset_id":f"dkajdlkajdlkajsdkfjasldkfj{i}",
+                    "format":"jpg",
+                    "bytes":102400,
+                    "height":800,
+                    "public_id":f"test_image_{i}",
+                    "secure_url":"https://example.com/test_image.jpg",
+                    "width":600,
+                } for i in range(3)
+            ],
+            'extra_conditions': 'I need a 1 bedroom flat in the maldives!',
         }
 
         # connect ws client
@@ -48,7 +63,7 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
         # function to send post request
         async def send_post_request():
             response = await http_client.post(
-                "/asset-request",
+                "/roommate-finder",
                 json=payload,
                 headers=auth_header 
             )
@@ -64,7 +79,7 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
             nonlocal notification_obj
             received_data = await ws.recv()
             loaded_data: dict = json.loads(received_data)
-            assert loaded_data.get('event') == 'asset_request'
+            assert loaded_data.get('event') == 'roommates_finder'
             notification_obj = loaded_data.get('data')
 
         async def receipt_check_group():
@@ -76,25 +91,30 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
 
         # assert that the data persisted in the database
         await test_db.refresh(test_user)
-        asset_requests = test_user.requested_assets
-        assert asset_requests is not None
-        recent_request = asset_requests[0]
+        roommates_finder_requests = test_user.roommates_finder
+        assert roommates_finder_requests is not None
+        recent_request: RoommateFinder = roommates_finder_requests[0]
         assert recent_request is not None
-        assert recent_request.description == payload['description']
+        assert recent_request.extra_conditions == payload['extra_conditions']
+        assert recent_request.max_roomies == payload['max_roomies']
         assert recent_request.area.country == payload['area']['country']
         assert recent_request.area.state_or_province == payload['area']['state_or_province']
         assert recent_request.area.city_or_town == payload['area']['city_or_town']
         assert recent_request.area.street == payload['area']['street']
+        assert len(recent_request.room_images) == len(payload['room_images'])
 
         # assert that the notification was sent
         assert notification_obj is not None
-        request_data: dict = notification_obj.get('request_data')
-        assert request_data.get('db_id')
-        assert request_data['description'] == payload['description'] 
-        assert request_data['area']['country'] == payload['area']['country'] 
-        assert request_data['area']['state_or_province'] == payload['area']['state_or_province'] 
-        assert request_data['area']['city_or_town'] == payload['area']['city_or_town'] 
-        assert request_data['area']['street'] == payload['area']['street'] 
+        roomies_request_data: dict = notification_obj.get('request_data')
+        assert roomies_request_data is not None
+        assert roomies_request_data.get('db_id')
+        assert roomies_request_data['extra_conditions'] == payload['extra_conditions']
+        assert roomies_request_data['max_roomies'] == payload['max_roomies']
+        assert roomies_request_data['area']['country'] == payload['area']['country']
+        assert roomies_request_data['area']['state_or_province'] == payload['area']['state_or_province']
+        assert roomies_request_data['area']['city_or_town'] == payload['area']['city_or_town']
+        assert roomies_request_data['area']['street'] == payload['area']['street']
+        assert len(roomies_request_data['room_images']) == len(payload['room_images'])
     finally:
         await test_db.close()
         await ws.close()

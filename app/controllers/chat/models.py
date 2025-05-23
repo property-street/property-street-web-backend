@@ -4,11 +4,64 @@ from sqlalchemy import (
     String,
     ForeignKey, 
     func,
+    Table,
     DateTime,
 )
 from sqlalchemy.orm import relationship
 
 from property_street_backend.config.postgres_connection_manager import Base
+
+# message-thread Association Table for many-to-many relationship
+thread_chat_session_association = Table(
+    'thread_chat_session_association',
+    Base.metadata,
+    Column(
+        'thread_id', 
+        Integer, 
+        ForeignKey(
+            'threads.id', 
+            name='fk_thread_chat_session_association_thread_id',
+            ondelete='RESTRICT'
+        ), 
+        primary_key=True
+    ),
+    Column(
+        'chat_session_id', 
+        Integer, 
+        ForeignKey(
+            'chat_sessions.id', 
+            name='fk_thread_chat_session_association_chat_session_id',
+            ondelete='RESTRICT'
+        ), 
+        primary_key=True
+    )
+)
+# message-thread Association Table for many-to-many relationship
+threads_participants_association = Table(
+    'threads_participants_association',
+    Base.metadata,
+    Column(
+        'thread_id', 
+        Integer, 
+        ForeignKey(
+            'threads.id', 
+            name='fk_threads_participants_association_thread_id',
+            ondelete='CASCADE'
+        ), 
+        primary_key=True
+    ),
+    Column(
+        'user_id', 
+        Integer, 
+        ForeignKey(
+            'users.id', 
+            name='fk_threads_participants_association_user_id',
+            ondelete='RESTRICT'
+        ), 
+        primary_key=True
+    )
+)
+
 
 class ChatSession(Base):
     __tablename__ = "chat_sessions"

@@ -88,57 +88,6 @@ asset_tag_association = Table(
         primary_key=True
     )
 )
-# message-thread Association Table for many-to-many relationship
-thread_chat_session_association = Table(
-    'thread_chat_session_association',
-    Base.metadata,
-    Column(
-        'thread_id', 
-        Integer, 
-        ForeignKey(
-            'threads.id', 
-            name='fk_thread_chat_session_association_thread_id',
-            ondelete='RESTRICT'
-        ), 
-        primary_key=True
-    ),
-    Column(
-        'chat_session_id', 
-        Integer, 
-        ForeignKey(
-            'chat_sessions.id', 
-            name='fk_thread_chat_session_association_chat_session_id',
-            ondelete='RESTRICT'
-        ), 
-        primary_key=True
-    )
-)
-# message-thread Association Table for many-to-many relationship
-threads_participants_association = Table(
-    'threads_participants_association',
-    Base.metadata,
-    Column(
-        'thread_id', 
-        Integer, 
-        ForeignKey(
-            'threads.id', 
-            name='fk_threads_participants_association_thread_id',
-            ondelete='CASCADE'
-        ), 
-        primary_key=True
-    ),
-    Column(
-        'user_id', 
-        Integer, 
-        ForeignKey(
-            'users.id', 
-            name='fk_threads_participants_association_user_id',
-            ondelete='RESTRICT'
-        ), 
-        primary_key=True
-    )
-)
-
 
 # models
 
@@ -226,8 +175,16 @@ class CloudImageDetail(AbstractCloudImage):  # Inherit the abstract base
         lazy="selectin",  # Ensures relationship loads in async contexts
     )
 
-    # relationship to roommate finder
-    roommate_finder = relationship(
+    roommates_finder_id = Column(
+        Integer,
+        ForeignKey(
+            'roommates_finder.id',
+            name = "fk_cloud_image_details_roommates_finder",
+            ondelete='CASCADE' 
+        )
+    )
+    # many-to-one relationship to roommate finder
+    roommates_finder = relationship(
         'RoommateFinder',
         lazy = 'selectin',
         back_populates= 'room_images',
@@ -405,11 +362,19 @@ class User(Base):
         back_populates = 'user'
     )
 
-    # relationship to rooommate finder
-    rooommate_finder = relationship(
+    # one-to-many relationship to rooommates_finder
+    roommates_finder = relationship(
         'RoommateFinder',
         lazy='selectin',
         back_populates = 'requester',
+    )
+
+    # many-to-many relationship to rooomies_application
+    roomies_application = relationship(
+        'RoomieApplication',
+        secondary = 'roomies_application_roomies_applicants_association',
+        lazy='selectin',
+        back_populates = 'roomie_applicants',
     )
 
     # method for a user to become an agent
@@ -529,7 +494,7 @@ class Area(Base):
     )
 
     # relationship to roommate finder
-    roommate_finder = relationship(
+    roommates_finder = relationship(
         'RoommateFinder',
         lazy='selectin',
         back_populates = 'area',

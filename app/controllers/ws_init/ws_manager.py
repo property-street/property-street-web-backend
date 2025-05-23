@@ -11,6 +11,7 @@ from property_street_backend.app.controllers.ws_init import websocket_logger
 from property_street_backend.config.redis_connection_manager import redis_pool_instance
 from property_street_backend.app.controllers.chat.pubsub_chat_handler import pubsub_chat_handler
 from property_street_backend.app.controllers.asset_request.pubsub_request_handler import pubsub_request_handler
+from property_street_backend.app.controllers.roommate_finder.pubsub_roommate_handler import pubsub_roommate_handler
 
 class ConnectionManager:
     def __init__(self):
@@ -49,7 +50,7 @@ class ConnectionManager:
         self.listener_tasks[user_id] = listener_task
     
         if DEBUG:
-            websocket_logger.info(f'**Websocket connection completed for user {user_id} with subscribed channels: {channel_list}')
+            websocket_logger.info(f'**Websocket connection completed for user:{user_id} with subscribed channels: {channel_list}')
     async def disconnect(self, user_id: int):
         # Cleanup WebSocket
         self.active_connections.pop(user_id, None)
@@ -105,11 +106,14 @@ class ConnectionManager:
 
     async def pubsub_message_dispatcher(self, websocket: WebSocket, data: str):
         parsed_data: dict = json.loads(data)
+        category = parsed_data.get('category')
 
-        if parsed_data.get('category') == 'chat':
+        if category == 'chat':
             await pubsub_chat_handler(websocket, parsed_data, self.redis, self.send_to_user)
-        if parsed_data.get('category') == 'asset_request':
+        elif category == 'asset_request':
             await pubsub_request_handler(websocket, parsed_data, self.redis)
+        elif category == 'roommates_finder':
+            await pubsub_roommate_handler(websocket, parsed_data)
 
 
 manager = ConnectionManager()

@@ -7,7 +7,8 @@ agent_specific_channels = {
     'asset_request':'asset-request'
 }
 generic_channels = {
-    'latest_assets': 'latest-assets'
+    'latest_assets': 'latest-assets',
+    'roommates_finder': 'roommates-finder'
 }
 
 websocket_logger = logging.getLogger("websocket")
