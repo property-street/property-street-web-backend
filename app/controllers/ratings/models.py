@@ -17,7 +17,7 @@ class Rating(Base):
     id = Column(Integer, primary_key=  True, index=True) 
 
     comment = Column(String, nullable=False)
-    score = Column(Integer, default=0)
+    score = Column(Integer, default=0) # number of stars
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

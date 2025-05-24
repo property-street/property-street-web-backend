@@ -34,9 +34,10 @@ from property_street_backend.app.controllers.chat.models import (
     ChatSession,
     Message,
 ) 
+from property_street_backend.app.controllers.ratings.models import Rating
 from property_street_backend.app.controllers.notification.models import Notification
 from property_street_backend.app.controllers.asset_request.models import AssetRequest
-from property_street_backend.app.controllers.ratings.models import Rating
+from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
 from property_street_backend.app.controllers.roommate_finder.models import RoomieApplication, RoommateFinder
 
 
@@ -192,7 +193,7 @@ class CloudImageDetail(AbstractCloudImage):  # Inherit the abstract base
     )
 
 
-class Agent(Base):
+class Agent(AggregateRatingAClass):
     __tablename__ = 'agents'
 
     id = Column(
@@ -459,7 +460,7 @@ class Tag(Base):
     )
 
 
-class Area(Base):
+class Area(AggregateRatingAClass):
     __tablename__ = 'areas'
 
     id = Column(Integer, primary_key=True, index=True)

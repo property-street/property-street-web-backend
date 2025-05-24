@@ -4,6 +4,7 @@ from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from property_street_backend.app.models import (
     Tag, 
+    Area,
     User,
     Asset, 
     Agent,
@@ -20,7 +21,9 @@ def return_model_from_string(str_value: str):
     """
     if str_value == 'Tag':
         return Tag
-    if str_value == 'User':
+    if str_value == 'Area':
+        return Area
+    elif str_value == 'User':
         return User
     elif str_value == 'Agent':
         return Agent
