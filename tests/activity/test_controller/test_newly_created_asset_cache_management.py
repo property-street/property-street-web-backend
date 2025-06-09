@@ -1,6 +1,9 @@
 import pytest
 import json
 import asyncio
+from redis.asyncio import Redis
+
+
 from property_street_backend.config.settings import REDIS_CACHE_DB
 from property_street_backend.app.controllers.activity.asset_routine_methods import (
     create_or_update_newly_created_asset_cache
@@ -13,19 +16,19 @@ hset_key = "auto_category"
 
 
 async def assertions_after_caching(
-    redis_client,
-    asset_id,
-    asset_data,
-    asset_json
+    redis_client: Redis,
+    asset_id: int,
+    asset_data: dict,
 ):
+    asset_data_str = json.dumps(asset_data)
+    
     # Assert that the asset ID was added to the tracking set
     assert await redis_client.sismember(f"{hash_key}", asset_id)
 
 
-
     # Assert that the value of the newly_created_asset:{asset_id} matches asset_json
-    stored_asset_json = await redis_client.get(f"{hash_key}:{asset_id}")
-    assert stored_asset_json == asset_json
+    cached_asset_str = await redis_client.get(f"{hash_key}:{asset_id}")
+    assert cached_asset_str.decode() == asset_data_str
 
     # Assert that the asset_json is an entry in the hash set
     auto_category = await redis_client.hget("auto_category", f"{hash_key}")

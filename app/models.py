@@ -6,11 +6,9 @@ from sqlalchemy import (
     Date, 
     Boolean, 
     JSON, 
-    Text, 
     Table,
     Enum as SQLAlchemyEnum, 
     func,
-    Numeric,
     DateTime,
     event,
     ARRAY,
@@ -19,13 +17,13 @@ from sqlalchemy.future import select
 from sqlalchemy import types as _types
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.ext.declarative import declared_attr
 
 
+from .models_helper import AbstractCloudImage
 from property_street_backend.app.enums import (
     EmailManagementReasonChoice,
     ClientTypeChoice,
-    AssetCategoryChoice,
+    ClientGenderChoice,
 )
 from property_street_backend.config.postgres_connection_manager import Base
 from property_street_backend.app.controllers.cart.models import CartItem
@@ -34,6 +32,12 @@ from property_street_backend.app.controllers.chat.models import (
     ChatSession,
     Message,
 ) 
+from property_street_backend.app.controllers.assets.models import (
+    Tag,
+    Asset,
+    AssetFeature,
+    AssetCloudImage,
+) 
 from property_street_backend.app.controllers.ratings.models import Rating
 from property_street_backend.app.controllers.notification.models import Notification
 from property_street_backend.app.controllers.asset_request.models import AssetRequest
@@ -41,27 +45,6 @@ from property_street_backend.app.controllers.ratings.utils import AggregateRatin
 from property_street_backend.app.controllers.roommate_finder.models import RoomieApplication, RoommateFinder
 
 
-# abstract class dependency for models with cloud images fields
-class AbstractCloudImage(Base):
-    __abstract__ = True  # Ensure this class is not mapped to its own table
-
-    id = Column(Integer, primary_key=True, index=True)
-    format = Column(String, nullable=False)
-    cloud_asset_id = Column(String, nullable=False)
-    bytes = Column(Integer, nullable=False)
-    height = Column(Integer, nullable=False)
-    public_id = Column(String, unique=True, nullable=False)
-    secure_url = Column(String, nullable=False)
-    width = Column(Integer, nullable=False)
-
-    # dates
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    # Optionally, if you want dynamic table names, you can define a declared_attr:
-    @declared_attr
-    def __tablename__(cls):
-        return cls.__name__.lower()  # Use class name as table name
 
 
 # asset-tag Association Table for many-to-many relationship
@@ -245,6 +228,9 @@ class User(Base):
     first_name = Column(String)
     last_name = Column(String)
     other_names = Column(String)
+    gender = Column(
+        SQLAlchemyEnum(ClientGenderChoice, name='client_gender_choice')
+    )
     account_status = Column(String, default="Active")
     misc = Column(JSON, default=dict, nullable=True)
     client_type = Column(SQLAlchemyEnum(ClientTypeChoice, name='client_type_choice'), nullable=True)
@@ -445,21 +431,6 @@ class UserSetting(Base):
     )
 
 
-class Tag(Base):
-    __tablename__ = 'tags'
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, nullable=False)
-
-    # Relationship
-    assets = relationship(
-        'Asset', 
-        secondary='asset_tag_association', 
-        back_populates='tags',
-        lazy="selectin",  # Ensures relationship loads in async contexts
-    )
-
-
 class Area(AggregateRatingAClass):
     __tablename__ = 'areas'
 
@@ -503,194 +474,6 @@ class Area(AggregateRatingAClass):
     )
 
 
-class Asset(Base):
-    __tablename__ = 'assets'
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)
-    
-    # area
-    area_id = Column(
-        Integer,
-        ForeignKey(
-            'areas.id',
-            name = 'fk_assets_areas',
-            ondelete = 'CASCADE',
-            use_alter = True,
-        )
-    )
-    area = relationship(
-        'Area',
-        back_populates='asset',
-        lazy='selectin',
-        uselist = False
-    )
-
-    currency = Column(String, nullable=False)
-    status = Column(String, nullable=False)
-    price = Column(Numeric(10, 2), nullable=False)  # Up to 10 digits, 2 decimal places; returns a Decimal type
-    lease_duration = Column(String, nullable=True)
-    description = Column(Text, nullable=True)
-    has_features = Column(Boolean, default=False)
-    availability = Column(Text, nullable=False, default="available")
-
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    # Enums
-    #category= Column(SQLAlchemyEnum(AssetCategoryChoice, name='asset_category_choice'), nullable=True)
-    category= Column(String, nullable=False)
-
-    # Foreign key relationship to Agent
-    agent_id = Column(
-        Integer, 
-        ForeignKey(
-            'agents.id', 
-            name='fk_assets_agent_id', 
-            ondelete='CASCADE'
-        )
-    )
-    agent = relationship(
-        'Agent', 
-        back_populates='assets',
-        lazy="selectin",  # Ensures relationship loads in async contexts
-    )
-
-    # One-to-one relationship for cover image (no cascade)
-    cover_image_id = Column(
-        Integer, 
-        ForeignKey(
-            'cloud_image_details.id', 
-            name='fk_assets_cover_image_id', 
-            use_alter=True, 
-            ondelete='SET NULL'
-        ), 
-        nullable=True
-    )
-    cover_image = relationship(
-        'CloudImageDetail', 
-        back_populates='asset',
-        uselist=False, # explicitly tell SQLAlchemy it's a one-to-one
-        foreign_keys=[cover_image_id], 
-        post_update=True,
-        lazy="selectin",  # Ensures relationship loads in async contexts
-    )
-    
-    # Many-to-many relationship with Tag
-    tags = relationship(
-        'Tag', 
-        secondary='asset_tag_association', 
-        back_populates='assets',
-        lazy="selectin",  # Ensures relationship loads in async contexts
-    )
-
-    # Reverse relationship to asset feature
-    features = relationship(
-        'AssetFeature', 
-        back_populates='asset',
-        cascade="all, delete-orphan", # cascade from Asset to AssetFeature
-        lazy="selectin",  # Ensures relationship loads in async contexts
-
-    )
-
-    # Reverse relationship to the AssetCloudImage
-    cloud_images = relationship(
-        'AssetCloudImage', 
-        back_populates='asset',
-        cascade="all, delete-orphan", # cascade from Asset to AssetCloudImage
-        lazy="selectin",  # Ensures relationship loads in async contexts
-    )
-
-    # relationship to CartItem
-    cart_items = relationship(
-        'CartItem', 
-        back_populates='asset',
-        cascade="all, delete-orphan", # cascade from Asset to CartItem
-        lazy="selectin",  # Ensures relationship loads in async contexts
-    )
-
-    # many-to-many relationship to AssetRequst
-    requests = relationship(
-        'AssetRequest',
-        secondary = 'request_asset_association',
-        lazy='selectin',
-        back_populates='assets'
-    )
-
-
-class AssetFeature(Base):
-    __tablename__ = 'asset_features'
-
-    id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, nullable=False)
-
-    # Foreign key relationship to Asset (cascade on delete)
-    asset_id = Column(
-        Integer, 
-        ForeignKey(
-            'assets.id', 
-            name='fk_asset_features_asset_id', 
-            use_alter=True,
-            ondelete='CASCADE'
-        )
-    )
-    asset = relationship(
-        'Asset', 
-        back_populates='features',
-        foreign_keys=[asset_id],
-        lazy="selectin",  # Ensures relationship loads in async contexts
-
-    )
-
-    # Reverse relationship to the AssetCloudImage
-    cloud_images = relationship(
-        'AssetCloudImage', 
-        back_populates='asset_feature',
-        cascade="all, delete-orphan", # cascade from AssetFeature to AssetCloudImage
-        lazy="selectin",  # Ensures relationship loads in async contexts
-    )
-
-
-class AssetCloudImage(AbstractCloudImage):
-    __tablename__ = 'asset_cloud_images'
-
-    id = Column(Integer, primary_key=True, index=True)
-    
-    # Foreign key relationship to asset (no cascade)
-    asset_id = Column(
-        Integer, 
-        ForeignKey(
-            'assets.id', 
-            name='fk_asset_cloud_images_asset_id', 
-            use_alter=True,
-            ondelete='CASCADE'
-        )
-    )
-    asset = relationship(
-        'Asset', 
-        back_populates='cloud_images',
-        foreign_keys=[asset_id],
-        lazy="selectin",  # Ensures relationship loads in async contexts
-
-    )
-
-    # Foreign key relationship to asset_features (no cascade)
-    asset_feature_id = Column(
-        Integer, 
-        ForeignKey(
-            'asset_features.id', 
-            name='fk_asset_cloud_images_asset_feature_id', 
-            use_alter=True,
-            ondelete='CASCADE'
-        )
-    )
-    asset_feature = relationship(
-        'AssetFeature', 
-        back_populates='cloud_images',
-        foreign_keys=[asset_feature_id],
-        lazy="selectin",  # Ensures relationship loads in async contexts
-    )
 
 
 class AddOn(Base):
@@ -701,6 +484,8 @@ class AddOn(Base):
 
 
 models = [
+    Tag,
+    Asset,
     Thread,
     Rating,
     Message,
@@ -708,16 +493,15 @@ models = [
     ChatSession,
     AssetRequest,
     Notification,
+    AssetFeature,
     RoommateFinder, 
-    RoomieApplication, 
+    AssetCloudImage, 
+    RoomieApplication,
 ]
 
     
 
 @event.listens_for(User, 'before_insert')
-@event.listens_for(Asset, 'before_insert')
-@event.listens_for(CartItem, 'before_insert')
-@event.listens_for(AbstractCloudImage, 'before_insert')
 # Listen for the 'before_insert' event to set updated_at
 def set_updated_at_before_insert(mapper, connection, target):
     target.updated_at = func.now()

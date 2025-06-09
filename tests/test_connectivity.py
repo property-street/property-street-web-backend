@@ -13,6 +13,7 @@ from property_street_backend.app.main import app
 from property_street_backend.app.models import User
 from .auth.test_user_creation import create_test_user
 from property_street_backend.app.database import get_db
+from property_street_backend.config.settings import TEST_REDIS_CACHE_DB
 from property_street_backend.app.controllers.auth import fetched_access_token
 
 
@@ -60,11 +61,10 @@ async def test_db_connectivity(
 async def test_redis_connectivity(redis_client__fixture):
     
     # fetch the client fixture
-    async for redis_client in redis_client__fixture:
-        break
+    redis_client: Redis = await anext(redis_client__fixture)
 
     # assertions
-    assert redis_client.connection_pool.connection_kwargs['db'] == 1
+    assert redis_client.connection_pool.connection_kwargs['db'] == TEST_REDIS_CACHE_DB
     assert isinstance(redis_client, Redis)
 
 
@@ -72,11 +72,10 @@ async def test_redis_connectivity(redis_client__fixture):
 async def test_client_connectivity(client__fixture):
     
     # get the yield client objects
-    async for fixture_obj in client__fixture:
-        redis_client = fixture_obj.get("redis_client")
-        http_client = fixture_obj.get("http_client")
-        test_db = fixture_obj.get("db")
-        break
+    fixture_obj: dict = await anext(client__fixture)
+    redis_client = fixture_obj.get("redis_client")
+    http_client = fixture_obj.get("http_client")
+    test_db = fixture_obj.get("db")
 
     # environment varible assertion
     assert os.getenv("TEST_ENV") == "true"
@@ -94,7 +93,7 @@ async def test_client_connectivity(client__fixture):
     # Making a request to a URL
     # asserting response
     url = "/"
-    response = await http_client.get(url)
+    response: dict = await http_client.get(url)
     assert response.status_code == 200
     assert response.json() == {
         "message": "Hello, World!",
@@ -104,14 +103,14 @@ async def test_client_connectivity(client__fixture):
     # Making a request to a URL
     # making assertions
     url = "/test-database"
-    response = await http_client.get(url)
+    response: dict = await http_client.get(url)
     assert response.status_code == 200
     assert response.json().get("database_connected")
 
     # Making a request to a URL
     # making assertions
     url = "/test-redis"
-    response = await http_client.get(url)
+    response: dict = await http_client.get(url)
     assert response.status_code == 200
     assert response.json().get("test_key") == "value"
 

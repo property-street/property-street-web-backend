@@ -8,12 +8,13 @@ from property_street_backend.config.settings import (
     DEBUG,
 )
 from property_street_backend.app.controllers.cache_expiration.expiry_pubsub_listener import run_cache_db_expiry_listener
+from property_street_backend.app.initiator import logger
 
 
 
 async def cache_expiry_initializer(redis_client: Redis):
     if DEBUG:
-        print("**Cache expiry invoked")
+        logger.info("**Cache expiry invoked")
 
     stop_event = None
     pubsub = None
@@ -26,10 +27,6 @@ async def cache_expiry_initializer(redis_client: Redis):
         listener_task = asyncio.create_task(
             run_cache_db_expiry_listener(pubsub, stop_event, redis_client)
         )
-
-        if DEBUG:
-            print("**Cache expiry listener initialized")
-        
         # return listener_task, stop_event, pubsub
     except Exception as e:
         # Log unexpected errors

@@ -1,10 +1,12 @@
 import asyncio
 from redis.asyncio import Redis, client, ConnectionError
 
+from .dispatch_expiry_case import dispatch_expiry_case
+from property_street_backend.config.settings import DEBUG
 from property_street_backend.log_config.logger_config import (
     log_message
 )
-from .dispatch_expiry_case import dispatch_expiry_case
+from property_street_backend.app.initiator import logger
 
 
 async def run_cache_db_expiry_listener(
@@ -28,6 +30,10 @@ async def run_cache_db_expiry_listener(
             try:
                 # Get a message (non-blocking)
                 message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                
+                if DEBUG:
+                    logger.info("**Cache expiry message received")
+
                 if message and message['type'] == 'pmessage':
                     expired_key = message['data'].decode('utf-8')
 

@@ -1,17 +1,15 @@
 import json
 import pytest
 import asyncio
+from redis.asyncio import Redis
 
 from property_street_backend.config.settings import REDIS_CACHE_DB
 
 @pytest.mark.asyncio
-async def test_redis_expiry(client__fixture_with_prod_redis):
+async def test_redis_expiry(client__fixture):
     # Fetch the client generator
-    client_gen = client__fixture_with_prod_redis
-    client, redis_client = await client_gen.__anext__()
-
-    response = await client.get("/")
-    assert response.status_code == 200
+    fixture_map = await anext(client__fixture)
+    redis_client: Redis = fixture_map['redis_client']
 
     # Step 1: Add the integer `1` to the set `newly_created_asset`
     await redis_client.sadd('newly_created_asset', 1)
@@ -63,3 +61,27 @@ async def test_redis_expiry(client__fixture_with_prod_redis):
     await redis_client.hdel(hash_key, field)
     # assert that the entry is null
     assert not await redis_client.hget(hash_key, field)
+
+
+@pytest.mark.asyncio
+async def test_redis_expiry_b( app_subprocess, redis_client__fixture ):
+    redis_client: Redis = await anext(redis_client__fixture)
+
+    # Step 1: Add the integer `1` to the set `newly_created_asset`
+    await redis_client.sadd('newly_created_asset', 1)
+    # Step 2: Retrieve and verify that the integer `1` exists in the set
+    assert await redis_client.sismember('newly_created_asset', 1)
+
+    # Step 3: Create another set with the key `newly_created_asset:1`
+    await redis_client.sadd('newly_created_asset:1', "This is a test value")
+    # Step 4: Set an expiry on the set `newly_created_asset:1` (1 second)
+    await redis_client.expire('newly_created_asset:1', 1)
+
+    # Step 5: Wait for 2 seconds to ensure the key expires
+    await asyncio.sleep(2)
+
+    # Verify if the key `newly_created_asset:1` has expired
+    assert not await redis_client.exists('newly_created_asset:1')
+
+    # Step 6: Check if the integer `1` is still a member of `newly_created_asset`
+    assert not await redis_client.sismember('newly_created_asset', 1)

@@ -13,6 +13,7 @@ class ChatObjectSchema(BaseModel):
     fmt_msg_txt: str
 
     # optional fields
-    unix_timestamp_ms: Optional[int]
-    db_id: Optional[int]
-    thread_id: Optional[int]
+    unix_timestamp_ms: Optional[int] = None
+    media_urls: Optional[str] = None
+    db_id: Optional[int] = None
+    thread_id: Optional[int] = None

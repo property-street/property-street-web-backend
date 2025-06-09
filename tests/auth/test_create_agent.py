@@ -10,23 +10,26 @@ from property_street_backend.app.controllers.auth import (
     verify_password,
 )
 
+user_data = UserRegistrationSchema(
+    email="agent@example.com",
+    username="agentuser",
+    password="password123",
+    first_name = "agent",
+    last_name = "zee"
+)
+
+async def create_test_agent(db:AsyncSession):
+    return await create_agent(
+        db = db, 
+        user_data = user_data
+    )
 
 @pytest.mark.asyncio
 async def test_create_agent(get_test_db__fixture):
     # fetch the testdb
-    test_db = await get_test_db__fixture.__anext__()
+    test_db: AsyncSession = await get_test_db__fixture.__anext__()
 
-    user_data = UserRegistrationSchema(
-        email="agent@example.com",
-        username="agentuser",
-        password="password123",
-        first_name = "agent",
-        last_name = "zee"
-    )
-    created_agent = await create_agent(
-        db = test_db, 
-        user_data = user_data
-    )
+    created_agent = await create_test_agent(test_db)
     
     # assertions 
     assert created_agent.user.username == user_data.username

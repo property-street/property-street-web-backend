@@ -138,7 +138,7 @@ async def create_or_update_object(
             setattr(instance, key, value)
 
     # Handle relationships
-    if len(relationships):
+    if relationships:
         for field, related_indices in relationships.items():
             related_value = None
             if isinstance(related_indices, list):

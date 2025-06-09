@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, DateTime, func, CheckConstraint
+from sqlalchemy import Column, ForeignKey, Integer, DateTime, func, CheckConstraint, event, func
 from sqlalchemy.orm import relationship
 from property_street_backend.config.postgres_connection_manager import Base
 
@@ -48,3 +48,8 @@ class CartItem(Base):
     __table_args__ = (
         CheckConstraint("quantity <= 1", name="check_quantity_max"),
     )
+
+@event.listens_for(CartItem, 'before_insert')
+# Listen for the 'before_insert' event to set updated_at
+def set_updated_at_before_insert(mapper, connection, target):
+    target.updated_at = func.now()

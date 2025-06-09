@@ -7,9 +7,12 @@ from pydantic import (
 )
 from typing import Optional
 from property_street_backend.app.enums import AssetCategoryChoice
+from .area_schema import Area as AreaSchema
+from .cloud_image_schema import CloudImageSchema
 
-from .cloud_image_schema import CloudImageCreateSchema
-
+class ConfigDictSetter(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
 
 class AssetFeatureCreateSchema(BaseModel):
     title: str = Field(..., description="The title of the feature")
@@ -18,22 +21,6 @@ class AssetFeatureCreateSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class AssetCreateSchema(BaseModel):
-    title: str = Field(..., description="The title of the asset")
-    country: str = Field(..., description="The country where the asset is located")
-    address: str = Field(..., description="The physical address of the asset")
-    currency: str = Field(..., description="The currency used for the asset's price (e.g. USD, EUR)")
-    price: float = Field(..., description="The monetary value of the asset")
-    description: str = Field(..., description="A detailed description of the asset, possibly in HTML")
-    category: str = Field(..., description="The category of the asset (e.g. House, Hotel)")
-    status: str = Field(..., description="The category of the asset (e.g. House, Hotel)")
-    availability: str = Field(..., description="availability status of the asset; i.e available")
-    # Tags can be a string or a list of strings
-    tags: Optional[str | List[str]] = Field(None, description="Tags associated with the asset")
-    agent_id: Optional[int] = Field(None, description="The ID of the agent managing the asset")
-    cover_image: CloudImageCreateSchema
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class RemoveTagFromAssetSchema(BaseModel):
@@ -44,30 +31,29 @@ class RemoveTagFromAssetSchema(BaseModel):
 
 
 # Asset return schema
-class CloudImageSchema(BaseModel):
+class CloudImageResponseSchema(BaseModel):
     secure_url: str = Field(..., description="The secure URL of the image in the cloud storage")
 
     model_config = ConfigDict(from_attributes=True)
 
-class AssetCloudImageSchema(CloudImageSchema):
-    pass
-
-class AssetFeatureSchema(BaseModel):
+class AssetFeatureSchema(ConfigDictSetter):
     title: str = Field(..., description="The title of the feature")
-    cloud_images: List[AssetCloudImageSchema] = Field(..., description="The cloud images of each asset feature")
+    cloud_images: List[CloudImageSchema] = Field(..., description="The cloud images of each asset feature")
 
-    model_config = ConfigDict(from_attributes=True)
+
+class NoFeatureSchema(ConfigDictSetter):
+    cloud_images: List[CloudImageSchema] = Field(..., description="The cloud images of each asset feature")
+
 
 class TagSchema(BaseModel):
     name: str = Field(..., description="Tag associated with the asset")
 
     model_config = ConfigDict(from_attributes=True)
 
-class AssetSchema(BaseModel):
+
+class AssetSchema(ConfigDictSetter):
     id: int = Field(..., description="The id of the asset")
     title: str = Field(..., description="The title of the asset")
-    country: str = Field(..., description="The country where the asset is located")
-    address: str = Field(..., description="The physical address of the asset")
     currency: str = Field(..., description="The currency used for the asset's price (e.g., USD, EUR)")
     price: float = Field(..., description="The monetary value of the asset")
     lease_duration: Optional[str] = Field(None, description="The lease duration of the asset, if it's a lease.")
@@ -81,16 +67,19 @@ class AssetSchema(BaseModel):
     tags: List[TagSchema] = Field(..., description="Tags associated with the asset")
     cover_image: CloudImageSchema = Field(..., description="The main image of the asset")
     features: Optional[List[AssetFeatureSchema]] = Field(None, description="A list of features of the asset")
-    cloud_images: Optional[List[AssetCloudImageSchema]] = Field(None, description="Fallback images for assets without features")
-
-    model_config = ConfigDict(from_attributes=True)
+    cloud_images: Optional[List[CloudImageSchema]] = Field(None, description="Fallback images for assets without features")
 
     @model_validator(mode="after")
     def validate_features_or_no_feature(cls, values):
         if values.features and values.cloud_images:
             raise ValueError("Only one of 'features' or 'cloud_images' can be included in the response at a time.")
         return values
-    
+
+
+class AssetResponseSchema(AssetSchema):
+    cover_image: CloudImageResponseSchema
+
+
 class AssetFetchResponseSchema(BaseModel):
     first_name: Optional[str] = None
     client_is_agent: Optional[bool] = None
@@ -98,8 +87,10 @@ class AssetFetchResponseSchema(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class LatestAssetsFetchResponseSchema(BaseModel):
     assets: List[AssetSchema]
+
 
 class AssetFetchByIdResponseSchema(AssetFetchResponseSchema):
     asset: AssetSchema

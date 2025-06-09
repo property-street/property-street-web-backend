@@ -1,6 +1,5 @@
 import json
-import asyncio
-import redis.asyncio as redis
+from redis.asyncio import Redis
 
 from property_street_backend.log_config.logger_config import (
     log_message
@@ -10,7 +9,7 @@ from property_street_backend.log_config.logger_config import (
 async def create_or_update_newly_created_asset_cache(
     asset_id: int, 
     asset_data: dict, 
-    redis_client: redis.Redis,
+    redis_client: Redis,
     newly_created: bool,
     expiry_seconds:int,
 ):
@@ -24,40 +23,39 @@ async def create_or_update_newly_created_asset_cache(
     hash_key = "newly_created_asset"
     hset_key = "auto_category"
 
+    asset_data_to_str = json.dumps(asset_data)
+
     try:
         asset_exists = await redis_client.exists(f'{hash_key}:{asset_id}')
         
         if newly_created:
-            # Serialize the asset data to a JSON string
-            asset_json = json.dumps(asset_data)
-
             # Add the asset ID to the tracking set
             await redis_client.sadd(hash_key, asset_id)
 
             # Create a specific key for the asset and set an expiry
             asset_key = f'{hash_key}:{asset_id}'
-            await redis_client.set(asset_key, asset_json, ex=expiry_seconds)
+            await redis_client.set(asset_key, asset_data_to_str, ex=expiry_seconds)
 
         if newly_created or asset_exists:
             # Add or update the `auto_category` HSET
-            existing_assets_json = await redis_client.hget(
+            existing_assets = await redis_client.hget(
                 hset_key, 
                 hash_key
             )
             
-            if existing_assets_json:
+            if existing_assets:
                 # Parse the existing JSON string and append the new asset
-                existing_assets = json.loads(existing_assets_json)
-                existing_assets[str(asset_id)] = asset_data
+                loaded_asset = json.loads(existing_assets)
+                loaded_asset[str(asset_id)] = asset_data
             else:
                 # If no data exists, start with the new asset
-                existing_assets = { asset_id:asset_data }
+                loaded_asset = { asset_id:asset_data }
 
             # Update the HSET with the updated list
             await redis_client.hset(
                 hset_key, 
                 hash_key, 
-                json.dumps(existing_assets)
+                json.dumps(loaded_asset)
             )
 
 

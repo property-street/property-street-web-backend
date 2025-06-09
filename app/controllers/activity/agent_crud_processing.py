@@ -81,7 +81,7 @@ async def process_asset(
         Dict: The result of the processing.
     """
     # variable to hold asset instance
-    asset_instance_id_after_flush_before_commit = None
+    asset_instance_before_commit = None
     # Initialize proxy object
     proxy = {}
     # Convert keys to integers for predictable ordering
@@ -149,29 +149,24 @@ async def process_asset(
                 )
                 proxy[key] = instance
                 # check if the instance is an Asset model instance
-                if isinstance(instance, Asset):
-                    asset_instance_id_after_flush_before_commit =  instance.id
+                if isinstance(instance, Asset): 
+                    # hold the asset instance id
+                    asset_instance_before_commit = instance
 
         # Commit all changes after all operations are completed
         await db.commit()
 
 
-        # handle caching
-        # fetch the asset after all transactions have been done
-        result = await db.execute(
-            select(Asset).filter(
-                Asset.id == asset_instance_id_after_flush_before_commit
-            )
-        )
-        asset_instance = result.scalars().first()
+        # Handle caching
+        ## refresh the asset after all transactions have been done
+        asset_instance = await db.refresh(asset_instance_before_commit)
+        
         if asset_instance:
-            asset_schema = AssetSchema.model_validate(asset_instance)
-            asset_cache_object = json.dumps(
-                asset_schema.model_dump()
-            )
+            asset_schema = AssetSchema.model_validate(asset_instance) # schema instance of asset
+            asset_instance_to_dict = asset_schema.model_dump()
             await create_or_update_newly_created_asset_cache(
                 asset_id = asset_instance.id,
-                asset_data = asset_cache_object,
+                asset_data = asset_instance_to_dict,
                 redis_client = redis_client,
                 newly_created = newly_created,
                 expiry_seconds = ttl_in_seconds,

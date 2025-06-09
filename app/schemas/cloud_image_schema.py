@@ -1,6 +1,6 @@
 from pydantic import Field, BaseModel, ConfigDict
 
-class CloudImageCreateSchema(BaseModel):
+class CloudImageSchema(BaseModel):
     cloud_asset_id: str = Field(..., description="asset_id from the cloud")
     format: str = Field(..., description="The format of the image (e.g. jpg, png)")
     bytes: int = Field(..., description="The size of the image in bytes")

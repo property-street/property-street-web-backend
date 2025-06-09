@@ -1,3 +1,29 @@
+cloud_image_template = {
+    "cloud_asset_id":"dkajdlkajdlkajsdkfjasldkfj",
+    "format":"jpg",
+    "bytes":102400,
+    "height":800,
+    "public_id":"test_image_123",
+    "secure_url":"https://example.com/test_image.jpg",
+    "width":600,
+}
+area_template = {
+    'country':'Sri-lanka',
+    'state_or_province': 'Mogadishu',
+    'city_or_town': 'Pisque Central', 
+    'street': 'No 11 Jokey street',
+}
+asset_data_template = {        
+    "title":"Test Asset",
+    "currency":"USD",
+    "price":100000.00,
+    "description":"Test description",
+    "category":"House",
+    "status":"auction",
+    "availability":"available",
+}
+tags_template = ["house", "condo"]
+
 # Test data
 feature_obj = {
     0: {
@@ -34,13 +60,8 @@ feature_obj = {
 
         # fields
         "fields": {
-            "cloud_asset_id":"dkajdlkajdlkajsdkfjasldkf",
-            "format": "jpg",
-            "bytes": 102400,
-            "height": 800,
+            **cloud_image_template,
             "public_id": "test_image_123",
-            "secure_url": "https://example.com/test_image.jpg",
-            "width": 600,
         }
     },
     4: {
@@ -51,18 +72,7 @@ feature_obj = {
 
         # fields
         "fields": {
-            "title": "value",
-            "country": "Caicos",
-            "address": "Barbados street",
-            "currency": "usd",
-            "status": "Auction",
-            "amount": 30000.98,
-            "category": "House",
-            "status": "auction",
-            "description": "<span>bla bla bla</span>",
-            "has_features": True,
-            "lease_duration": "Three months",
-            "availability": "balablu",
+            **asset_data_template,
 
             "relationship": {
                 "tags": [1, 2],
@@ -103,7 +113,37 @@ feature_obj = {
                 "asset": 4,
             }
         },
+    },
+    7: {
+        # Area
+        "db_delete": False,
+        "db_table_id": -1,
+        "db_table_name": "Area",
 
+        # fields
+        "fields": {
+            **area_template,
+
+            # relationships
+            "relationship":{
+                "asset": 4
+            }
+        }
+    },
+    8: {
+        # tag 1
+        "db_table_id": -1,
+        "db_delete": False,
+        "db_table_name": "Tag",
+
+        # fields
+        "fields": {
+            "name": "tag_value1",
+
+            "relationship":{
+                "asset": 4,
+            }
+        }
     },
 }
 

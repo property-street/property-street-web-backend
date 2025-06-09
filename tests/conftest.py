@@ -25,14 +25,19 @@ def test_env_var():
 
 @pytest.fixture(scope="function")
 async def get_test_db__fixture(test_env_var):
-        
-    async for session in get_db():
-        yield session
+    try:
+        async for session in get_db():
+            yield session
+    finally:
+        await session.close()
 
 
 @pytest.fixture(scope="function")
 async def redis_client__fixture(test_env_var):
     # Initialize Redis client
+    #try:
+    #finally:
+    #    await redis_client.flushdb()
     async for redis_client in get_redis():
         yield redis_client
 
