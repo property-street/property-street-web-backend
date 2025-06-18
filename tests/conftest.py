@@ -77,6 +77,44 @@ async def sessions_fixture(get_test_db__fixture, redis_client__fixture):
         "db": test_db,
     }
 
+@pytest.fixture(scope='function')
+async def sessions_with_cache_expiry_event_fixture(
+    request, 
+    event_loop,
+    get_test_db__fixture, 
+    redis_client__fixture, 
+):
+    async for test_db in get_test_db__fixture:
+        break
+    async for test_redis_client in redis_client__fixture:
+        break
+
+    app.dependency_overrides[get_db] = lambda: test_db
+    app.dependency_overrides[get_redis] = lambda: test_redis_client
+
+    # ✅ FIXED: Properly await the initializer
+    (
+        listener_task, 
+        stop_event, 
+        _
+    ) = await cache_expiry_initializer(test_redis_client)
+    
+    # ✅ Finalizer for cleanup
+    async def finalizer():
+        if stop_event:
+            stop_event.set()
+        if listener_task:
+            await listener_task
+
+    # ✅ Register the async finalizer using pytest
+    request.addfinalizer(lambda: event_loop.run_until_complete(finalizer()))
+
+    
+    yield {
+        "redis_client": test_redis_client,
+        "db": test_db,
+    }
+
 
 @pytest.fixture(scope="function")
 def celery_worker_and_beat():
