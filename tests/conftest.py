@@ -3,6 +3,7 @@ import time
 import pytest
 import signal
 import pytest
+import asyncio
 import requests
 import platform
 import subprocess
@@ -25,19 +26,13 @@ def test_env_var():
 
 @pytest.fixture(scope="function")
 async def get_test_db__fixture(test_env_var):
-    try:
-        async for session in get_db():
-            yield session
-    finally:
-        await session.close()
+    async for session in get_db():
+        yield session
 
 
 @pytest.fixture(scope="function")
 async def redis_client__fixture(test_env_var):
-    # Initialize Redis client
-    #try:
-    #finally:
-    #    await redis_client.flushdb()
+    # await redis_client.flushdb()
     async for redis_client in get_redis():
         yield redis_client
 
@@ -47,18 +42,15 @@ async def client__fixture(
     get_test_db__fixture, 
     redis_client__fixture,
 ):
-    # getting the test_db fixture
-    test_db = await anext(get_test_db__fixture)
+    async for test_db in get_test_db__fixture:
+        break
 
-    # get the yield client object
-    test_redis_client = await anext(redis_client__fixture)
+    async for test_redis_client in redis_client__fixture:
+        break
 
     # overriding the client's get_db dependency
     app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
     app.dependency_overrides[get_redis] = lambda: test_redis_client  # Override redis_client dependency
-
-    # start the cache expiry listener
-    await cache_expiry_initializer(test_redis_client)
 
     # Use ASGITransport with the app
     transport = ASGITransport(app=app)
@@ -71,8 +63,7 @@ async def client__fixture(
 
 
 @pytest.fixture(scope='function')
-async def websocket_client_fixture(get_test_db__fixture, redis_client__fixture):
-    # Override dependencies as before
+async def sessions_fixture(get_test_db__fixture, redis_client__fixture):
     async for test_db in get_test_db__fixture:
         break
     async for test_redis_client in redis_client__fixture:

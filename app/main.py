@@ -44,12 +44,22 @@ from property_street_backend.app.controllers.cache_expiration import cache_expir
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
-    redis_client = await anext(get_redis())
-
-    await cache_expiry_initializer(redis_client)
-    yield  # Application runs here
+    async for redis_client in get_redis():
+        (
+            listener_task, 
+            stop_event, 
+            _
+        ) = await cache_expiry_initializer(redis_client)
+    
+    yield  
+    # Application runs here
     # Shutdown logic (if needed)
     # e.g., await redis_client.close()
+
+    if stop_event:
+        stop_event.set()
+    if listener_task:
+        await listener_task
 
 app = FastAPI(lifespan=lifespan)
 

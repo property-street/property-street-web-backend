@@ -22,9 +22,8 @@ async def test_db_connectivity(
     get_test_db__fixture
 ):
     # fetch the testdb
-    test_db = await anext(get_test_db__fixture)
-    
-    assert isinstance(test_db, AsyncSession)
+    async for test_db in get_test_db__fixture:
+        assert isinstance(test_db, AsyncSession)
 
 @pytest.mark.asyncio
 async def test_db_persistence_multi_session(
@@ -48,24 +47,13 @@ async def test_db_persistence_multi_session(
         await test_db2.close()
         await test_db.close() # explicitly close; it's finally hasn't been called
 
-@pytest.mark.asyncio
-async def test_db_connectivity(
-    get_test_db__fixture
-):
-    # fetch the testdb
-    test_db = await anext(get_test_db__fixture)
-    
-    assert isinstance(test_db, AsyncSession)
 
 @pytest.mark.asyncio
 async def test_redis_connectivity(redis_client__fixture):
-    
-    # fetch the client fixture
-    redis_client: Redis = await anext(redis_client__fixture)
-
-    # assertions
-    assert redis_client.connection_pool.connection_kwargs['db'] == TEST_REDIS_CACHE_DB
-    assert isinstance(redis_client, Redis)
+    async for redis_client in redis_client__fixture:
+        redis_client: Redis
+        assert redis_client.connection_pool.connection_kwargs['db'] == TEST_REDIS_CACHE_DB
+        assert isinstance(redis_client, Redis)
 
 
 @pytest.mark.asyncio

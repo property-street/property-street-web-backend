@@ -131,6 +131,8 @@ class Message(Base):
     status = Column(String, nullable=False)
     timestamp = Column(Integer, nullable=False)
     updated_timestamp = Column(Integer, nullable=True)
+    media_urls = Column(String) # This would hold a serialized array of urls
+    additional_metadata = Column(String) # This would hold non-formal data
 
     # Foreign key relationship to Thread
     thread_id = Column(

@@ -30,7 +30,7 @@ async def get_redis_instance(**kwargs):
     env_is_test = redis_accessories['env_is_test']
     key = redis_accessories['key']
 
-    redis_client = _redis_instances.get(key)
+    redis_client: Redis = _redis_instances.get(key)
     skip_session_close = kwargs.get('skip_session_close',False)
 
 
@@ -40,12 +40,11 @@ async def get_redis_instance(**kwargs):
             _redis_instances["active_connections"].get(key, 0) + 1
         )
 
-        if redis_client:
-            yield redis_client
-        else:
+        if not redis_client:
             redis_client = redis_pool_instance()
             _redis_instances[key] = redis_client
-            yield redis_client
+        
+        yield redis_client
     finally:
         # variable to determine if the session should be closed
         skip_close = skip_session_close and env_is_test

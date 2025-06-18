@@ -1,87 +1,50 @@
-import json
 import pytest
 import asyncio
 from redis.asyncio import Redis
 
-from property_street_backend.config.settings import REDIS_CACHE_DB
-
-@pytest.mark.asyncio
-async def test_redis_expiry(client__fixture):
-    # Fetch the client generator
-    fixture_map = await anext(client__fixture)
-    redis_client: Redis = fixture_map['redis_client']
-
-    # Step 1: Add the integer `1` to the set `newly_created_asset`
-    await redis_client.sadd('newly_created_asset', 1)
-    # Step 2: Retrieve and verify that the integer `1` exists in the set
-    assert await redis_client.sismember('newly_created_asset', 1)
-
-    # Step 3: Create another set with the key `newly_created_asset:1`
-    await redis_client.sadd('newly_created_asset:1', "This is a test value")
-    # Step 4: Set an expiry on the set `newly_created_asset:1` (1 second)
-    await redis_client.expire('newly_created_asset:1', 1)
-
-    # Step 5: Wait for 2 seconds to ensure the key expires
-    await asyncio.sleep(2)
-
-    # Verify if the key `newly_created_asset:1` has expired
-    assert not await redis_client.exists('newly_created_asset:1')
-
-    # Step 6: Check if the integer `1` is still a member of `newly_created_asset`
-    assert not await redis_client.sismember('newly_created_asset', 1)
-
-    asset_id = 12345
-    asset_data = {
-        "name": "Test Asset", 
-        "category": "Test Category",
-    }
-
-    # test deletion of specific set
-    specific_set = f'newly_created_asset:{asset_id}'
-    await redis_client.sadd(specific_set, "This is a test value")
-    await redis_client.delete(specific_set)
-    assert not await redis_client.exists(specific_set)
-
-    # test hset insertion and deletion
-    hash_key = "auto_category"
-    field = "newly_created_asset"
-    # insert data to the hset
-    await redis_client.hset(
-        hash_key, 
-        field, 
-        json.dumps({asset_id:asset_data})
-    )
-    # get the just inserted data 
-    auto_category = await redis_client.hget(hash_key, field)
-    # convert it to a python object
-    collection = json.loads(auto_category)
-    key = str(asset_id)
-    assert collection.pop(key) == asset_data
-    # delete the newly_created_asset entry
-    await redis_client.hdel(hash_key, field)
-    # assert that the entry is null
-    assert not await redis_client.hget(hash_key, field)
+from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer 
+from property_street_backend.app.controllers.cache_expiration.expiry_pubsub_listener import expiry_pubsub_loop_entered 
 
 
 @pytest.mark.asyncio
-async def test_redis_expiry_b( app_subprocess, redis_client__fixture ):
-    redis_client: Redis = await anext(redis_client__fixture)
+async def test_redis_expiry(sessions_fixture):
+    listener_task = None
+    stop_event = None
 
-    # Step 1: Add the integer `1` to the set `newly_created_asset`
-    await redis_client.sadd('newly_created_asset', 1)
-    # Step 2: Retrieve and verify that the integer `1` exists in the set
-    assert await redis_client.sismember('newly_created_asset', 1)
+    try:
+        async for fixture_map in sessions_fixture:
+            redis_client: Redis
+            redis_client = fixture_map['redis_client']
 
-    # Step 3: Create another set with the key `newly_created_asset:1`
-    await redis_client.sadd('newly_created_asset:1', "This is a test value")
-    # Step 4: Set an expiry on the set `newly_created_asset:1` (1 second)
-    await redis_client.expire('newly_created_asset:1', 1)
+        # ✅ FIXED: Properly await the initializer
+        (
+            listener_task, 
+            stop_event, 
+            _
+        ) = await cache_expiry_initializer(redis_client)
 
-    # Step 5: Wait for 2 seconds to ensure the key expires
-    await asyncio.sleep(2)
+        # ✅ Poll until the listener loop is confirmed to be active
+        for _ in range(60):
+            loop_entered = await redis_client.exists(expiry_pubsub_loop_entered)
+            if loop_entered:
+                break
+            await asyncio.sleep(0.1)  # prevent tight loop
 
-    # Verify if the key `newly_created_asset:1` has expired
-    assert not await redis_client.exists('newly_created_asset:1')
+        if not loop_entered:
+            raise Exception("Expiry pubsub listener never started.")
 
-    # Step 6: Check if the integer `1` is still a member of `newly_created_asset`
-    assert not await redis_client.sismember('newly_created_asset', 1)
+        await redis_client.sadd('newly_created_asset', 1)
+        assert await redis_client.sismember('newly_created_asset', 1)
+
+        await redis_client.set('newly_created_asset:1', "value", ex=1)
+
+        await asyncio.sleep(2)  # allow expiry to trigger
+
+        assert not await redis_client.exists('newly_created_asset:1')
+        assert not await redis_client.sismember('newly_created_asset', 1)
+
+    finally:
+        if stop_event:
+            stop_event.set()
+        if listener_task:
+            await listener_task

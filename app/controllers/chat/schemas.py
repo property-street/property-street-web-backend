@@ -8,7 +8,7 @@ class ChatObjectSchema(BaseModel):
     category: Literal['chat'] = 'chat'
     recipient_id: int
     sender_id: int
-    msg_type: Literal['incoming_message', 'read_message']
+    msg_type: Literal['outbound_message','incoming_message', 'read_message']
     status: Literal['unsent', 'sent', 'delivered', 'read']
     fmt_msg_txt: str
 
@@ -17,3 +17,4 @@ class ChatObjectSchema(BaseModel):
     media_urls: Optional[str] = None
     db_id: Optional[int] = None
     thread_id: Optional[int] = None
+    additional_metadata: Optional[str] = None
