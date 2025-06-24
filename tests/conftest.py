@@ -7,13 +7,13 @@ import asyncio
 import requests
 import platform
 import subprocess
+from redis.asyncio import Redis
 from httpx import AsyncClient, ASGITransport
 
 
 from property_street_backend.app.main import app
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
-from property_street_backend.config.context_sessions import get_db_based_on_context
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
 
 
@@ -26,8 +26,14 @@ def test_env_var():
 
 @pytest.fixture(scope="function")
 async def get_test_db__fixture(test_env_var):
-    async for session in get_db():
-        yield session
+    redis_session: Redis = None
+
+    try:
+        async for session in get_db():
+            redis_session = session
+            yield session
+    finally:
+        await redis_session.flushdb()
 
 
 @pytest.fixture(scope="function")

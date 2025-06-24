@@ -5,13 +5,11 @@ import asyncio
 import websockets
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..utils import get_user_ws_endpoint
 from property_street_backend.app.controllers.auth import fetched_access_token
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
 
-def get_user_ws_endpoint(client_id):
-    timestamp = int(time.time()*1000)
-    return  f'ws://localhost:8001/deep-chat/{client_id}?sesion_ts={timestamp}'
 
 @pytest.mark.asyncio
 async def test_dialogue(app_subprocess, get_test_db__fixture):

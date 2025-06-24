@@ -24,7 +24,6 @@ from property_street_backend.app.routers import (
     activity,
     search,
     settings,
-    deep_chat,
     google_oauth,
     asset_request,
     rating_review,
@@ -127,8 +126,7 @@ app.include_router(activity.router)
 app.include_router(search.router)
 app.include_router(settings.router)
 app.include_router(google_oauth.router)
-app.include_router(deep_chat.router)
-app.include_router(ws.router)
+app.include_router(ws.router) 
 app.include_router(asset_request.router)
 app.include_router(roommates_finder.router)
 app.include_router(rating_review.router)

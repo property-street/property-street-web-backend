@@ -39,15 +39,15 @@ class ConnectionManager:
                 channel_list += list(agent_specific_channels.values())
 
             # start pending transaction task
-            # pending_trx_task = await asyncio.create_task(handle_pending_trx(self.redis, user_id, last_n_timestamp, is_agent, websocket))
-            # self.pending_trx_tasks[user_id] = pending_trx_task
+            pending_trx_task = await asyncio.create_task(handle_pending_trx(self.redis, user_id, last_n_timestamp, is_agent, websocket))
+            self.pending_trx_tasks[user_id] = pending_trx_task
         
         # subscribe to channels
         await pubsub.subscribe(*channel_list)
 
         # Start channel listening task
-        listener_task = asyncio.create_task(self._pubsub_listener(user_id, pubsub))
-        self.listener_tasks[user_id] = listener_task
+        # listener_task = asyncio.create_task(self._pubsub_listener(user_id, pubsub))
+        # self.listener_tasks[user_id] = listener_task
     
         if DEBUG:
             websocket_logger.info(f'**Websocket connection completed for user:{user_id} with subscribed channels: {channel_list}')

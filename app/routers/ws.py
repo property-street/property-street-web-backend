@@ -46,7 +46,9 @@ async def websocket_endpoint( websocket: WebSocket ):
         })
 
     await manager.connect(
-        websocket, client_id, is_agent, 
+        websocket, 
+        client_id, 
+        is_agent, 
         int(last_n_timestamp) if last_n_timestamp else None
     ) 
     

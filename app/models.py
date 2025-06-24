@@ -365,7 +365,7 @@ class User(Base):
     )
 
     # method for a user to become an agent
-    async def become_agent(self, session):
+    async def become_agent(self, session: AsyncSession):
         """Method to convert a user into an agent."""
         if not self.agent_profile:
             # Create a new Agent instance associated with this user

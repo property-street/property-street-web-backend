@@ -103,10 +103,10 @@ async def dispatch_pending_notification(
     elif is_agent:
         entries = await redis_client.zrange(agent_pend_pool_key, 0, -1)
         if entries:
-            await ws.send_json({
+            await ws.send_text(json.dumps({
                 'event': 'agent_pending_lazy_notifications',
-                'data': [obj for obj in entries]
-            })
+                'data': [json.loads(obj) for obj in entries]
+            }))
             msg = f"Successfully pinged pending lazy agent notification to agent with user_id {user_id}"
             log_message('success', msg)
             if DEBUG:

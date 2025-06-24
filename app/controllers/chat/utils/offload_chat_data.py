@@ -84,11 +84,12 @@ async def offload_chat_data(
         thread_id = await get_or_create_thread_id(min_id, max_id, db)
 
         # Load and prepare chat data
-        loaded_chat_obj = json.loads(chat_obj)
+        loaded_chat_obj: dict = json.loads(chat_obj)
         update_data = []
         create_data = []
 
         for timestamp, item in loaded_chat_obj.items():
+            item: dict
             if item.get('db_id'):
                 update_data.append({
                     'id': item['db_id'],
