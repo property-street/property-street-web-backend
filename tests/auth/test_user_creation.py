@@ -88,11 +88,12 @@ async def test_route_create_user(client__fixture_with_onlyDB_fixture: tuple):
     assert "access_token" in json_response
 
 @pytest.mark.asyncio
-async def test_route_probe_user_existence(client__fixture: AsyncClient):
+async def test_route_probe_user_existence(client__fixture):
     # fetch the client generator
-    client_gen =  client__fixture
-    # get the yield client object
-    client = await client_gen.__anext__()
+    async for fixture_obj in client__fixture:
+        # get the yield client object
+        client = fixture_obj['http_client']
+        break
 
     # Define a post data
     post_data = {
@@ -103,7 +104,7 @@ async def test_route_probe_user_existence(client__fixture: AsyncClient):
     # sign the user up
     await client.post(
         "/auth/register",
-        json=post_data  # Use json instead of data for a JSON body
+        json=post_data  
     )
 
 

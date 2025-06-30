@@ -9,6 +9,7 @@ from . import agent_specific_channels, generic_channels
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.controllers.ws_init import websocket_logger
 from property_street_backend.config.redis_connection_manager import redis_pool_instance
+from property_street_backend.config.postgres_connection_manager import get_async_session
 from property_street_backend.app.controllers.chat.pubsub_chat_handler import pubsub_chat_handler
 from property_street_backend.app.controllers.asset_request.pubsub_request_handler import pubsub_request_handler
 from property_street_backend.app.controllers.roommate_finder.pubsub_roommate_handler import pubsub_roommate_handler
@@ -20,6 +21,7 @@ class ConnectionManager:
         self.user_pubsubs: Dict[int, client.PubSub] = {}
         self.listener_tasks: Dict[int, asyncio.Task] = {}
         self.pending_trx_tasks: Dict[int, asyncio.Task] = {}
+        self.db = get_async_session()
         
     async def connect(self, websocket: WebSocket, user_id: int, is_agent: bool = False, last_n_timestamp: int = None):
         self.active_connections[user_id] = websocket
@@ -39,18 +41,19 @@ class ConnectionManager:
                 channel_list += list(agent_specific_channels.values())
 
             # start pending transaction task
-            pending_trx_task = await asyncio.create_task(handle_pending_trx(self.redis, user_id, last_n_timestamp, is_agent, websocket))
+            pending_trx_task = asyncio.create_task(handle_pending_trx(self.db, self.redis, user_id, last_n_timestamp, is_agent, websocket))
             self.pending_trx_tasks[user_id] = pending_trx_task
         
         # subscribe to channels
         await pubsub.subscribe(*channel_list)
 
         # Start channel listening task
-        # listener_task = asyncio.create_task(self._pubsub_listener(user_id, pubsub))
-        # self.listener_tasks[user_id] = listener_task
+        listener_task = asyncio.create_task(self._pubsub_listener(user_id, pubsub))
+        self.listener_tasks[user_id] = listener_task
     
         if DEBUG:
             websocket_logger.info(f'**Websocket connection completed for user:{user_id} with subscribed channels: {channel_list}')
+    
     async def disconnect(self, user_id: int):
         # Cleanup WebSocket
         self.active_connections.pop(user_id, None)

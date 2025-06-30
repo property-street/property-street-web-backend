@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Literal
 from pydantic import BaseModel, Field, ConfigDict
 
 from property_street_backend.app.schemas.area_schema import Area
@@ -9,5 +9,7 @@ class RoommateFinderRequestSchema(BaseModel):
     area: Area
     room_images: List[CloudImageSchema]
     max_roomies: int = 1
+    gender: Literal['male', 'female']
+    category: str
 
     model_config = ConfigDict(from_attributes=True)

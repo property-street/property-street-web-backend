@@ -106,7 +106,10 @@ async def test_client_connectivity(client__fixture):
 @pytest.mark.asyncio
 async def test_websocket_client(app_subprocess, get_test_db__fixture):
     # get the yield client objects
-    test_db = await anext(get_test_db__fixture)
+    async for test_db in get_test_db__fixture:
+        test_db : AsyncSession
+        break
+
     test_user = await create_test_user(test_db)
     await test_user.become_agent(test_db)
 
@@ -125,7 +128,8 @@ async def test_websocket_client(app_subprocess, get_test_db__fixture):
         assert int(response["last_n_timestamp"]) == timestamp
         assert response["is_agent"]
     finally:
-        await test_db.close()
+        if test_db:
+            await test_db.close()
         if test_ws:
             await test_ws.close()
 

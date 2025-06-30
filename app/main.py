@@ -1,5 +1,5 @@
 # main.py
-import redis
+from redis.asyncio import Redis
 from fastapi import (
     APIRouter, 
     Depends, 
@@ -73,7 +73,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include celery app
 
 home_router = APIRouter()
 
@@ -86,7 +85,7 @@ def read_root():
 
 @home_router.get("/test-redis")
 async def test_redis(
-    redis_client: redis.Redis = Depends(get_redis),
+    redis_client: Redis = Depends(get_redis),
 ):
     await redis_client.set("test_key", "value")
     value = await redis_client.get("test_key")

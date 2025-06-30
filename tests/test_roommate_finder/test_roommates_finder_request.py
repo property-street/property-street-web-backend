@@ -11,9 +11,10 @@ from property_street_backend.app.initiator import logger
 
 @pytest.mark.asyncio
 async def test_roommates_finder_request(client__fixture):
-    fixture_obj: dict = await anext(client__fixture)
-    test_db: AsyncSession = fixture_obj.get('db') 
-    http_client: AsyncClient = fixture_obj.get('http_client') 
+    async for fixture_obj in client__fixture:
+        test_db: AsyncSession = fixture_obj['db'] 
+        http_client: AsyncClient = fixture_obj['http_client']
+        break
 
     # create test_user and make user agent
     test_user: User = await create_test_user(test_db)
@@ -45,6 +46,8 @@ async def test_roommates_finder_request(client__fixture):
             } for i in range(3)
         ],
         'extra_conditions': 'I need a 1 bedroom flat in the maldives!',
+        'gender': 'male',
+        'category': 'hotel',
     }
 
 
@@ -63,10 +66,13 @@ async def test_roommates_finder_request(client__fixture):
     await test_db.refresh(test_user)
     roommates_finder_requests = test_user.roommates_finder
     assert roommates_finder_requests is not None
+    assert test_user.gender.value == payload['gender']
+
     recent_request: RoommateFinder = roommates_finder_requests[0]
     assert recent_request is not None
     assert recent_request.extra_conditions == payload['extra_conditions']
     assert recent_request.max_roomies == payload['max_roomies']
+    assert recent_request.category == payload['category']
     assert recent_request.area.country == payload['area']['country']
     assert recent_request.area.state_or_province == payload['area']['state_or_province']
     assert recent_request.area.city_or_town == payload['area']['city_or_town']

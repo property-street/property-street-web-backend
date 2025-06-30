@@ -84,6 +84,7 @@ class RoommateFinder(Base):
     id = Column(Integer, index=True, primary_key=True)
     max_roomies = Column(Integer, default=1, nullable=False)
     extra_conditions = Column(Text)
+    category = Column(Text, nullable=False)
 
     # one-to-many relationship to cloud_image_details
     room_images = relationship(

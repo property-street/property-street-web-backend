@@ -13,6 +13,10 @@ generic_channels = {
 
 websocket_logger = logging.getLogger("websocket")
 
+user_pend_pool_fields = {
+    'notification': 'notifications'
+}
+
 def user_pend_pool_key(user_id:int,/)->str:
     """Accepts a user id and returns a proposed zset key 
     for holding data for a user on websocket failure.

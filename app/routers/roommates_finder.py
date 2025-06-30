@@ -19,7 +19,7 @@ async def request_rommmate_finder(
 ):
     return await publish_roommate_finding(
         request_data = data.model_dump(),
-        requester_id = requester.id,
+        requester = requester,
         redis_client = redis_client,
         db = db
     )

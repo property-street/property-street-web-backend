@@ -1,13 +1,13 @@
 from urllib.parse import parse_qs
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from property_street_backend.app.database import get_db
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.controllers.ws_init import websocket_logger
 from property_street_backend.app.controllers.ws_init.ws_manager import manager
 from property_street_backend.app.controllers.ws_init.core import ws_reception_handler
 from property_street_backend.app.controllers.auth import decode_user_from_token_optional
+from property_street_backend.config.postgres_connection_manager import get_postgres_instance
 
 router = APIRouter(prefix='/ws', tags=['ws'])
 
@@ -24,11 +24,8 @@ async def websocket_endpoint( websocket: WebSocket ):
     current_user = None
     if token:
         try:
-            db = await anext(get_db(
-                metadata_test_routine = False,
-                skip_session_close = True,
-            ))                
-            current_user = await decode_user_from_token_optional(token,db)
+            async with get_postgres_instance() as db: 
+                current_user = await decode_user_from_token_optional(token,db)
         except Exception as e:
             if DEBUG:
                 websocket_logger.info(f'** Error decoding user from token. Reason: {e}')
@@ -45,11 +42,17 @@ async def websocket_endpoint( websocket: WebSocket ):
             'is_agent': is_agent
         })
 
+
+    try:
+        last_n_timestamp = int(last_n_timestamp)
+    except:
+        last_n_timestamp = None
+
     await manager.connect(
         websocket, 
         client_id, 
         is_agent, 
-        int(last_n_timestamp) if last_n_timestamp else None
+        last_n_timestamp
     ) 
     
     try:
@@ -60,5 +63,3 @@ async def websocket_endpoint( websocket: WebSocket ):
             await ws_reception_handler(data, manager)
     except WebSocketDisconnect:
         await manager.disconnect(client_id)
-    finally: 
-        await db.close()

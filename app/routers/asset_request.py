@@ -19,7 +19,7 @@ async def asset_request_handler(
     current_user:TokenData = Depends(decode_user_from_token),
 ):
     return await handle_asset_request(
-        requester_id = current_user.id,
+        requester = current_user,
         db = db,
         redis_client =  redis_client,
         request_data = data.model_dump()

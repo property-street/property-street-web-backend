@@ -1,7 +1,6 @@
-from typing import Optional
-import redis.asyncio as redis
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, HTTPException, status, Depends, WebSocket
+from fastapi import APIRouter, HTTPException, status, Depends
 
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
@@ -51,7 +50,7 @@ async def probe_user_existence(
 @router.post("/send-email-verification-code", status_code=status.HTTP_200_OK)
 async def send_email_verification_code(
     requester_data: SendEmailCodeSchema, 
-    redis_client: redis.Redis = Depends(get_redis),
+    redis_client: Redis = Depends(get_redis),
     expiry_time_in_secs: int = Depends(email_verification_code_ttl)
 ):
     try:
@@ -73,7 +72,7 @@ async def send_email_verification_code(
 @router.post("/confirm-email-verification-code", status_code=status.HTTP_200_OK)
 async def confirm_email_verification_code(
     requester_data: SignupCodeVerificationSchema, 
-    redis_client: redis.Redis = Depends(get_redis),
+    redis_client: Redis = Depends(get_redis),
     db: AsyncSession = Depends(get_db),
 ):
     return await controller_confirm_email_verification_code_and_sign_user_up(
@@ -85,7 +84,10 @@ async def confirm_email_verification_code(
 
 # signin endpoint
 @router.post("/signin", response_model=SigninResponse, status_code=status.HTTP_200_OK)
-async def signin_for_access_token(user_data: UserSigninSchema, db: AsyncSession = Depends(get_db)):
+async def signin_for_access_token(
+    user_data: UserSigninSchema, 
+    db: AsyncSession = Depends(get_db)
+):
     user = await authenticate_user(
         db = db, 
         login = user_data.email, 

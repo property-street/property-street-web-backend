@@ -7,13 +7,18 @@ import asyncio
 import requests
 import platform
 import subprocess
+from sqlalchemy import text
 from redis.asyncio import Redis
+from contextlib import asynccontextmanager
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy.ext.asyncio import create_async_engine
 
 
 from property_street_backend.app.main import app
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
+from property_street_backend.config.settings import TEST_DATABASE_URL
+from property_street_backend.config.postgres_connection_manager import Base, get_postgres_instance
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
 
 
@@ -26,20 +31,24 @@ def test_env_var():
 
 @pytest.fixture(scope="function")
 async def get_test_db__fixture(test_env_var):
-    redis_session: Redis = None
-
-    try:
-        async for session in get_db():
-            redis_session = session
-            yield session
-    finally:
-        await redis_session.flushdb()
+    # initialize a test engine and store its reference
+    async_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    # Create a clean database if it's a test environment
+    async with async_engine.begin() as conn:
+        await conn.execute(text("DROP SCHEMA public CASCADE"))
+        await conn.execute(text("CREATE SCHEMA public"))
+        print("***Dropped and recreated public schema")
+        await conn.run_sync(Base.metadata.create_all)
+        print("***Created a new Base metadata")
+    
+    async with get_postgres_instance() as session:
+        yield session
 
 
 @pytest.fixture(scope="function")
 async def redis_client__fixture(test_env_var):
-    # await redis_client.flushdb()
     async for redis_client in get_redis():
+        await redis_client.flushdb() # flush the database before each test
         yield redis_client
 
 
@@ -67,7 +76,6 @@ async def client__fixture(
             "db": test_db,
         }
 
-
 @pytest.fixture(scope='function')
 async def sessions_fixture(get_test_db__fixture, redis_client__fixture):
     async for test_db in get_test_db__fixture:
@@ -82,6 +90,7 @@ async def sessions_fixture(get_test_db__fixture, redis_client__fixture):
         "redis_client": test_redis_client,
         "db": test_db,
     }
+
 
 @pytest.fixture(scope='function')
 async def sessions_with_cache_expiry_event_fixture(

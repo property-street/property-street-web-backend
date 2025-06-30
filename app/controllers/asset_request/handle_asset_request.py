@@ -4,12 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
-from property_street_backend.app.models import AssetRequest, Area
+from property_street_backend.app.models import AssetRequest, Area, User
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.ws_init import agent_specific_channels
 
 async def handle_asset_request(
-    requester_id: int,
+    requester: User,
     db: AsyncSession,
     request_data: dict,
     redis_client: Redis,
@@ -25,20 +25,25 @@ async def handle_asset_request(
     try:
         # get the description and area entry
         # create and save an instance of the AssetRequest 
-        description = request_data.get('description')
-        area_collection = request_data.get('area')
+        description = request_data['description']
+        area_collection = request_data['area']
         
         request_instance = AssetRequest(
             area = Area(**area_collection),
             description = description,
-            requester_id = requester_id
+            requester_id = requester.id
         )
         db.add(request_instance)
         await db.commit()
 
-        # publish the request to the asset_request channel
         await db.refresh(request_instance)
-        request_data['db_id'] = request_instance.id,
+        # add the db_id, profile avatar, fullname of requester
+        request_data['db_id'] = request_instance.id
+        if requester.profile_avatar:
+            request_data['requester_avatar'] = requester.profile_avatar.secure_url
+        request_data['requester_name'] = f'{requester.first_name} {requester.last_name}'
+
+        # publish the request to the asset_request channel
         data_to_publish = {
             'request_data': request_data,
             'category': 'asset_request'
