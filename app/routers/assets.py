@@ -24,8 +24,11 @@ from property_street_backend.app.schemas.asset_schemas import (
     LatestAssetsFetchResponseSchema,
     AssetFetchByIdResponseSchema 
 )
+from fastapi import Query
+from pydantic import ValidationError
 from property_street_backend.app.controllers.assets.schemas import (
-    AssetResponseSchema
+    AssetFetchResponseSchema,
+    AssetFetchResponseSchema
 )
 from property_street_backend.config import env_is_test
 from property_street_backend.log_config.logger_config import log_message
@@ -71,7 +74,7 @@ async def process_asset(
                 )
             )
             if processed_asset:
-                schematized_asset = AssetResponseSchema.model_validate(processed_asset)
+                schematized_asset = AssetFetchResponseSchema.model_validate(processed_asset)
                 schematized_asset_to_dict = schematized_asset.model_dump()
                 return {"data" : schematized_asset_to_dict}
 
@@ -142,35 +145,58 @@ async def fetch_agent_assets(
         )
 
 
-@router.get("/assets/latest",response_model=LatestAssetsFetchResponseSchema)
+
+@router.get("/assets/latest", response_model=LatestAssetsFetchResponseSchema)
 async def fetch_latest_assets(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(get_db),
 ):
     """
-    Fetches the 100 latest assets based on the created_at timestamp.
+    Fetch paginated latest assets. Assets that fail schema validation are logged and skipped.
     """
     try:
-        # Fetch latest 100 assets
-        stmt = select(Asset).order_by(Asset.created_at.desc()).limit(100)
+        offset = (page - 1) * size
+
+        stmt = (
+            select(Asset)
+            .order_by(Asset.created_at.desc())
+            .offset(offset)
+            .limit(size)
+        )
         result = await session.execute(stmt)
-        assets = result.scalars().all()
+        raw_assets = result.scalars().all()
+
+        valid_assets = []
+        skipped_assets = []
+
+        for asset in raw_assets:
+            try:
+                # Manually validate using schema
+                validated_asset = AssetFetchResponseSchema.model_validate(asset)
+                valid_assets.append(validated_asset)
+            except ValidationError as ve:
+                skipped_assets.append(asset.id if hasattr(asset, "id") else None)
+                # Notify admin or log the validation error
+                log_message(
+                    log_type="error",
+                    message=f"Asset ID {getattr(asset, 'id', 'unknown')} failed validation. Reason: {ve}"
+                )
 
         log_message(
             log_type="success",
-            message="Latest assets successfully retrieved"
+            message=f"{len(valid_assets)} valid assets returned. {len(skipped_assets)} skipped due to schema errors."
         )
 
-        # Return assets and user authentication status
-        return {
-            "assets": assets,
-        }
+        return {"assets": valid_assets}
 
     except Exception as e:
         log_message(
             log_type="error",
-            message=f"An error occurred on retrieval of latest assets. Reason: {e}"
+            message=f"An error occurred while retrieving latest assets. Reason: {e}"
         )
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve assets.")
+
 
 
 @router.get("/assets/{asset_id}",response_model=AssetFetchByIdResponseSchema)

@@ -14,7 +14,7 @@ from property_street_backend.app.controllers.auth import (
 )
 from property_street_backend.app.controllers.assets.schemas import (
     AssetSchema,
-    AssetResponseSchema
+    AssetFetchResponseSchema
 )
 from property_street_backend.config.settings import TEST_NEWLY_CREATED_ASSET_TTL
 from property_street_backend.tests.activity.test_controller.test_objects import (
@@ -76,7 +76,7 @@ async def test_upload_asset(
     # Assertions
     assert response.status_code == 200
     response_data = response.json()['data']
-    schematized_response_data = AssetResponseSchema.model_validate(response_data)
+    schematized_response_data = AssetFetchResponseSchema.model_validate(response_data)
     
     # cache assertions
     result = await test_db.execute(

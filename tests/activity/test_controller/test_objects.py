@@ -12,6 +12,8 @@ area_template = {
     'state_or_province': 'Mogadishu',
     'city_or_town': 'Pisque Central', 
     'street': 'No 11 Jokey street',
+    "zip_or_postal_code": "",
+	"building_name_or_suite": "",
 }
 asset_data_template = {        
     "title":"Test Asset",

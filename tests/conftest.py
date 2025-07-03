@@ -78,6 +78,7 @@ async def client__fixture(
             "db": test_db,
         }
 
+
 @pytest.fixture(scope='function')
 async def sessions_fixture(get_test_db__fixture, redis_client__fixture):
     async for test_db in get_test_db__fixture:

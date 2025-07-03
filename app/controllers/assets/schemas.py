@@ -78,5 +78,14 @@ class AssetSchema(ConfigDictSetter):
             raise ValueError("Only one of 'features' or 'cloud_images' can be included in the response at a time.")
         return values
 
-class AssetResponseSchema(AssetSchema):
+
+class AssetFetchResponseSchema(AssetSchema):
     cover_image: CloudImageResponseSchema
+
+
+class LatestAssetsFetchResponseSchema(ConfigDictSetter):
+    assets: List[AssetFetchResponseSchema]
+
+
+class AssetFetchByIdResponseSchema(ConfigDictSetter):
+    asset: AssetFetchResponseSchema

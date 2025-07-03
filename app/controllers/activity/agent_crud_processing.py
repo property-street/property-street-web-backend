@@ -82,6 +82,7 @@ async def process_asset(
     newly_created = None
     # variable to hold asset instance
     asset_instance_before_commit = None
+    created_asset = None
     # Initialize proxy object
     proxy = {}
     # Convert keys to integers for predictable ordering
@@ -170,15 +171,19 @@ async def process_asset(
         
         # Handle caching
         if created_asset:
-            schematized_asset = AssetSchema.model_validate(created_asset) # schema instance of asset
-            schematized_asset_to_dict = schematized_asset.model_dump()
-            await create_or_update_newly_created_asset_cache(
-                asset_id = created_asset.id,
-                asset_data = schematized_asset_to_dict,
-                redis_client = redis_client,
-                newly_created = newly_created,
-                expiry_seconds = ttl_in_seconds,
-            )
+            try:
+                schematized_asset = AssetSchema.model_validate(created_asset) # schema instance of asset
+                schematized_asset_to_dict = schematized_asset.model_dump()
+                await create_or_update_newly_created_asset_cache(
+                    asset_id = created_asset.id,
+                    asset_data = schematized_asset_to_dict,
+                    redis_client = redis_client,
+                    newly_created = newly_created,
+                    expiry_seconds = ttl_in_seconds,
+                )
+            except Exception as e:
+                logger.warning(f"Cache update failed: {e}")
+                raise
         
         return created_asset if created_asset else None
 

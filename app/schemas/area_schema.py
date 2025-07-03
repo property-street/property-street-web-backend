@@ -8,5 +8,5 @@ class AreaSchema(ConfigDictSetter):
     city_or_town: str
     county: Optional[str] = Field(None, description='Asset county') 
     street: Optional[str] = Field(None, description='Street detail')
-    zip_or_postal_code: Optional[int] = Field(None, description='Postal code')
+    zip_or_postal_code: Optional[str] = Field(None, description='Postal code')
     building_name_or_suite: Optional[str] = Field(None, description='Building name')
