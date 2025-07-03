@@ -1,6 +1,7 @@
 import json
 from redis.asyncio import Redis
 
+from property_street_backend.app.initiator import logger
 from property_street_backend.log_config.logger_config import (
     log_message
 )
@@ -59,13 +60,17 @@ async def create_or_update_newly_created_asset_cache(
             )
 
 
+        s_message=f"Asset {asset_id} cached successfully."
         log_message(
-            log_type='success',
-            message=f"Asset {asset_id} cached successfully."
+            log_type = 'success',
+            message = s_message
         )
+        logger.info(s_message)
 
     except Exception as e:
+        e_message=f"Error caching asset {asset_id}: {e}"
         log_message(
-            log_type='success',
-            message=f"Error caching asset {asset_id}: {e}"
+            log_type = 'success',
+            message = e_message
         )
+        logger.error(e_message)

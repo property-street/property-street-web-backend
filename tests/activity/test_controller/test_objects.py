@@ -239,27 +239,45 @@ no_feature_obj = {
 
         # fields
         "fields": {
-            "title": "value",
-            "country": "Caicos",
-            "address": "Barbados street",
-            "currency": "usd",
-            "status": "Auction",
-            "amount": 30000.98,
-            "category": "House",
-            "status": "auction",
-            "description": "<span>bla bla bla</span>",
-            "has_features": False,
-            "lease_duration": None,
-            "availability": "bulaba",
+            **asset_data_template,
 
             "relationship": {
-                "tags": [
-                    1
-                ],
+                "tags": [1],
                 "cover_image": 2,
                 "cloud_images":[3,4,5]
             }
         },
+    },
+    7: {
+        # Area
+        "db_delete": False,
+        "db_table_id": -1,
+        "db_table_name": "Area",
+
+        # fields
+        "fields": {
+            **area_template,
+
+            # relationships
+            "relationship":{
+                "asset": 6
+            }
+        }
+    },
+    8: {
+        # tag 1
+        "db_table_id": -1,
+        "db_delete": False,
+        "db_table_name": "Tag",
+
+        # fields
+        "fields": {
+            "name": "tag_value1",
+
+            "relationship":{
+                "asset": 6,
+            }
+        }
     },
 }
 

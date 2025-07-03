@@ -1,4 +1,3 @@
-import json
 from typing import Dict
 from sqlalchemy import delete
 import redis.asyncio as redis
@@ -19,6 +18,7 @@ from property_street_backend.app.models import (
 from property_street_backend.config.settings import (
     DEBUG
 )
+from property_street_backend.app.initiator import logger
 from property_street_backend.app.controllers.utils import (
     return_model_from_string,
     handle_instance_delete,
@@ -67,7 +67,6 @@ async def process_asset(
     data_to_be_processed: Dict, 
     db: AsyncSession,
     redis_client: redis.Redis,
-    newly_created: bool,
     ttl_in_seconds: int,
 ):
     """
@@ -80,6 +79,7 @@ async def process_asset(
     Returns:
         Dict: The result of the processing.
     """
+    newly_created = None
     # variable to hold asset instance
     asset_instance_before_commit = None
     # Initialize proxy object
@@ -133,60 +133,65 @@ async def process_asset(
 
         # Process the rest of the items
         for key, value in data.items():
+            # delete the entry
             if value.get('db_delete') and value.get('db_table_id') > 0:
                 await handle_instance_delete(
                     db=db,
                     model=return_model_from_string(value['db_table_name']),
                     id=value['db_table_id']
                 )
+            # create or update the entry
             elif value.get('db_delete') == False:
                 instance = await create_or_update_object(
                     db=db,
                     model=return_model_from_string(value['db_table_name']),
-                    obj_data=value['fields'],
+                    fields=value['fields'],
                     proxyObject=proxy,
                     table_id=None if value['db_table_id'] == -1 else value['db_table_id']
                 )
-                proxy[key] = instance
+                proxy[key] = instance # bind the created or modified instance to the proxy of the data_to_be_processed
+
                 # check if the instance is an Asset model instance
                 if isinstance(instance, Asset): 
+                    # check if the asset is new
+                    newly_created = value['db_table_name'] == 'Asset' and value['db_table_id'] == -1
+                    
                     # hold the asset instance id
                     asset_instance_before_commit = instance
 
         # Commit all changes after all operations are completed
         await db.commit()
 
-
-        # Handle caching
-        ## refresh the asset after all transactions have been done
-        asset_instance = await db.refresh(asset_instance_before_commit)
+        if asset_instance_before_commit:
+            result = await db.execute(
+                select(Asset).filter(Asset.id == asset_instance_before_commit.id)
+            )
+            created_asset = result.scalars().first()
         
-        if asset_instance:
-            asset_schema = AssetSchema.model_validate(asset_instance) # schema instance of asset
-            asset_instance_to_dict = asset_schema.model_dump()
+        # Handle caching
+        if created_asset:
+            schematized_asset = AssetSchema.model_validate(created_asset) # schema instance of asset
+            schematized_asset_to_dict = schematized_asset.model_dump()
             await create_or_update_newly_created_asset_cache(
-                asset_id = asset_instance.id,
-                asset_data = asset_instance_to_dict,
+                asset_id = created_asset.id,
+                asset_data = schematized_asset_to_dict,
                 redis_client = redis_client,
                 newly_created = newly_created,
                 expiry_seconds = ttl_in_seconds,
             )
         
-        return {
-            "detail": "Asset processed successfully",
-            
-            # For debugging
-            "status": "success", 
-            "processed": len(data),
-        }
+        return created_asset if created_asset else None
 
     except Exception as e:
         await db.rollback()  # Rollback if there's an error to ensure atomicity
+        e_message=f'An error occured on processing of asset. Reason: {e}'
+        if DEBUG:
+            logger.error(e_message)
         log_message(
-            log_type='error',
-            message=f'An error occured on processing of asset. Reason: {e}'
+            log_type = 'error',
+            message = e_message
         )
         raise HTTPException(    
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while creating the asset."
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = "An error occurred while creating the asset."
         )

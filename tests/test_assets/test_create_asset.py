@@ -1,7 +1,7 @@
 import pytest
-
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from property_street_backend.app.models import (
     Tag,
     Area, 
@@ -10,16 +10,16 @@ from property_street_backend.app.models import (
     AssetCloudImage,
     CloudImageDetail,
 )
-from property_street_backend.app.schemas.area_schema import Area as AreaSchema
-from property_street_backend.app.controllers.assets.enums import AvailabilityStatus
+from property_street_backend.app.controllers.assets.schemas import (
+    AreaSchema,
+    CloudImageSchema,
+)
 from property_street_backend.app.schemas.asset_schemas import (
     AssetSchema
 )
-from property_street_backend.app.schemas.asset_schemas import (
-    CloudImageCreateSchema,
-)
+from property_street_backend.app.controllers.assets.enums import AvailabilityStatus
 from property_street_backend.tests.auth.test_create_agent import create_test_agent
-from .test_objects import (
+from property_street_backend.tests.activity.test_controller.test_objects import (
     cloud_image_template,
     area_template,
     tags_template,
@@ -49,13 +49,13 @@ async def create_test_asset(db: AsyncSession, agent_id=None):
     # Cover image
     cloud_image_template['public_id'] = 'public_id_cover_image'
     cover_image_data = cloud_image_template
-    CloudImageCreateSchema.model_validate(cover_image_data)
+    CloudImageSchema.model_validate(cover_image_data)
     asset_cover_image = CloudImageDetail(**cover_image_data)
 
     # Asset cloud image
     cloud_image_template['public_id'] =  'public_id_asset_cloud_image'
     cloud_image_data = cloud_image_template
-    CloudImageCreateSchema.model_validate(cloud_image_data)
+    CloudImageSchema.model_validate(cloud_image_data)
     asset_cloud_image = AssetCloudImage(**cloud_image_data)
 
     # area data
@@ -87,20 +87,40 @@ async def create_test_asset(db: AsyncSession, agent_id=None):
 
 
 @pytest.mark.asyncio
-async def test_controller_create_asset_feature_and_image(get_test_db__fixture): 
+async def test_create_asset_with_no_feature(get_test_db__fixture): 
     try:
         # fetch the testdb
-        test_db = await anext(get_test_db__fixture)
+        async for test_db in get_test_db__fixture:
+            test_db: AsyncSession
+            break
 
         # Create a test agent/user
         created_agent = await create_test_agent(test_db)
         assert created_agent is not None
 
         # Create a test asset
-        created_asset = await create_test_asset(test_db,created_agent.id)
+        created_asset: Asset = await create_test_asset(test_db,created_agent.id)
         assert created_asset is not None
         assert created_asset.title == asset_data_template['title']
         # direct testing of the AssetSchema schema on an asset instance 
+        AssetSchema.model_validate(created_asset)
+
+        # set the cloud_images to None, and set a feature
+        created_asset.cloud_images = []
+
+        del cloud_image_template['public_id']
+        created_asset.features = [AssetFeature(
+            title = 'feature1',
+            cloud_images = [
+                AssetCloudImage(
+                    **cloud_image_template,
+                    public_id = f'asset_feature_public_id{i}'
+                ) for i in range(2)
+            ]
+        )]
+        test_db.add(created_asset)
+        await test_db.commit()
+        await test_db.refresh(created_asset)
         AssetSchema.model_validate(created_asset)
         
         # Create an asset feature linked to the asset

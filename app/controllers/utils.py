@@ -37,12 +37,14 @@ def return_model_from_string(str_value: str):
         return AssetCloudImage
     elif str_value == 'CloudImageDetail':
         return CloudImageDetail
+    else: 
+        raise Exception('Model equivalent of str_value not found')
 
 
 async def get_existing_instance_from_unique_fields(
     db: AsyncSession, 
     model: Type[Any], 
-    obj_data: Dict[str, Any]
+    model_fields: Dict[str, Any]
 ) -> Any:
     """
     Automatically find and fetch the instance that violates the uniqueness constraint asynchronously
@@ -68,8 +70,8 @@ async def get_existing_instance_from_unique_fields(
     # Build a query dynamically based on the unique fields found in obj_data
     stmt = select(model)
     for field in unique_columns:
-        if field in obj_data:
-            stmt = stmt.where(getattr(model, field) == obj_data[field])
+        if field in model_fields:
+            stmt = stmt.where(getattr(model, field) == model_fields[field])
 
     # Execute the query asynchronously
     result = await db.execute(stmt)
@@ -89,7 +91,7 @@ async def handle_instance_delete(db: AsyncSession, model: Type[Any], id: int):
 async def create_or_update_object(
     db: AsyncSession, 
     model: Type[Any], 
-    obj_data: Dict[str, Any], 
+    fields: Dict[str, Any], 
     proxyObject: Dict[int, Any], 
     table_id: int = None
 ) -> Any:
@@ -113,7 +115,7 @@ async def create_or_update_object(
     instance = None
 
     # Pop out the relationship object if it exists
-    relationships = obj_data.pop('relationship', {})
+    relationships: dict = fields.pop('relationship', {})
     
     # Fetch the instance if table_id is provided
     if table_id is not None:
@@ -126,28 +128,32 @@ async def create_or_update_object(
 
     if instance is None:  # Create a new instance if it doesn't exist
         
-        # Pre-check to avoid duplicate insertions
-        existing_instance = await get_existing_instance_from_unique_fields(db, model, obj_data)
+        # redundant-check to avoid duplicate insertions
+        existing_instance = await get_existing_instance_from_unique_fields(db, model, fields)
         
         if existing_instance:
             instance = existing_instance
         else:
-            instance = model(**obj_data)
+            instance = model(**fields) # create a new instance
     else:  # Update the existing instance
-        for key, value in obj_data.items():
+        for key, value in fields.items():
             setattr(instance, key, value)
 
     # Handle relationships
     if relationships:
         for field, related_indices in relationships.items():
-            related_value = None
             if isinstance(related_indices, list):
-                related_value = [proxyObject[index] for index in related_indices]
+                related_objects = [proxyObject[index] for index in related_indices]
+                existing_value = getattr(instance, field, None)
+                
+                # If it's not new, extend the relationship, else create it
+                if isinstance(existing_value, list):
+                    existing_value.extend(related_objects)
+                else:
+                    setattr(instance, field, related_objects)
             else:
-                related_value = proxyObject.get(related_indices)
-
-            setattr(instance, field, related_value)
-
+                related_object = proxyObject.get(related_indices)
+                setattr(instance, field, related_object)
 
     # Add the instance back to the session
     db.add(instance)

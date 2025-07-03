@@ -1,6 +1,6 @@
 from enum import Enum
 
-class AvailabilityStatus(Enum):
+class AvailabilityStatus(str, Enum):
     available = "available"
     unavailable = "unavailable"
     reserved = "reserved"

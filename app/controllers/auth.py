@@ -142,10 +142,6 @@ async def create_user(
     
     try:
         db.add(user)
-        # Writes changes to the database but does not commit them.
-        # Ensure the user is added and has an ID
-        await db.flush()  
-        # Commit the transaction to make changes permanent
         await db.commit()  
     except IntegrityError:
         await db.rollback()
@@ -244,8 +240,6 @@ async def send_email_verification_code(
     redis_client: redis.Redis,
     expiry_time_in_secs: int,
 ):
-    # print(f"**expiry_time_in_secs: {expiry_time_in_secs}")
-
     email_address = requester_data.email
     user_name = requester_data.username if requester_data.username else "User"
     reason = "email_verification"
@@ -348,59 +342,51 @@ async def confirm_email_verification_code_and_sign_user_up(
         )
 
     # Confirm the input code matches the one in the cache
-    if input_code != user_email_code.decode('utf-8'):
+    if input_code != user_email_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid verification code."
         )
 
-    # Hash the user's password before saving it to the database
-    # hashed_password = get_password_hash(requester_data.password)
-
     # get the client type User or Agent
-    client_type = requester_data.client_type.lower()
-    
-    user_data = UserRegistrationSchema(
-        email=email_address,
-        username=requester_data.username,
-        password=requester_data.password,
-    )
-
-    created_client = None  # Initialize variable to avoid UnboundLocalError
-
-    if client_type == 'client':
-        # Create the new user instance
-        created_client = await create_user(
-            db = db,
-            user_data = user_data   
-        )
-    elif client_type == 'agent':
-        agent = await create_agent(
-            db = db,
-            user_data = user_data
-        )
-        created_client = agent.user
+    user_role = requester_data.role.lower()
 
     # extracting names from the fullname
     name_list = requester_data.fullname.split()
     
     # adding the first_name
-    created_client.first_name = name_list[0]
+    first_name = name_list[0]
+
+    user_data = UserRegistrationSchema(
+        email = email_address,
+        username = requester_data.username,
+        password = requester_data.password,
+        role = user_role,
+        first_name = first_name,
+    )
     
     # adding last_name
-    if len(name_list) > 1:
-        created_client.last_name = name_list[-1]
+    if len(name_list) == 2:
+        user_data.last_name = name_list[-1]
     
     # Adding other_names (middle names or any names between the first and last)
-    if len(name_list) > 2:
-        created_client.other_names = " ".join(name_list[1:-1])
+    if len(name_list) >= 3:
+        user_data.other_names = " ".join(name_list[1:-1])
+
+    if user_role == 'client':
+        # Create the new user instance
+        created_client = await create_user(
+            db = db,
+            user_data = user_data   
+        ) 
+    elif user_role == 'agent':
+        created_client = await create_agent(
+            db = db,
+            user_data = user_data
+        )
+
 
     try:
-        # Add the new user to the session and commit the transaction
-        db.add(created_client)
-        await db.commit()
-        await db.refresh(created_client)
-
         # delete the verification code from Redis after successful registration
         await redis_client.delete(user_key)
 

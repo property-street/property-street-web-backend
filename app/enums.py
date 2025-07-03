@@ -5,14 +5,6 @@ class EmailManagementReasonChoice(enum.Enum):
     password_change = 'password-change'
     verified = 'verified'
 
-class ClientTypeChoice(enum.Enum):
-    client = 'client'
-    agent = 'agent'
-
-class ClientGenderChoice(enum.Enum):
-    male = 'male'
-    female = 'female'
-    custom = 'custom'
 
 class AssetCategoryChoice(enum.Enum):
     house = "House"

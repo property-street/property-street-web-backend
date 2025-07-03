@@ -101,9 +101,10 @@ async def test_dispatch_pending_notification(app_subprocess, sessions_fixture):
         loaded_response = json.loads(await asyncio.wait_for(ws.recv(), timeout = 60))
         assert len(loaded_response['data']) == 2
 
-    # let it sleep a lil
+    # pause execution for some seconds to permit modification of notification instances
     await asyncio.sleep(5)
-    await test_db.refresh()
+    await test_db.refresh(notif1)
+    await test_db.refresh(notif2)
     # Ensure notifications are marked as delivered
     result = await test_db.execute(
         select(Notification).where(Notification.id.in_([notif1.id, notif2.id]))

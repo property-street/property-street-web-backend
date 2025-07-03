@@ -23,9 +23,9 @@ from property_street_backend.app.controllers.activity.agent_crud_processing impo
     process_asset,
     remove_tags_from_asset,
 )
-from property_street_backend.tests.activity.test_controller.test_asset_creation import (
+from property_street_backend.tests.test_assets.test_create_asset import (
     create_test_asset,
-    create_test_asset_feature,
+    # create_test_asset_feature,
 )
 from property_street_backend.tests.activity.test_controller.test_newly_created_asset_cache_management import (
     expiry_seconds,
@@ -51,63 +51,51 @@ async def add_created_clientId_to_payload(db,payload):
 
 @pytest.mark.asyncio
 async def test_create_asset_with_feature(
-    client__fixture_with_prod_redis,
+    sessions_with_cache_expiry_event_fixture,
 ):
     # get the yield client objects
-    fixture_obj = await client__fixture_with_prod_redis.__anext__()
-    # extract the database entry
-    test_db = fixture_obj.get("db")
-    # fetch the client fixture
-    redis_client =  await fixture_obj.get("redis_client")
+    async for fixture_obj in sessions_with_cache_expiry_event_fixture:
+        test_db = fixture_obj["db"]
+        redis_client = fixture_obj["redis_client"]
+        break
 
-    try:
-        # call the function that would add a real client id to the payload
-        await add_created_clientId_to_payload(
-            db = test_db,
-            payload = feature_obj
-        )
-        
-        # Process asset with features
-        await process_asset(
-            data_to_be_processed=feature_obj, 
-            db = test_db,
-            redis_client = redis_client,
-            newly_created = True,
-            ttl_in_seconds = expiry_seconds,
-        )
+    # call the function that would add a real client id to the payload
+    await add_created_clientId_to_payload(
+        db = test_db,
+        payload = feature_obj
+    )
+    
+    # Process asset with features
+    await process_asset(
+        data_to_be_processed=feature_obj, 
+        db = test_db,
+        redis_client = redis_client,
+        newly_created = True,
+        ttl_in_seconds = expiry_seconds,
+    )
 
-        # Fetch the created asset from the database
-        result = await test_db.execute(select(Asset).filter(Asset.title == feature_obj[4]['fields']['title']))
-        created_asset = result.scalars().first()
-        asset_schema = AssetSchema.model_validate(created_asset)
-        asset_cache_object = json.dumps(
-            asset_schema.model_dump()
-        )
-        asset_json = json.dumps(asset_cache_object)
+    # Fetch the created asset from the database
+    result = await test_db.execute(select(Asset).filter(Asset.title == payload[4]['fields']['title']))
+    created_asset = result.scalars().first()
+    assert created_asset is not None
+    assert created_asset.title == feature_obj[4]['fields']['title']
+    assert created_asset.has_features is True
+    schematized_asset = AssetSchema.model_validate(created_asset)
+    schematized_asset_to_dict = schematized_asset.model_dump()
 
-        # cache assertions
-        await assertions_after_caching(
-            redis_client=redis_client,
-            asset_id=created_asset.id,
-            asset_data=asset_cache_object,
-            asset_json = asset_json,
-        )
+    # cache assertions
+    await assertions_after_caching(
+        redis_client=redis_client,
+        asset_id=created_asset.id,
+        asset_data=schematized_asset_to_dict,
+    )
 
-        # Assertions
-        assert created_asset is not None
-        assert created_asset.title == feature_obj[4]['fields']['title']
-        assert created_asset.has_features is True
 
-        # Check the features
-        result = await test_db.execute(select(AssetFeature).filter(AssetFeature.asset_id == created_asset.id))
-        asset_feature = result.scalars().first()
-        assert asset_feature is not None
-    finally:
-        # cache finality
-        await finality_after_caching(
-            redis_client = redis_client,
-            asset_id = created_asset.id
-        )
+    # Check the features
+    result = await test_db.execute(select(AssetFeature).filter(AssetFeature.asset_id == created_asset.id))
+    asset_feature = result.scalars().first()
+    assert asset_feature is not None
+
 
 
 @pytest.mark.asyncio

@@ -21,9 +21,10 @@ from property_street_backend.app.database import (
 from property_street_backend.app.routers import (
     ws,
     auth, 
-    activity,
     search,
+    assets,
     settings,
+    activity,
     google_oauth,
     asset_request,
     rating_review,
@@ -120,13 +121,14 @@ async def test_database(
         }
 
 # Include routers
+app.include_router(ws.router)
 app.include_router(auth.router)
-app.include_router(activity.router)
 app.include_router(search.router)
+app.include_router(assets.router)
 app.include_router(settings.router)
+app.include_router(activity.router)
 app.include_router(google_oauth.router)
-app.include_router(ws.router) 
 app.include_router(asset_request.router)
-app.include_router(roommates_finder.router)
 app.include_router(rating_review.router)
+app.include_router(roommates_finder.router)
 app.include_router(home_router)

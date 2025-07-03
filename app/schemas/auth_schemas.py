@@ -3,7 +3,7 @@
 #Ensures data consistency between the client and the server.
 
 from pydantic import BaseModel, ConfigDict, EmailStr
-from typing import Optional
+from typing import Optional, Literal
 
 
 class UserSigninSchema(BaseModel):
@@ -24,7 +24,8 @@ class UserRegistrationSchema(BaseModel):
     password: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    #last_name: str
+    other_names: Optional[str] = None
+    user_role: Optional[Literal['user','agent']] = None
     # Add other fields as needed
 
 class AgentRegistrationSchema(UserRegistrationSchema):
@@ -33,7 +34,6 @@ class AgentRegistrationSchema(UserRegistrationSchema):
 class SignupCodeVerificationSchema(UserRegistrationSchema):
     verification_code: str
     fullname: str
-    client_type: str
 
 class Token(BaseModel):
     access_token: str

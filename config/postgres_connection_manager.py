@@ -8,9 +8,7 @@ from property_street_backend.config.settings import DATABASE_URL, TEST_DATABASE_
 Base = declarative_base()
 
 def get_async_session():
-    env = get_env()
-    env_is_test = env == "test"
-
+    env_is_test = get_env() == 'test'
     database_url = TEST_DATABASE_URL if env_is_test else DATABASE_URL
 
     async_engine = create_async_engine(database_url, echo=False) # create engine (it manages a connection pool internally)

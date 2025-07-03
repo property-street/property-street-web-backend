@@ -4,13 +4,11 @@ import asyncio
 from redis.asyncio import Redis
 
 
-from property_street_backend.config.settings import REDIS_CACHE_DB
 from property_street_backend.app.controllers.activity.asset_routine_methods import (
     create_or_update_newly_created_asset_cache
 )
 
 # Mock inputs
-expiry_seconds = 5
 hash_key = "newly_created_asset"
 hset_key = "auto_category"
 
@@ -19,6 +17,7 @@ async def assertions_after_caching(
     redis_client: Redis,
     asset_id: int,
     asset_data: dict,
+    expiry_seconds: int
 ):
     asset_data_str = json.dumps(asset_data)
     
@@ -31,12 +30,13 @@ async def assertions_after_caching(
     assert cached_asset_str.decode() == asset_data_str
 
     # Assert that the asset_json is an entry in the hash set
-    auto_category = await redis_client.hget("auto_category", f"{hash_key}")
+    newly_created_asset_hset_field = hash_key
+    auto_category = await redis_client.hget("auto_category", f"{newly_created_asset_hset_field}")
     assert auto_category is not None
     collection = json.loads(auto_category)
-    assert collection.get(str(asset_id)) == asset_data
+    assert collection[str(asset_id)] == asset_data
 
-    # Wait for expiry (using asyncio.sleep for async context)
+    # Wait for expiry 
     await asyncio.sleep(expiry_seconds + 3)
 
     # Assertions after expiry
@@ -54,8 +54,8 @@ async def assertions_after_caching(
 
 
 async def finality_after_caching(
-    redis_client,
-    asset_id,
+    redis_client: Redis,
+    asset_id: int,
 ):
     # Cleanup to ensure no residual data in Redis
     await redis_client.delete(f"{hash_key}:{asset_id}")
@@ -74,6 +74,7 @@ async def finality_after_caching(
 
 @pytest.mark.asyncio
 async def test_cache_newly_created_asset(client__fixture_with_prod_redis):
+    expiry_seconds = 5
     # Connect to the Redis server
     client_gen = client__fixture_with_prod_redis
     client, redis_client = await client_gen.__anext__()

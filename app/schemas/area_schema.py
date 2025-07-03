@@ -1,7 +1,8 @@
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import Field
+from . import ConfigDictSetter
 
-class Area(BaseModel):
+class AreaSchema(ConfigDictSetter):
     country: str
     state_or_province: str
     city_or_town: str

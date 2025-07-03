@@ -18,8 +18,10 @@ from property_street_backend.app.main import app
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.config.settings import TEST_DATABASE_URL
-from property_street_backend.config.postgres_connection_manager import Base, get_postgres_instance
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
+from property_street_backend.config.postgres_connection_manager import Base, get_postgres_instance
+from property_street_backend.app.controllers.cache_expiration.expiry_pubsub_listener import expiry_pubsub_loop_entered 
+
 
 
 @pytest.fixture
@@ -124,11 +126,23 @@ async def sessions_with_cache_expiry_event_fixture(
     # ✅ Register the async finalizer using pytest
     request.addfinalizer(lambda: event_loop.run_until_complete(finalizer()))
 
+    # ✅ Poll until the listener loop is confirmed to be active
+    for _ in range(60):
+        loop_entered = await test_redis_client.exists(expiry_pubsub_loop_entered)
+        if loop_entered:
+            break
+        await asyncio.sleep(0.1)  # prevent tight loop
+
+    if not loop_entered:
+        raise Exception("Expiry pubsub listener never started.")
     
-    yield {
-        "redis_client": test_redis_client,
-        "db": test_db,
-    }
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        yield {
+            "http_client": ac, 
+            "redis_client": test_redis_client,
+            "db": test_db,
+        }
 
 
 @pytest.fixture(scope="function")
