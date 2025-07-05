@@ -7,11 +7,12 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..utils import get_user_ws_endpoint
-from property_street_backend.app.models import User, CloudImageDetail
 from property_street_backend.app.initiator import logger
+from property_street_backend.app.models import User, CloudImageDetail
 from property_street_backend.app.controllers.auth import fetched_access_token
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.controllers.roommate_finder.models import RoommateFinder
+from property_street_backend.app.controllers.roommate_finder.schemas import RoommateFinderResponseSchema
 
 @pytest.mark.asyncio
 async def test_roommates_finder_request(app_subprocess, client__fixture):
@@ -102,22 +103,26 @@ async def test_roommates_finder_request(app_subprocess, client__fixture):
         
         await asyncio.wait_for(receipt_check_group(), timeout = 60)
 
-        # assert that the data persisted in the database
+        # assert the updated user
         await test_db.refresh(test_user)
         assert test_user.gender.value == payload['gender']
         roommates_finder_requests = test_user.roommates_finder
         assert roommates_finder_requests is not None
         
+        # assert persistence of RoommateFinder
         recent_request: RoommateFinder = roommates_finder_requests[0]
         assert recent_request is not None
-        assert recent_request.extra_conditions == payload['extra_conditions']
-        assert recent_request.category == payload['category']
-        assert recent_request.max_roomies == payload['max_roomies']
-        assert recent_request.area.country == payload['area']['country']
-        assert recent_request.area.state_or_province == payload['area']['state_or_province']
-        assert recent_request.area.city_or_town == payload['area']['city_or_town']
-        assert recent_request.area.street == payload['area']['street']
-        assert len(recent_request.room_images) == len(payload['room_images'])
+        schematized_response = RoommateFinderResponseSchema.model_validate(recent_request)
+        assert schematized_response.max_roomies == payload['max_roomies']
+        assert schematized_response.category == payload['category']
+        assert schematized_response.area.country == payload['area']['country']
+        assert schematized_response.area.state_or_province == payload['area']['state_or_province']
+        assert schematized_response.area.city_or_town == payload['area']['city_or_town']
+        assert schematized_response.area.street == payload['area']['street']
+        assert len(schematized_response.room_images) == len(payload['room_images'])
+        assert schematized_response.requester == f"{test_user.first_name} {test_user.last_name}"
+        assert schematized_response.requester_avatar_url == test_user.profile_avatar.secure_url
+        assert schematized_response.gender == payload['gender']
 
         # assert that the notification was sent
         assert notification_obj is not None

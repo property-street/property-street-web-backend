@@ -13,6 +13,7 @@ from property_street_backend.app.models import (
 from property_street_backend.app.controllers.assets.schemas import (
     AreaSchema,
     CloudImageSchema,
+    AssetFetchResponseSchema,
 )
 from property_street_backend.app.schemas.asset_schemas import (
     AssetSchema
@@ -103,7 +104,8 @@ async def test_create_asset_with_no_feature(get_test_db__fixture):
         assert created_asset is not None
         assert created_asset.title == asset_data_template['title']
         # direct testing of the AssetSchema schema on an asset instance 
-        AssetSchema.model_validate(created_asset)
+        schema = AssetFetchResponseSchema.model_validate(created_asset)
+        print(schema)
 
         # set the cloud_images to None, and set a feature
         created_asset.cloud_images = []

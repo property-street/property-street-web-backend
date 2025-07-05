@@ -14,14 +14,12 @@ from property_street_backend.app.schemas.asset_schemas import (
 from property_street_backend.tests.activity.test_controller.test_objects import (
     feature_obj,
 )
-from property_street_backend.tests.activity.test_controller.test_asset_management_phase1 import (
-    add_created_clientId_to_payload,
-)
 from property_street_backend.tests.activity.test_controller.test_newly_created_asset_cache_management import (
     expiry_seconds,
     finality_after_caching, 
     assertions_after_caching,
 )
+from property_street_backend.tests.activity.test_controller.test_process_asset import add_created_clientId_to_payload
 
 
 

@@ -3,6 +3,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from property_street_backend.app.schemas import ConfigDictSetter 
 from property_street_backend.app.schemas.area_schema import AreaSchema
+from property_street_backend.app.controllers.actors.schemas import AgentResponseSchema
     
 
 class AssetFeatureCreateSchema(BaseModel):
@@ -81,6 +82,7 @@ class AssetSchema(ConfigDictSetter):
 
 class AssetFetchResponseSchema(AssetSchema):
     cover_image: CloudImageResponseSchema
+    # agent: AgentResponseSchema
 
 
 class LatestAssetsFetchResponseSchema(ConfigDictSetter):

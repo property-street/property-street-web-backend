@@ -1,12 +1,18 @@
+from fastapi import Query
 import redis.asyncio as redis
+from redis.asyncio import Redis
 from typing import Dict, Optional
+from pydantic import ValidationError
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
 from property_street_backend.app.models import Asset
 from property_street_backend.app.database import get_db
-from property_street_backend.app.initiator import logger
+from property_street_backend.app.initiator import (
+    logger,
+    get_redis,
+)
 from property_street_backend.config.settings import (
     DEBUG,
     NEWLY_CREATED_ASSET_TTL,
@@ -24,8 +30,6 @@ from property_street_backend.app.schemas.asset_schemas import (
     LatestAssetsFetchResponseSchema,
     AssetFetchByIdResponseSchema 
 )
-from fastapi import Query
-from pydantic import ValidationError
 from property_street_backend.app.controllers.assets.schemas import (
     AssetFetchResponseSchema,
     AssetFetchResponseSchema
@@ -36,6 +40,7 @@ from property_street_backend.app.controllers.activity.agent_crud_processing impo
     process_asset as controller_process_asset,
     remove_tags_from_asset,
 )
+from property_street_backend.app.controllers.assets.fetch_latest_asset import fetch_latest_assets
 from property_street_backend.app.controllers.activity.agent_assets_retrieval import get_agent_assets
 
 
@@ -146,57 +151,22 @@ async def fetch_agent_assets(
 
 
 
-@router.get("/assets/latest", response_model=LatestAssetsFetchResponseSchema)
-async def fetch_latest_assets(
+@router.get("/latest", response_model=LatestAssetsFetchResponseSchema)
+async def retrieve_latest_assets(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(get_db),
+    redis_client: Redis = Depends(get_redis),
 ):
     """
     Fetch paginated latest assets. Assets that fail schema validation are logged and skipped.
     """
-    try:
-        offset = (page - 1) * size
-
-        stmt = (
-            select(Asset)
-            .order_by(Asset.created_at.desc())
-            .offset(offset)
-            .limit(size)
-        )
-        result = await session.execute(stmt)
-        raw_assets = result.scalars().all()
-
-        valid_assets = []
-        skipped_assets = []
-
-        for asset in raw_assets:
-            try:
-                # Manually validate using schema
-                validated_asset = AssetFetchResponseSchema.model_validate(asset)
-                valid_assets.append(validated_asset)
-            except ValidationError as ve:
-                skipped_assets.append(asset.id if hasattr(asset, "id") else None)
-                # Notify admin or log the validation error
-                log_message(
-                    log_type="error",
-                    message=f"Asset ID {getattr(asset, 'id', 'unknown')} failed validation. Reason: {ve}"
-                )
-
-        log_message(
-            log_type="success",
-            message=f"{len(valid_assets)} valid assets returned. {len(skipped_assets)} skipped due to schema errors."
-        )
-
-        return {"assets": valid_assets}
-
-    except Exception as e:
-        log_message(
-            log_type="error",
-            message=f"An error occurred while retrieving latest assets. Reason: {e}"
-        )
-        raise HTTPException(status_code=500, detail="Failed to retrieve assets.")
-
+    return await fetch_latest_assets(
+        page = page,
+        size = size,
+        session = session,
+        redis_client = redis_client
+    )
 
 
 @router.get("/assets/{asset_id}",response_model=AssetFetchByIdResponseSchema)

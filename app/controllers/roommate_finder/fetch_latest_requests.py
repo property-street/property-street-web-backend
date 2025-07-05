@@ -1,0 +1,71 @@
+import json
+from sqlalchemy import select
+from redis.asyncio import Redis
+from fastapi import HTTPException
+from pydantic import ValidationError
+from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
+from .models import RoommateFinder 
+from .schemas import RoommateFinderResponseSchema
+from property_street_backend.app.models import User
+from property_street_backend.app.initiator import logger
+from property_street_backend.config.settings import DEBUG
+from property_street_backend.log_config.logger_config import log_message
+
+
+
+async def fetch_recent_roommate_finder_request(
+    page: int,
+    size: int,
+    session: AsyncSession,
+):
+    offset = (page - 1) * size
+
+    stmt = (
+        select(RoommateFinder)
+        .options(
+            selectinload(RoommateFinder.area),
+            selectinload(RoommateFinder.room_images),
+            selectinload(RoommateFinder.requester)
+                .selectinload(User.profile_avatar),
+        )
+        .order_by(RoommateFinder.id.desc())
+        .offset(offset)
+        .limit(size)
+    )
+    result = await session.execute(stmt)
+    raw_requests = result.scalars().all()
+
+    valid_requests = []
+    skipped_requests = []
+
+    try:
+        for request in raw_requests:
+            try:
+                if isinstance(request, dict):
+                    validated_asset = RoommateFinderResponseSchema.from_orm_with_relationship(request)
+                else:
+                    validated_asset = RoommateFinderResponseSchema.from_orm_with_response(request.__dict__)
+                valid_requests.append(validated_asset)
+            except ValidationError as ve:
+                asset_id = getattr(request, 'id', request.get('id') if isinstance(request, dict) else None)
+                skipped_requests.append(asset_id)
+                log_message(
+                    log_type="error",
+                    message=f"RoomamteFinder ID {asset_id or 'unknown'} failed validation. Reason: {ve}"
+                )
+
+    except Exception as e:
+        f_message = "An error occurred while retrieving latest Roommate-finder requests."
+        d_message = f"{f_message} Reason: {e}"
+        log_message(log_type="error", message=d_message)
+        logger.error(d_message)
+        raise HTTPException(status_code=500, detail=f_message)
+
+    logger.info(
+        f"{len(valid_requests)} valid assets returned. {len(skipped_requests)} skipped due to schema errors."
+    )
+
+    return valid_requests

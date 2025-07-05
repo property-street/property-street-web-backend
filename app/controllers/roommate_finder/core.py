@@ -3,6 +3,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import RoommateFinder
+from .schemas import RoommateFinderResponseSchema
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.log_config.logger_config import log_message
@@ -41,15 +42,16 @@ async def publish_roommate_finding(
         await db.commit()
 
         await db.refresh(roommate_finder)
+        response = RoommateFinderResponseSchema.from_orm_with_relations(roommate_finder)
+        
+        channel_payload = response.model_dump(exclude_none=True)
         # add the id of the roommate finder instance to the request_data
-        request_data['db_id'] = roommate_finder.id,
-        # add the reqeuter profile avatar to the data to publish
-        if requester.profile_avatar:
-            request_data['requester_avatar'] = requester.profile_avatar.secure_url
+        channel_payload['db_id'] = roommate_finder.id,
+
         
         channel_category = 'roommates_finder'
         data_to_publish ={
-            'request_data': request_data,
+            'request_data': channel_payload,
             'category': channel_category
         }
         channel = generic_channels.get(channel_category)
@@ -57,6 +59,8 @@ async def publish_roommate_finding(
 
         if DEBUG:
             logger.info('**Roommate finder request successfully published.')
+        
+        return response
     except Exception as e:
         await db.rollback()
         msg = f'**An error occured while requesting for a roommate finder. reason:{e}'

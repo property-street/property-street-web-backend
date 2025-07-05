@@ -3,6 +3,7 @@ from redis.asyncio import Redis
 
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
+from . import newly_created_asset_set_key, auto_category_hset_key
 from property_street_backend.log_config.logger_config import log_message
 
 
@@ -11,20 +12,17 @@ async def handle_newly_created_asset_expiry(
     redis_client: Redis
 ) -> dict:
 
-    hash_key = "newly_created_asset"
-    hset_key = "auto_category"
-    
     try:
         # Extract the asset ID from the expired key
         asset_id = int(expired_key.split(':')[-1])
 
         # Remove the ID from the Redis set
-        id_removed_from_set = await redis_client.srem(hash_key, asset_id)
+        id_removed_from_set = await redis_client.srem(newly_created_asset_set_key, asset_id)
         if id_removed_from_set and DEBUG:
             logger.info(f"Removed asset ID {asset_id} from 'newly_created_asset' set.")
 
         # Update the HSET
-        auto_category = await redis_client.hget(hset_key, hash_key)
+        auto_category = await redis_client.hget(auto_category_hset_key, newly_created_asset_set_key)
         if auto_category:
             collection = json.loads(auto_category)
             data_removed_from_collection = collection.pop(str(asset_id), None)
@@ -39,8 +37,8 @@ async def handle_newly_created_asset_expiry(
             
             # Update the HSET with what's left
             await redis_client.hset(
-                hset_key,
-                hash_key,
+                auto_category_hset_key,
+                newly_created_asset_set_key,
                 json.dumps(collection)
             )
 
