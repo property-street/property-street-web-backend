@@ -1,7 +1,10 @@
 import json
+from sqlalchemy import select
 from redis.asyncio import Redis
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .schemas import AssetRequestResponseSchema
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.models import AssetRequest, Area, User
@@ -36,22 +39,32 @@ async def handle_asset_request(
         db.add(request_instance)
         await db.commit()
 
-        await db.refresh(request_instance)
-        # add the db_id, profile avatar, fullname of requester
-        request_data['db_id'] = request_instance.id
-        if requester.profile_avatar:
-            request_data['requester_avatar'] = requester.profile_avatar.secure_url
-        request_data['requester_name'] = f'{requester.first_name} {requester.last_name}'
 
+        stmt = await db.execute(
+            select(AssetRequest)
+            .where(AssetRequest.id == request_instance.id)
+            .options(
+                selectinload(AssetRequest.area),
+                selectinload(AssetRequest.requester).selectinload(User.profile_avatar)
+            )
+        )
+        asset_request = stmt.scalars().one()
+
+        # serialize the request instance
+        schematized_data = AssetRequestResponseSchema.from_orm_with_relations(asset_request)
+        schematized_data_to_dict = schematized_data.model_dump()
+        
         # publish the request to the asset_request channel
         data_to_publish = {
-            'request_data': request_data,
+            'request_data': schematized_data_to_dict,
             'category': 'asset_request'
         }
         channel = agent_specific_channels['asset_request']
         await redis_client.publish(channel, json.dumps(data_to_publish))
         if DEBUG:
-            log_message('success', f'Asset successfully requested!')
+            log_message('success', f'Asset request successfully published to channel!')
+
+        return schematized_data
     except Exception as e:
         await db.rollback()
         log_message('error',f'An error occured while requesting asset. Reason: {e}')

@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.database import get_db
 from property_street_backend.app.controllers.ratings.core import rate_asset
-from property_street_backend.app.controllers.ratings.schema import RatingReviewSchema
+from property_street_backend.app.controllers.ratings.schemas import RatingReviewSchema
 
 router = APIRouter(prefix='/rating-review', tags=['rating-review'])
 

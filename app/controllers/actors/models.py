@@ -213,6 +213,23 @@ class User(Base):
         back_populates = 'roomie_applicants',
     )
 
+    # relationship to ratings
+    rating_id = Column(
+        Integer,
+        ForeignKey(
+            'ratings.id',
+            name = "fk_users_ratings",
+            ondelete="CASCADE"
+        )
+    )
+    ratings = relationship(
+        'Rating',
+        lazy='selectin',
+        back_populates = 'commenter'
+    )
+
+    
+
     # method for a user to become an agent
     async def become_agent(self, session: AsyncSession):
         """Method to convert a user into an agent."""

@@ -82,12 +82,16 @@ class AssetSchema(ConfigDictSetter):
 
 class AssetFetchResponseSchema(AssetSchema):
     cover_image: CloudImageResponseSchema
-    # agent: AgentResponseSchema
+
+
+class AssetResponseSchema(AssetSchema):
+    cover_image: CloudImageResponseSchema
+    agent: AgentResponseSchema
 
 
 class LatestAssetsFetchResponseSchema(ConfigDictSetter):
-    assets: List[AssetFetchResponseSchema]
+    assets: List[AssetResponseSchema]
 
 
 class AssetFetchByIdResponseSchema(ConfigDictSetter):
-    asset: AssetFetchResponseSchema
+    asset: AssetResponseSchema

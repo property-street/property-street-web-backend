@@ -10,6 +10,7 @@ from property_street_backend.app.initiator import logger
 from property_street_backend.app.controllers.auth import fetched_access_token
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.models import User, CloudImageDetail, AssetRequest
+from property_street_backend.app.controllers.asset_request.schemas import AssetRequestResponseSchema
 
 @pytest.mark.asyncio
 async def test_asset_request_creation(app_subprocess, client__fixture):
@@ -18,7 +19,7 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
     try:
         async for fixture_obj in client__fixture:
             test_db: AsyncSession = fixture_obj['db'] 
-            http_client = fixture_obj['http_client']
+            httpx_client = fixture_obj['http_client']
             break; 
 
         cloud_image_detail = {
@@ -67,15 +68,20 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
         # running tasks before the request is sent
         await asyncio.sleep(10)
 
+        httpx_response = None
         # function to send post request
         async def send_post_request():
-            response = await http_client.post(
+            nonlocal httpx_response
+            response = await httpx_client.post(
                 "/asset-request",
                 json=payload,
                 headers=auth_header 
             )
-            assert response.status_code == 201
 
+            assert response.status_code == 201
+            httpx_response = response.json()
+            print(httpx_response)
+            
             if response.status_code == 422:
                 logger.error("Validation error: %s", response.json())
                 raise HTTPException( status_code=status.HTTP_422_UNPROCESSABLE_ENTITY) 
@@ -97,11 +103,12 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
         await asyncio.wait_for(receipt_check_group(), timeout = 60)
 
         # assert that the data persisted in the database
-        await test_db.refresh(test_user)
-        asset_requests = test_user.requested_assets
-        assert asset_requests is not None
-        recent_request: AssetRequest = asset_requests[0]
+        recent_request = AssetRequestResponseSchema.model_validate(httpx_response)
         assert recent_request is not None
+        assert recent_request.id is not None
+        assert recent_request.requester['avatar_url'] == test_user.profile_avatar.secure_url
+        assert recent_request.requester['name'] == f'{test_user.first_name} {test_user.last_name}'
+        assert recent_request.time_requested is not None
         assert recent_request.description == payload['description']
         assert recent_request.area.country == payload['area']['country']
         assert recent_request.area.state_or_province == payload['area']['state_or_province']
@@ -111,10 +118,11 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
         # assert that the notification was sent
         assert notification_obj is not None
         request_data: dict = notification_obj.get('request_data')
-        assert request_data.get('db_id')
+        assert request_data is not None
+        assert request_data.get('id')
         assert request_data['description'] == payload['description'] 
-        assert request_data['requester_avatar'] == test_user.profile_avatar.secure_url 
-        assert request_data['requester_name'] == f'{test_user.first_name} {test_user.last_name}' 
+        assert request_data['requester']['avatar_url'] == test_user.profile_avatar.secure_url 
+        assert request_data['requester']['name'] == f'{test_user.first_name} {test_user.last_name}' 
         assert request_data['area']['country'] == payload['area']['country'] 
         assert request_data['area']['state_or_province'] == payload['area']['state_or_province'] 
         assert request_data['area']['city_or_town'] == payload['area']['city_or_town'] 

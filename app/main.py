@@ -18,6 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from property_street_backend.app.database import (
     get_db,
 )
+from property_street_backend.app.controllers.asset_request import routes as asset_request_routes
+from property_street_backend.app.controllers.roommate_finder import routes as roommates_fineder_routes
 from property_street_backend.app.routers import (
     ws,
     auth, 
@@ -26,9 +28,7 @@ from property_street_backend.app.routers import (
     settings,
     activity,
     google_oauth,
-    asset_request,
     rating_review,
-    roommates_finder,
 )
 from property_street_backend.app.initiator import (
     app, 
@@ -128,7 +128,7 @@ app.include_router(assets.router)
 app.include_router(settings.router)
 app.include_router(activity.router)
 app.include_router(google_oauth.router)
-app.include_router(asset_request.router)
 app.include_router(rating_review.router)
-app.include_router(roommates_finder.router)
+app.include_router(asset_request_routes.router)
+app.include_router(roommates_fineder_routes.router)
 app.include_router(home_router)

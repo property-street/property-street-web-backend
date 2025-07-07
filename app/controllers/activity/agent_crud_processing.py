@@ -2,13 +2,14 @@ from typing import Dict
 from sqlalchemy import delete
 import redis.asyncio as redis
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from property_street_backend.app.schemas.asset_schemas import (
-    AssetSchema
+from property_street_backend.app.controllers.assets.schemas import (
+    AssetResponseSchema
 )
 from property_street_backend.app.models import (
     Asset, 
@@ -165,14 +166,18 @@ async def process_asset(
 
         if asset_instance_before_commit:
             result = await db.execute(
-                select(Asset).filter(Asset.id == asset_instance_before_commit.id)
+                select(Asset)
+                .options(
+                    selectinload(Asset.agent)
+                )
+                .filter(Asset.id == asset_instance_before_commit.id)
             )
             created_asset = result.scalars().first()
         
         # Handle caching
         if created_asset:
             try:
-                schematized_asset = AssetSchema.model_validate(created_asset) # schema instance of asset
+                schematized_asset = AssetResponseSchema.model_validate(created_asset) # schema instance of asset
                 schematized_asset_to_dict = schematized_asset.model_dump()
                 await create_or_update_newly_created_asset_cache(
                     asset_id = created_asset.id,

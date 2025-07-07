@@ -19,19 +19,23 @@ from property_street_backend.app.schemas.auth_schemas import (
     TokenData, 
 )
 from property_street_backend.app.schemas.asset_schemas import (
+    AssetFetchByIdResponseSchema, 
     LatestAssetsFetchResponseSchema,
-    AssetFetchByIdResponseSchema 
 )
 from property_street_backend.log_config.logger_config import log_message
-from property_street_backend.app.controllers.settings.user_update import user_record_update
-from property_street_backend.app.schemas.route_based_asset_schemas import UserUIMetaDataSchema
 from property_street_backend.app.controllers.activity.agent_crud_processing import (
     process_asset as controller_process_asset,
     remove_tags_from_asset,
 )
+from property_street_backend.app.controllers.settings.user_update import user_record_update
+from property_street_backend.app.controllers.activity.schemas import LatestCollectionSchema
+from property_street_backend.app.schemas.route_based_asset_schemas import UserUIMetaDataSchema
 from property_street_backend.app.controllers.activity.agent_assets_retrieval import get_agent_assets
+from property_street_backend.app.controllers.activity.latest_collection import fetch_latest_collection
+
 
 router = APIRouter(prefix="/activity", tags=["activity"])
+
 
 @router.post("/process-asset", status_code=status.HTTP_200_OK)
 async def process_asset(
@@ -277,3 +281,21 @@ async def user_profile_thumbnail_update(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occured on updating user profile thumbnail"
         )
+
+
+@router.get("/latest-collection",response_model=LatestCollectionSchema)
+async def latest_collection(
+    page: int = 1,
+    size: int = 20,
+    redis_client: redis.Redis = Depends(get_redis),
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    Fetches the latest collection of assets, roommate finder requests, and asset requests.
+    """
+    return await fetch_latest_collection(
+        page=page,
+        size=size,
+        session=session,
+        redis_client=redis_client
+    )

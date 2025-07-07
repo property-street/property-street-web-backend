@@ -7,6 +7,8 @@ from pydantic import (
     Field,
 )
 
+from .models import Rating
+
 class RatingReviewSchema(BaseModel):
     asset_to_rate: Literal['Agent', 'Area']
     comment: str
@@ -23,3 +25,26 @@ class RatingReviewSchema(BaseModel):
         elif values.agent_id and values.area_id:
             raise ValueError("Only one of area_id or agent_id can be included in the request at a time!")
         return values
+    
+class RatingResponseSchema(BaseModel):
+    comment: str
+    score: int = 0
+    commenter: Optional[dict] = Field(None, description='details of the commenter')
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @classmethod
+    def from_orm_with_relations(cls, rating: Rating):
+        """Transform ORM object to response schema with all relationships resolved"""
+        return cls(
+            comment=rating.comment,
+            score=rating.score,
+            commenter=(
+                {
+                    "profile_avatar_url": commenter.profile_avatar.secure_url if commenter.profile_avatar else "",
+                    "name": f"{commenter.first_name} {commenter.last_name}"
+                }
+                if (commenter := rating.commenter)
+                else None
+            )
+        )

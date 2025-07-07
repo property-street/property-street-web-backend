@@ -56,6 +56,13 @@ class Rating(Base):
         uselist = False
     )
 
+    # relationship to Commenter
+    commenter = relationship(
+        "User",
+        back_populates = "ratings",
+        lazy = "selectin",
+        uselist = False # one-to-many relationship
+    )
     
     __table_args__ = (
         CheckConstraint("score <= 5", name="check_score_max"),
