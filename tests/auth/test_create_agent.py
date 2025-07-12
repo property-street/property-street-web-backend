@@ -17,8 +17,8 @@ user_data = UserRegistrationSchema(
     email="agent@example.com",
     username="agentuser",
     password="password123",
-    first_name = "agent",
-    last_name = "zee"
+    first_name = "Nike",
+    last_name = "Addidas"
 )
 
 async def create_test_agent(db:AsyncSession):

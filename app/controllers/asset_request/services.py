@@ -27,9 +27,10 @@ async def fetch_recent_asset_request(
         select(AssetRequest)
         .options(
             selectinload(AssetRequest.area),
-            selectinload(AssetRequest.requester).selectinload(User.profile_avatar)
+            selectinload(AssetRequest.requester)
+            .selectinload(User.profile_avatar)
         )
-        .order_by(AssetRequest.id.desc())
+        .order_by(AssetRequest.created_at.desc())
         .offset(offset)
         .limit(size)
     )
@@ -42,18 +43,16 @@ async def fetch_recent_asset_request(
     try:
         for request in raw_requests:
             try:
-                if isinstance(request, dict):
-                    validated_asset = AssetRequestResponseSchema.from_orm_with_relationship(request)
-                else:
-                    validated_asset = AssetRequestResponseSchema.from_orm_with_response(request.__dict__)
+                validated_asset = AssetRequestResponseSchema.from_orm_with_relations(request)
                 valid_requests.append(validated_asset)
             except ValidationError as ve:
-                asset_request_id = getattr(request, 'id', request.get('id') if isinstance(request, dict) else None)
+                asset_request_id = getattr(request, 'id', None)
                 skipped_requests.append(asset_request_id)
-                log_message(
-                    log_type="error",
-                    message=f"AssetRequest ID {asset_request_id or 'unknown'} failed validation. Reason: {ve}"
-                )
+                f_message = "An error occurred while retrieving latest Asset-requests."
+                d_message = f"AssetRequest ID {asset_request_id or 'unknown'} failed validation. Reason: {ve}"
+                log_message(log_type="error", message=d_message)
+                logger.error(d_message)
+                raise HTTPException(status_code=500, detail=f_message)
 
     except Exception as e:
         f_message = "An error occurred while retrieving latest Asset-requests."

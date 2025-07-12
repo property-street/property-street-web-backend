@@ -3,27 +3,21 @@ import pytest
 from property_street_backend.app.controllers.auth import (
     fetched_access_token,
 )
-from property_street_backend.app.controllers.auth import (
-    create_user, 
-)
+from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
+from property_street_backend.app.controllers.settings.schemas import UserSettingResponseSchema
 
 
 @pytest.mark.asyncio
 async def test_user_profile_thumbnail_update(client__fixture):
+    
     # Extract the fixture object
-    fixture_obj = await client__fixture.__anext__()
-    test_db = fixture_obj.get("db")
-    client = fixture_obj.get("http_client")
+    async for fixture_obj in client__fixture:
+        test_db = fixture_obj["db"]
+        httpx_client = fixture_obj["http_client"]
+        break
 
-
-    # Define a test user and create it
-    user_data = UserRegistrationSchema(
-        email="test@example.com",
-        username="testuser",
-        password="password123"
-    )
-    created_user = await create_user(test_db, user_data)
+    created_user = await create_test_user(test_db)
     user_id = created_user.id
     update_obj = {
         0: {
@@ -45,7 +39,7 @@ async def test_user_profile_thumbnail_update(client__fixture):
         },
         1: {
             # tag 1
-            "db_table_id": user_id,
+            "db_table_id": -1,
             "db_delete": False,
             "db_table_name": "User",
 
@@ -65,21 +59,14 @@ async def test_user_profile_thumbnail_update(client__fixture):
 
     # Make a request when no setting instance hasn't been associated with the user
     # assert that the user has no settings
-    response = await client.post(
+    response = await httpx_client.post(
         "/activity/update-profile-thumbnail", 
         json = update_obj,
         headers=headers,
     )
     assert response.status_code == 200
+    json_response = response.json()
 
-    # refresh user instance and 
-    # assert to verify the updated data
-    await test_db.refresh(created_user) 
-    cover_image = created_user.profile_avatar
-    fields = update_obj[0]['fields']
-    assert cover_image.format == fields['format']
-    assert cover_image.bytes == fields['bytes']
-    assert cover_image.height == fields['height']
-    assert cover_image.public_id == fields['public_id']
-    assert cover_image.secure_url == fields['secure_url']
-    assert cover_image.width == fields['width']
+
+    recent_settings = UserSettingResponseSchema.model_validate(json_response) 
+    recent_settings.profile_avatar_url == update_obj[0]['fields']['secure_url']

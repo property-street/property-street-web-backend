@@ -12,6 +12,7 @@ from property_street_backend.app.controllers.assets.schemas import (
     AssetResponseSchema
 )
 from property_street_backend.app.models import (
+    User,
     Asset, 
     Agent,
     asset_tag_association,
@@ -168,7 +169,13 @@ async def process_asset(
             result = await db.execute(
                 select(Asset)
                 .options(
+                    selectinload(Asset.features),
+                    selectinload(Asset.tags),
+                    selectinload(Asset.area),
+                    selectinload(Asset.cloud_images),
                     selectinload(Asset.agent)
+                    .selectinload(Agent.user)
+                    .selectinload(User.profile_avatar)
                 )
                 .filter(Asset.id == asset_instance_before_commit.id)
             )

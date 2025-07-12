@@ -3,7 +3,8 @@ from pydantic import (
     BaseModel, 
     ConfigDict,
 )
-from typing import Optional
+from typing import Optional, List
+from property_street_backend.app.schemas.area_schema import AreaSchema
 
 
 class OptionalBaseModel(BaseModel):
@@ -13,13 +14,13 @@ class OptionalBaseModel(BaseModel):
             cls.__annotations__[field] = Optional[cls.__annotations__[field]]
 
 
-class UserSettingSchema(OptionalBaseModel):
+class UserSettingSchema(BaseModel):
     id: Optional[int] = Field(None, description="Instance's id")
     phone_number: Optional[str] = Field(None, description="User's phone number")
-    address: Optional[str] = Field(None, description="User's address")
-    country: Optional[str] = Field(None, description="country")
     email_notification: Optional[bool] = Field(None, description="Email notification status")
     push_notification: Optional[bool] = Field(None, description="Push notification status")
+    areas: Optional[List[AreaSchema]] = Field(None, description="List of user's address areas")
+    date_of_birth: Optional[str] = Field(None, description="User's date of birth")
 
     model_config = ConfigDict(from_attributes=True)
     

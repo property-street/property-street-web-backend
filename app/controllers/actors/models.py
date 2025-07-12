@@ -159,7 +159,7 @@ class User(Base):
     )
 
     # user settings relationship
-    user_settings = relationship(
+    settings = relationship(
         'UserSetting',
         back_populates = 'user',
         lazy = 'selectin',

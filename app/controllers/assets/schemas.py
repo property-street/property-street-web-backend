@@ -64,7 +64,7 @@ class AssetSchema(ConfigDictSetter):
     category: str = Field(..., description="The category of the asset (e.g., House, Hotel)")
     status: str = Field(..., description="The status of the asset (e.g., Available, Sold)")
     availability: str = Field(..., description="availability status")
-    has_features: bool = Field(..., description="Boolean indicating if the asset has features or not")
+    has_features: Optional[bool] = Field(None, description="Boolean indicating if the asset has features or not")
     area: AreaSchema
 
     # Updated fields to allow for multiple entries

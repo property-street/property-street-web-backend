@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from property_street_backend.app.initiator import logger
-from property_street_backend.app.controllers.assets.fetch_latest_asset import fetch_latest_assets
+from property_street_backend.app.controllers.assets.services import fetch_latest_assets
 from property_street_backend.app.controllers.asset_request.services import fetch_recent_asset_request
 from property_street_backend.app.controllers.roommate_finder.fetch_latest_requests import fetch_recent_roommate_finder_request
 

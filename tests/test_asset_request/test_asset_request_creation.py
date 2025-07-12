@@ -38,8 +38,6 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
 
         # give the user a profile avata, first name and last name
         test_user.profile_avatar = CloudImageDetail(**cloud_image_detail)
-        test_user.first_name = 'John'
-        test_user.last_name = 'Doe'
         test_db.add(test_user)
         await test_db.flush() # flush to reflect change
 
@@ -73,7 +71,7 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
         async def send_post_request():
             nonlocal httpx_response
             response = await httpx_client.post(
-                "/asset-request",
+                "/asset-requests",
                 json=payload,
                 headers=auth_header 
             )

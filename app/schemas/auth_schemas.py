@@ -15,21 +15,26 @@ class ProbeUserExistenceSchema(BaseModel):
     username: str
     email: str
 
-class SendEmailCodeSchema(ProbeUserExistenceSchema):
-    pass
+class SendEmailCodeSchema(BaseModel):
+    email: str
+    username: str
 
 class UserRegistrationSchema(BaseModel):
     email: str
     username: str
     password: str
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+    first_name: str
+    last_name: str
     other_names: Optional[str] = None
     user_role: Optional[Literal['user','agent']] = None
     # Add other fields as needed
 
 class AgentRegistrationSchema(UserRegistrationSchema):
     pass
+
+class VerifyEmailCodeSchema(BaseModel):
+    verification_code: str
+    email: str
 
 class SignupCodeVerificationSchema(UserRegistrationSchema):
     verification_code: str

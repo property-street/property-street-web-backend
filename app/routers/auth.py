@@ -2,8 +2,9 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, HTTPException, status, Depends
 
+
 from property_street_backend.app.database import get_db
-from property_street_backend.app.initiator import get_redis
+from property_street_backend.app.initiator import get_redis, logger
 from property_street_backend.app.schemas.auth_schemas import (
     UserRegistrationSchema, 
     UserSigninSchema, 
@@ -12,8 +13,10 @@ from property_street_backend.app.schemas.auth_schemas import (
     ProbeUserExistenceSchema,
     SendEmailCodeSchema,
     SignupCodeVerificationSchema,
+    VerifyEmailCodeSchema
 )
 from property_street_backend.log_config.logger_config import log_message
+from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.utils.store import email_verification_code_ttl
 from property_street_backend.app.controllers.auth import (
     create_user, 
@@ -23,7 +26,8 @@ from property_street_backend.app.controllers.auth import (
     decode_user_from_token_optional, 
     check_username_email_availability,
     send_email_verification_code as controller_send_email_verification_code,
-    confirm_email_verification_code_and_sign_user_up as controller_confirm_email_verification_code_and_sign_user_up
+    confirm_email_verification_code_and_sign_user_up as controller_confirm_email_verification_code_and_sign_user_up,
+    confirm_email_verification_code,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -46,6 +50,7 @@ async def probe_user_existence(
 ):
     return await check_username_email_availability(db, user_data)
 
+
 # send email verification for signup endpoint
 @router.post("/send-email-verification-code", status_code=status.HTTP_200_OK)
 async def send_email_verification_code(
@@ -53,24 +58,16 @@ async def send_email_verification_code(
     redis_client: Redis = Depends(get_redis),
     expiry_time_in_secs: int = Depends(email_verification_code_ttl)
 ):
-    try:
-        return await controller_send_email_verification_code(
-            requester_data = requester_data,
-            redis_client = redis_client,
-            expiry_time_in_secs = expiry_time_in_secs
-        )
-    except Exception as e:
-        # log the error
-        log_message(
-            log_type='error',
-            message=f'An error occured on retrieval of agent data. Reason: {e}'
-        )
-        raise e
+    return await controller_send_email_verification_code(
+        requester_data = requester_data,
+        redis_client = redis_client,
+        expiry_time_in_secs = expiry_time_in_secs
+    )
 
 
 # confirm email verification endpoint
-@router.post("/confirm-email-verification-code", status_code=status.HTTP_200_OK)
-async def confirm_email_verification_code(
+@router.post("/confirm-email-verification-code-and-register-user", status_code=status.HTTP_200_OK)
+async def handle_email_verification_code_and_register(
     requester_data: SignupCodeVerificationSchema, 
     redis_client: Redis = Depends(get_redis),
     db: AsyncSession = Depends(get_db),
@@ -79,6 +76,18 @@ async def confirm_email_verification_code(
         requester_data = requester_data,
         redis_client = redis_client,
         db = db
+    )
+
+
+# confirm email verification endpoint
+@router.post("/confirm-email-verification-code", status_code=status.HTTP_200_OK)
+async def handle_email_verification_code(
+    data: VerifyEmailCodeSchema, 
+    redis_client: Redis = Depends(get_redis),
+):
+    return await confirm_email_verification_code(
+        requester_data = data.model_dump(),
+        redis_client = redis_client,
     )
 
 

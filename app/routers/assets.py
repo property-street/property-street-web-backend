@@ -40,7 +40,7 @@ from property_street_backend.app.controllers.activity.agent_crud_processing impo
     process_asset as controller_process_asset,
     remove_tags_from_asset,
 )
-from property_street_backend.app.controllers.assets.fetch_latest_asset import fetch_latest_assets
+from property_street_backend.app.controllers.assets.services import fetch_latest_assets
 from property_street_backend.app.controllers.activity.agent_assets_retrieval import get_agent_assets
 
 
@@ -148,25 +148,6 @@ async def fetch_agent_assets(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occured on retrieval of agent data."
         )
-
-
-
-@router.get("/latest", response_model=LatestAssetsFetchResponseSchema)
-async def retrieve_latest_assets(
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    session: AsyncSession = Depends(get_db),
-    redis_client: Redis = Depends(get_redis),
-):
-    """
-    Fetch paginated latest assets. Assets that fail schema validation are logged and skipped.
-    """
-    return await fetch_latest_assets(
-        page = page,
-        size = size,
-        session = session,
-        redis_client = redis_client
-    )
 
 
 @router.get("/assets/{asset_id}",response_model=AssetFetchByIdResponseSchema)

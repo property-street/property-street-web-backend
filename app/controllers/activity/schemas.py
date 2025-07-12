@@ -4,7 +4,7 @@ from property_street_backend.app.controllers.asset_request.schemas import AssetR
 from property_street_backend.app.controllers.roommate_finder.schemas import RoommateFinderResponseSchema
 
 
-class LatestCollection(ConfigDictSetter):
+class LatestCollectionSchema(ConfigDictSetter):
     properties: list[AssetResponseSchema]
     roommates_finder_requests: list[RoommateFinderResponseSchema]
     asset_requests: list[AssetRequestResponseSchema]

@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI, APIRouter, HTTPException, status, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Response
 
 from property_street_backend.app.models import (
     User,
@@ -19,18 +19,19 @@ from property_street_backend.app.schemas.auth_schemas import (
     SendEmailCodeSchema,
     SignupCodeVerificationSchema
 )
+from property_street_backend.app.initiator import logger
 from property_street_backend.app.utils.store import (
     read_email_from_html_template_name,
     substituted_string,
     send_email,
 )
-from property_street_backend.config.settings import JWT_SECRET_KEY, JWT_EXPIRATION_DELTA, JWT_ALGORITHM
+from property_street_backend.config.settings import (
+    DEBUG,
+    JWT_SECRET_KEY,
+    JWT_EXPIRATION_DELTA,
+    JWT_ALGORITHM,
+)
 from property_street_backend.app.database import get_db
-
-
-import logging
-
-logger = logging.getLogger(__name__)
 
 # Constants for JWT
 SECRET_KEY = JWT_SECRET_KEY
@@ -293,7 +294,7 @@ async def send_email_verification_code(
             )
 
             # create another instance of the user with the new code
-            await redis_client.hset(user_key, reason, new_code)
+            await redis_client.hset(user_key, reason, str(new_code))
 
             # get the current time and add the ttl
             current_time = datetime.now(timezone.utc)
@@ -315,10 +316,67 @@ async def send_email_verification_code(
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Internal Server Error: Something went wrong. Please try again later.",
+                detail="Something went wrong. Please try again later.",
                 headers={"X-Error": "Server error"},
             )
+
+
+async def confirm_email_verification_code(
+    requester_data: dict, 
+    redis_client: redis.Redis,
+):
+    email_address = requester_data['email']
+    input_code = requester_data['verification_code']
+    if DEBUG:
+        logger.info(f"**Requesting code: {input_code}")
+    reason = "email_verification"
+
+    # `email:reason` is the HSET's key
+    user_key = f'{email_address}:{reason}'
+
+    # Check if the key exists in the cache
+    cached_code = await redis_client.hget(user_key, reason)
+    emailed_code = (
+        cached_code.decode() 
+        if isinstance(cached_code,bytes) 
+        else cached_code
+    )
+    if DEBUG:
+        logger.info(f"**Emailed code: {emailed_code}")
         
+    if not emailed_code:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Verification code not found or expired."
+        )
+
+    # Confirm the input code matches the one in the cache
+    if input_code != emailed_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code."
+        )
+
+
+    try:
+        # delete the verification code from Redis after successful registration
+        await redis_client.delete(user_key)
+
+        return {
+            "detail" : "The email has been successfully verified.",
+            "email_status": "Verified",
+        }
+
+    except Exception as e:
+        f_message = "An error occurred while verifying the email address."
+        d_message = f"{f_message} Reason: {e}"
+        if DEBUG:
+            logger.info(d_message)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f_message
+        )
+
 
 async def confirm_email_verification_code_and_sign_user_up(
     requester_data: SignupCodeVerificationSchema, 

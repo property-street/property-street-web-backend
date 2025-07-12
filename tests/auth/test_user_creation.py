@@ -2,6 +2,7 @@ import pytest
 import asyncio
 
 from httpx import AsyncClient
+from redis.asyncio import Redis
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +16,9 @@ async def create_test_user(
     user_data = UserRegistrationSchema(
         email="test@example.com",
         username="testuser",
-        password="password123"
+        password="password123",
+        first_name="John",
+        last_name="Doe",
     )
 ):
 
@@ -183,11 +186,12 @@ async def test_send_email_verification_code_hash(client__fixture: tuple):
 
 
 @pytest.mark.asyncio
-async def test_confirm_email_verification_code(client__fixture: tuple):    
+async def test_confirm_email_verification_code(client__fixture):    
     # Fetch the client generator
-    client_gen = client__fixture
-    # Get the yield client objects
-    client, redis_client = await client_gen.__anext__()
+    async for fixture_obj in client__fixture:
+        httpx_client: AsyncClient = fixture_obj['http_client']
+        redis_client: Redis = fixture_obj['redis_client']
+        break
 
     # Define the post data for sending the email verification code
     send_code_data = {
@@ -196,7 +200,71 @@ async def test_confirm_email_verification_code(client__fixture: tuple):
     }
 
     # Request a verification code
-    response = await client.post(
+    response = await httpx_client.post(
+        "/auth/send-email-verification-code",
+        json=send_code_data  # Use json instead of data for a JSON body
+    )
+
+    # Assertions for sending the verification code
+    assert response.status_code == 200
+    json_response = response.json()
+    assert json_response.get("message") == "A new verification code has been sent to your email."
+
+    # Retrieve the code directly from Redis (this simulates the user entering the code they received)
+    user_key = f'{send_code_data["email"]}:email_verification'
+    verification_code = await redis_client.hget(user_key, "email_verification")
+    assert verification_code is not None
+
+    # ** testing the confirm_email_verification_code function
+    # ...
+
+    # Case 1: Correct code
+    confirm_code_data = {
+        "email": send_code_data["email"],
+        "verification_code": verification_code.decode('utf-8'),
+    }
+
+    # Confirm the verification code with correct data
+    response = await httpx_client.post(
+        "/auth/confirm-email-verification-code",
+        json=confirm_code_data  # Use json instead of data for a JSON body
+    )
+
+    # Assertions for confirming the verification code
+    assert response.status_code == 200
+    json_response = response.json()
+
+
+    # Case 2: Expired verification code
+
+    # Try confirming again
+    response = await httpx_client.post(
+        "/auth/confirm-email-verification-code",
+        json=confirm_code_data  # Re-use the correct code data
+    )
+    # Assertions for the expired code
+    assert response.status_code == 404
+    json_response = response.json()
+    assert json_response.get("detail") == "Verification code not found or expired."
+
+
+
+@pytest.mark.asyncio
+async def test_confirm_email_verification_code_and_register(client__fixture):    
+    # Fetch the client generator
+    async for fixture_obj in client__fixture:
+        httpx_client: AsyncClient = fixture_obj['http_client']
+        redis_client: Redis = fixture_obj['redis_client']
+        break
+
+    # Define the post data for sending the email verification code
+    send_code_data = {
+        "email": "wisdomscott98@gmail.com",
+        "username": "crank",
+    }
+
+    # Request a verification code
+    response = await httpx_client.post(
         "/auth/send-email-verification-code",
         json=send_code_data  # Use json instead of data for a JSON body
     )
@@ -225,7 +293,7 @@ async def test_confirm_email_verification_code(client__fixture: tuple):
     }
 
     # Confirm the verification code with correct data
-    response = await client.post(
+    response = await httpx_client.post(
         "/auth/confirm-email-verification-code",
         json=confirm_code_data  # Use json instead of data for a JSON body
     )
@@ -241,7 +309,7 @@ async def test_confirm_email_verification_code(client__fixture: tuple):
     # Case 2: Expired verification code
 
     # Try confirming again
-    response = await client.post(
+    response = await httpx_client.post(
         "/auth/confirm-email-verification-code",
         json=confirm_code_data  # Re-use the correct code data
     )

@@ -4,7 +4,10 @@ from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
-from property_street_backend.app.models import Asset
+from property_street_backend.app.models import (
+    User,
+    Asset,
+)
 from property_street_backend.app.database import get_db
 from property_street_backend.config.settings import (
     DEBUG,
@@ -257,30 +260,13 @@ async def fetch_asset_by_id(
 async def user_profile_thumbnail_update(
     data: Dict, 
     db: AsyncSession = Depends(get_db),
-    _: TokenData = Depends(decode_user_from_token)
+    user: User = Depends(decode_user_from_token)
 ):
-    try:
-        await user_record_update(
-            data_to_be_processed=data,
-            db = db,
-        )
-        # log a success message
-        if DEBUG:
-            log_message(
-                log_type='success',
-                message=f'user profile thumbnail successfully updated'
-            )
-    except Exception as e:
-        # log the error
-        if DEBUG:
-            log_message(
-                log_type='error',
-                message=f'An error occured while updating user profile thumbnail. Reason: {e}'
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occured on updating user profile thumbnail"
-        )
+    return await user_record_update(
+        data_to_be_processed = data,
+        db = db,
+        user = user
+    )
 
 
 @router.get("/latest-collection",response_model=LatestCollectionSchema)

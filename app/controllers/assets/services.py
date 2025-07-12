@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from .schemas import AssetFetchResponseSchema
+from .schemas import AssetResponseSchema
 from property_street_backend.app.models import (
     User,
     Asset, 
@@ -16,7 +16,10 @@ from property_street_backend.app.models import (
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.log_config.logger_config import log_message
-from property_street_backend.app.controllers.activity import auto_category_hset_key
+from property_street_backend.app.controllers.activity import (
+    auto_category_hset_key,
+    newly_created_asset_set_key, 
+)
 
 
 
@@ -31,7 +34,7 @@ async def fetch_latest_assets(
 
     # === Step 1: Try Redis Cache ===
     newly_created_asset_serialized_cache_dict = await redis_client.hget(
-        auto_category_hset_key, 'newly_created_asset'
+        auto_category_hset_key, newly_created_asset_set_key
     )
 
     newly_created_asset_cache_dict = (
@@ -39,7 +42,6 @@ async def fetch_latest_assets(
         if newly_created_asset_serialized_cache_dict
         else {}
     )
-
     if newly_created_asset_cache_dict:
         asset_list = list(newly_created_asset_cache_dict.values())
         asset_list.reverse()
@@ -48,17 +50,24 @@ async def fetch_latest_assets(
         cache_slice = asset_list[offset:offset + size]
         results.extend(cache_slice)
 
-    size -= len(results)
+    cache_result_length = len(results)
+    size -= cache_result_length
 
     # === Step 2: Fill remaining slots from DB ===
     if size > 0:
-        db_offset = max(0, offset - len(asset_list))  # Adjust offset to avoid skipping
+        # db_offset = max(0, offset - len(asset_list))  # Adjust offset to avoid skipping
+        db_offset = offset + cache_result_length  # Adjust offset to avoid skipping
         stmt = (
             select(Asset)
             .options(
+                selectinload(Asset.features),
+                selectinload(Asset.tags),
+                selectinload(Asset.area),
+                selectinload(Asset.cloud_images),
                 selectinload(Asset.agent)
                 .selectinload(Agent.user)
                 .selectinload(User.profile_avatar)
+
             )  # Eager load relationships
             .order_by(Asset.created_at.desc())
             .offset(db_offset)
@@ -76,9 +85,9 @@ async def fetch_latest_assets(
         for asset in results:
             try:
                 if isinstance(asset, dict):
-                    validated_asset = AssetFetchResponseSchema.model_validate(asset)
+                    validated_asset = AssetResponseSchema.model_validate(asset)
                 else:
-                    validated_asset = AssetFetchResponseSchema.model_validate(asset.__dict__)
+                    validated_asset = AssetResponseSchema.model_validate(asset.__dict__)
                 valid_assets.append(validated_asset)
             except ValidationError as ve:
                 asset_id = getattr(asset, 'id', asset.get('id') if isinstance(asset, dict) else None)

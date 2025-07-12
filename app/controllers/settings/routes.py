@@ -4,20 +4,23 @@ from fastapi import (
     APIRouter,
 )
 from typing import Dict
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
 
+from .schemas import UserSettingResponseSchema
 from property_street_backend.app.database import get_db
+from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.controllers.auth import (
     decode_user_from_token,
     get_password_hash,
     verify_password,
 )
-from property_street_backend.config.settings import DEBUG
+from property_street_backend.app.models import User, UserSetting
 from property_street_backend.app.schemas.auth_schemas import TokenData 
 from property_street_backend.log_config.logger_config import log_message
-from property_street_backend.app.schemas.settings_schemas import SettingsSchema
 from property_street_backend.app.controllers.settings.user_update import user_record_update
 
 
@@ -26,34 +29,23 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 @router.get(
     "",
-    response_model=SettingsSchema
+    response_model=UserSettingResponseSchema
 )
 async def fetch_user_settings(
-    current_user: TokenData = Depends(decode_user_from_token),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(decode_user_from_token),
 ):
-    setting_instance = current_user.user_settings
+    query = await db.execute(
+        select(User)
+        .options(
+            selectinload(User.settings).selectinload(UserSetting.areas),
+            selectinload(User.profile_avatar)
+        )
+        .where(User.id == current_user.id)
+    )   
+    result = query.scalars().one()
     
-    user_data = {
-        "id": current_user.id,
-        "email": current_user.email,
-        "first_name": current_user.first_name,
-        "last_name": current_user.last_name,
-        "has_settings": True if setting_instance else False
-    }
-
-    setting_data = {
-        "id": setting_instance.id if setting_instance else -1,
-        "phone_number": setting_instance.phone_number if setting_instance else None,
-        "address": setting_instance.address if setting_instance else None,
-        "country": setting_instance.country if setting_instance else None,
-        "email_notification": setting_instance.email_notification if setting_instance else False,
-        "push_notification": setting_instance.push_notification if setting_instance else False,
-    }
-    
-    return {
-        **user_data, 
-        "settings_data": setting_data
-    }
+    return UserSettingResponseSchema.from_orm_with_relations(result)
 
 
 @router.post("/update-user-and-settings", status_code=status.HTTP_200_OK)

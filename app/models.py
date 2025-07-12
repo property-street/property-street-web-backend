@@ -42,6 +42,7 @@ from property_street_backend.app.controllers.notification.models import Notifica
 from property_street_backend.app.controllers.asset_request.models import AssetRequest
 from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
 from property_street_backend.app.controllers.roommate_finder.models import RoomieApplication, RoommateFinder
+from property_street_backend.app.controllers.settings.models import UserSetting
 
 
 
@@ -202,33 +203,6 @@ class GoogleOAuthDetail(Base):
     )
 
 
-class UserSetting(Base):
-    __tablename__ = 'user_settings'
-
-    id = Column(Integer, primary_key=True, index=True)
-    date_of_birth = Column(Date, nullable=True)
-    country = Column(String, nullable=True)
-    phone_number = Column(String, nullable=True)
-    address = Column(String, nullable=True)
-    email_notification = Column(Boolean, default=True)
-    push_notification = Column(Boolean, default=True)
-
-    user_id = Column(
-        Integer, 
-        ForeignKey(
-            'users.id', 
-            name='fk_user_settings_users', 
-            use_alter=True,
-            ondelete='CASCADE'
-        ), 
-        nullable=False
-    )
-    user = relationship(
-        'User',
-        back_populates='user_settings',
-        lazy='selectin',
-        uselist = False,
-    )
 
 
 class Area(AggregateRatingAClass):
@@ -273,6 +247,13 @@ class Area(AggregateRatingAClass):
         uselist = False
     )
 
+    occupant = relationship(
+        'UserSetting',
+        lazy='selectin',
+        back_populates='areas',
+        uselist = False
+    )
+
 
 class AddOn(Base):
     __tablename__ = 'add_ons'
@@ -292,6 +273,7 @@ models = [
     Message,
     CartItem,
     ChatSession,
+    UserSetting,
     AssetRequest,
     Notification,
     AssetFeature,
