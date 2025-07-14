@@ -1,6 +1,6 @@
 import pytest
 
-from property_street_backend.app.controllers.auth import (
+from property_street_backend.app.controllers.auth.services import (
     fetched_access_token,
     create_user
 )

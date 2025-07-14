@@ -67,6 +67,13 @@ def fetched_access_token(user: User):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+def fetch_access_token(user: User):
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
 # signin
 async def authenticate_user(db: AsyncSession, login: str, password: str):
     # Check if the login is either a username or an email

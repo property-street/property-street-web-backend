@@ -7,7 +7,7 @@ from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import User
-from property_street_backend.app.controllers.auth import create_user
+from property_street_backend.app.controllers.auth.services import create_user
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
 
 

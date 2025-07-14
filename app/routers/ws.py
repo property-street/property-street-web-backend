@@ -6,7 +6,7 @@ from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.controllers.ws_init import websocket_logger
 from property_street_backend.app.controllers.ws_init.ws_manager import manager
 from property_street_backend.app.controllers.ws_init.core import ws_reception_handler
-from property_street_backend.app.controllers.auth import decode_user_from_token_optional
+from property_street_backend.app.controllers.auth.services import decode_user_from_token_optional
 from property_street_backend.config.postgres_connection_manager import get_postgres_instance
 
 router = APIRouter(prefix='/ws', tags=['ws'])

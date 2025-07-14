@@ -11,7 +11,7 @@ from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import oauth
 from property_street_backend.app.models import User, GoogleOAuthDetail
 from property_street_backend.config.settings import GOOGLE_REDIRECT_URL
-from property_street_backend.app.controllers.auth import fetched_access_token
+from property_street_backend.app.controllers.auth.services import fetch_access_token
 
 
 router = APIRouter(prefix="/google_oauth", tags=["google_oauth"])
@@ -46,6 +46,6 @@ async def auth_callback(request: Request,  db: AsyncSession = Depends(get_db)):
         await db.commit()
         await db.refresh(new_user)
 
-        return {"access_token": fetched_access_token(new_user)}
+        return {"access_token": fetch_access_token(new_user)}
 
-    return {"access_token": fetched_access_token(existing_user)}
+    return {"access_token": fetch_access_token(existing_user)}

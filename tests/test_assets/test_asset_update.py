@@ -1,19 +1,15 @@
 import pytest
 from sqlalchemy.future import select
 
-from property_street_backend.app.controllers.auth import (
-    fetched_access_token,
-)
 from property_street_backend.app.models import (
     User,
 )
 from property_street_backend.tests.activity.test_controller.test_objects import (
     feature_obj,
 )
-from property_street_backend.tests.activity.test_controller.test_asset_creation import (
-    create_test_asset,
-    create_test_agent,
-)
+from property_street_backend.tests.auth.test_create_agent import create_test_agent
+from property_street_backend.app.controllers.auth.services import fetch_access_token
+from property_street_backend.tests.test_assets.test_create_asset import create_test_asset
 
 
 
@@ -24,14 +20,9 @@ async def test_asset_update_with_auth(client__fixture_with_onlyDB_fixture: tuple
     # Get the yielded client object
     client, test_db = await client_gen.__anext__()
 
-    # create the test agent
-    agent = await create_test_agent(
-        db = test_db
-    )
 
     created_asset = await create_test_asset(
         db = test_db,
-        agent_id = agent.id
     )
 
     update_obj = {
@@ -85,7 +76,7 @@ async def test_asset_update_with_auth(client__fixture_with_onlyDB_fixture: tuple
     agent_user = result.scalars().first()
 
     # fetch a token for the user
-    tokenObj = fetched_access_token(user=agent_user)
+    tokenObj = fetch_access_token(user=agent_user)
 
     # Generate an access token for authentication
     token = tokenObj['access_token']

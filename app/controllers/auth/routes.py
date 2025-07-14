@@ -18,7 +18,7 @@ from property_street_backend.app.schemas.auth_schemas import (
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.utils.store import email_verification_code_ttl
-from property_street_backend.app.controllers.auth import (
+from .services import (
     create_user, 
     authenticate_user, 
     fetched_access_token, 

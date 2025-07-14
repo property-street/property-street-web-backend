@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
-from property_street_backend.app.controllers.auth import decode_user_from_token, TokenData
+from property_street_backend.app.controllers.auth.services import decode_user_from_token, TokenData
 from property_street_backend.app.controllers.roommate_finder.core import publish_roommate_finding
 from property_street_backend.app.controllers.roommate_finder.schemas import (
     RoommateFinderRequestSchema,

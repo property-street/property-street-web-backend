@@ -9,7 +9,7 @@ from property_street_backend.app.models import (
     Asset,
     Agent,
 )
-from property_street_backend.app.controllers.auth import (
+from property_street_backend.app.controllers.auth.services import (
     fetched_access_token,
 )
 from property_street_backend.app.controllers.assets.schemas import (

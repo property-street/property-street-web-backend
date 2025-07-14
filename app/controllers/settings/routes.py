@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from .schemas import UserSettingResponseSchema
 from property_street_backend.app.database import get_db
 from property_street_backend.config.settings import DEBUG
-from property_street_backend.app.controllers.auth import (
+from property_street_backend.app.controllers.auth.services import (
     decode_user_from_token,
     get_password_hash,
     verify_password,

@@ -6,6 +6,7 @@ from property_street_backend.app.models import (
     Tag,
     Area, 
     Asset, 
+    Agent,
     AssetFeature,
     AssetCloudImage,
     CloudImageDetail,
@@ -18,7 +19,6 @@ from property_street_backend.app.controllers.assets.schemas import (
 from property_street_backend.app.schemas.asset_schemas import (
     AssetSchema
 )
-from property_street_backend.app.controllers.assets.enums import AvailabilityStatus
 from property_street_backend.tests.auth.test_create_agent import create_test_agent
 from property_street_backend.tests.activity.test_controller.test_objects import (
     cloud_image_template,
@@ -64,6 +64,8 @@ async def create_test_asset(db: AsyncSession, agent_id=None):
     AreaSchema.model_validate(area_data)
     asset_area = Area(**area_data)
 
+    created_agent: Agent = await create_test_agent(db)
+
     # Create the asset
     new_asset = Asset(
         **asset_data_template,
@@ -71,6 +73,7 @@ async def create_test_asset(db: AsyncSession, agent_id=None):
         agent_id=agent_id,
         cover_image=asset_cover_image,
         cloud_images=[asset_cloud_image],
+        agent_id = created_agent.id if not agent_id else created_agent.id
     )
 
     new_asset.tags = asset_tags
@@ -104,8 +107,7 @@ async def test_create_asset_with_no_feature(get_test_db__fixture):
         assert created_asset is not None
         assert created_asset.title == asset_data_template['title']
         # direct testing of the AssetSchema schema on an asset instance 
-        schema = AssetFetchResponseSchema.model_validate(created_asset)
-        print(schema)
+        AssetFetchResponseSchema.model_validate(created_asset)
 
         # set the cloud_images to None, and set a feature
         created_asset.cloud_images = []
@@ -124,38 +126,5 @@ async def test_create_asset_with_no_feature(get_test_db__fixture):
         await test_db.commit()
         await test_db.refresh(created_asset)
         AssetSchema.model_validate(created_asset)
-        
-        # Create an asset feature linked to the asset
-        # created_feature = await create_test_asset_feature(test_db, created_asset.id)
-        # assert created_feature is not None
-        # assert created_feature.title == "Test Feature"
-    # 
-        # # Create a cloud image detail linked to the asset
-        # created_image = await create_test_cloud_image_detail(test_db, created_asset.id)
-        # assert created_image is not None
-        # assert created_image.public_id == "test_image_123"
-        # 
-        # # Verify that the asset was actually created in the database
-        # result = await test_db.execute(
-        #     select(Asset).filter(Asset.title == "Test Asset")
-        # )
-        # asset = result.scalars().first()
-        # assert asset is not None
-    # 
-        # # Verify that the asset feature was actually created in the database
-        # result = await test_db.execute(
-        #     select(AssetFeature).filter(AssetFeature.title == "Test Feature")
-        # )
-        # feature = result.scalars().first()
-        # assert feature is not None
-        # assert feature.asset_id == created_asset.id
-    # 
-        # # Verify that the cloud image detail was actually created in the database
-        # result = await test_db.execute(
-        #     select(AssetCloudImage).filter(AssetCloudImage.public_id == "test_image_123")
-        # )
-        # image = result.scalars().first()
-        # assert image is not None
-        # assert image.asset_id == created_asset.id
     finally: 
         await test_db.close()

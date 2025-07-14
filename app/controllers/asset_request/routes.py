@@ -9,7 +9,7 @@ from .services import fetch_recent_asset_request
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.schemas.auth_schemas import TokenData
-from property_street_backend.app.controllers.auth import decode_user_from_token
+from property_street_backend.app.controllers.auth.services import decode_user_from_token
 from property_street_backend.app.controllers.asset_request.schemas import AssetRequestSchema
 from property_street_backend.app.controllers.asset_request.handle_asset_request import handle_asset_request
 

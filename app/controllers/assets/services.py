@@ -1,11 +1,11 @@
 import json
+from fastapi import status
 from sqlalchemy import select
 from redis.asyncio import Redis
 from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
-
 
 from .schemas import AssetResponseSchema
 from property_street_backend.app.models import (
@@ -21,6 +21,20 @@ from property_street_backend.app.controllers.activity import (
     newly_created_asset_set_key, 
 )
 
+def eager_asset_load():
+    return (
+        select(Asset)
+        .options(
+            selectinload(Asset.features),
+            selectinload(Asset.tags),
+            selectinload(Asset.area),
+            selectinload(Asset.cloud_images),
+            selectinload(Asset.agent)
+            .selectinload(Agent.user)
+            .selectinload(User.profile_avatar)
+
+        )
+    ) 
 
 
 async def fetch_latest_assets(
@@ -58,17 +72,7 @@ async def fetch_latest_assets(
         # db_offset = max(0, offset - len(asset_list))  # Adjust offset to avoid skipping
         db_offset = offset + cache_result_length  # Adjust offset to avoid skipping
         stmt = (
-            select(Asset)
-            .options(
-                selectinload(Asset.features),
-                selectinload(Asset.tags),
-                selectinload(Asset.area),
-                selectinload(Asset.cloud_images),
-                selectinload(Asset.agent)
-                .selectinload(Agent.user)
-                .selectinload(User.profile_avatar)
-
-            )  # Eager load relationships
+            eager_asset_load() # Eager load relationships
             .order_by(Asset.created_at.desc())
             .offset(db_offset)
             .limit(size)
@@ -91,11 +95,24 @@ async def fetch_latest_assets(
                 valid_assets.append(validated_asset)
             except ValidationError as ve:
                 asset_id = getattr(asset, 'id', asset.get('id') if isinstance(asset, dict) else None)
-                skipped_assets.append(asset_id)
-                log_message(
-                    log_type="error",
-                    message=f"Asset ID {asset_id or 'unknown'} failed validation. Reason: {ve}"
-                )
+                
+                # refresh the asset
+                try:
+                    result = await session.execute(
+                        eager_asset_load() # Eager load relationships
+                        .where(Asset.id == asset_id)
+                    )
+                    refreshed_asset = result.scalars().one()
+                    valid_assets.append(
+                        AssetResponseSchema.model_validate(refreshed_asset)
+                    )
+                except:
+                    skipped_assets.append(asset_id)
+                
+                    log_message(
+                        log_type="error",
+                        message=f"Asset ID {asset_id or 'unknown'} failed validation. Reason: {ve}"
+                    )
 
     except Exception as e:
         f_message = "An error occurred while validating latest assets."
@@ -109,3 +126,40 @@ async def fetch_latest_assets(
     )
 
     return {"assets": valid_assets}
+
+
+async def fetch_agent_assets(
+    session: AsyncSession,
+    user: User,
+    size: int,
+    page: int,
+):
+    agent: Agent = user.agent_profile
+    if not user.agent_profile:
+        if not agent:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Agent not found"
+            )
+    
+    agent_id = agent.id
+    offset  = (page-1) * size
+
+    try:
+        # Query the agent and related assets
+        query = await session.execute(
+            eager_asset_load()
+            .where(Asset.id == agent_id)
+            .offset(offset)
+            .limit(size)
+        )
+        return query.scalars().all()
+    except Exception as e:
+        f_message = "An error occured while retrieving your assets."
+        d_message = f"An error occured while retrieving agent {agent_id} asset. Reason {e}" 
+        logger.error(d_message)
+        log_message('error', d_message)
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = f_message
+        )

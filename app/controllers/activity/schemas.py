@@ -1,3 +1,4 @@
+from typing import Optional
 from property_street_backend.app.schemas import ConfigDictSetter
 from property_street_backend.app.controllers.assets.schemas import AssetResponseSchema
 from property_street_backend.app.controllers.asset_request.schemas import AssetRequestResponseSchema
@@ -8,3 +9,8 @@ class LatestCollectionSchema(ConfigDictSetter):
     properties: list[AssetResponseSchema]
     roommates_finder_requests: list[RoommateFinderResponseSchema]
     asset_requests: list[AssetRequestResponseSchema]
+
+
+class ProcessAssetSchema(ConfigDictSetter):
+    tags_to_remove_object: Optional[dict]
+    asset_data_to_process: Optional[dict]

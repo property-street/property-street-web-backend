@@ -1,5 +1,6 @@
 import json
 import pytest
+from typing import List
 from sqlalchemy import select
 from httpx import AsyncClient
 from redis.asyncio import Redis
@@ -31,23 +32,11 @@ from property_street_backend.app.controllers.activity import (
 )
 
 
-@pytest.mark.asyncio
-async def test_latest_collection(client__fixture):
-
-    # Unpack the client and test database from the fixture
-    async for fixture_obj in client__fixture:
-        httpx_client: AsyncClient = fixture_obj['http_client'] 
-        test_db: AsyncSession = fixture_obj['db']
-        redis_client: Redis = fixture_obj['redis_client']
-        break
-
-    # Create a test agent/user
-    created_agent: Agent = await create_test_agent(test_db)
-
+def pre_commit_test_asset_collection(agent_id: int ,size: int = 10) -> List[Asset]: 
     # Create 10 assets
-    test_assets = [
+    return [
         Asset(
-            agent_id = created_agent.id,
+            agent_id = agent_id,
             title=f"Test Asset {i}",
             currency="USD",
             price=5000.0,
@@ -77,9 +66,25 @@ async def test_latest_collection(client__fixture):
                 )
                 for j in range(2)
             ],
-        ) for i in range(10)
+        ) for i in range(size)
     ]
-    assert len(test_assets) == 10
+
+
+@pytest.mark.asyncio
+async def test_latest_collection(client__fixture):
+
+    # Unpack the client and test database from the fixture
+    async for fixture_obj in client__fixture:
+        httpx_client: AsyncClient = fixture_obj['http_client'] 
+        test_db: AsyncSession = fixture_obj['db']
+        redis_client: Redis = fixture_obj['redis_client']
+        break
+
+    # Create a test agent/user
+    created_agent: Agent = await create_test_agent(test_db)
+
+    # Create 10 assets
+    test_assets = pre_commit_test_asset_collection(created_agent.id)
 
     # Save the last 5 asset to the database
     test_db.add_all(test_assets[:5])

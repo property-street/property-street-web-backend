@@ -6,28 +6,17 @@ from property_street_backend.app.schemas.area_schema import AreaSchema
 from property_street_backend.app.controllers.actors.schemas import AgentResponseSchema
     
 
-class AssetFeatureCreateSchema(BaseModel):
+class AssetFeatureCreateSchema(ConfigDictSetter):
     title: str = Field(..., description="The title of the feature")
     asset_id: Optional[int] = Field(None, description="The ID of the asset to which this feature belongs")
 
-    model_config = ConfigDict(from_attributes=True)
 
-
-class RemoveTagFromAssetSchema(BaseModel):
+class RemoveTagFromAssetSchema(ConfigDictSetter):
     asset_id: int = Field(..., description="The id of the asset whose tags is to be removed")
     tag_ids: List[int] = Field(..., description="Ids of tags to be removed from the asset")
 
-    model_config = ConfigDict(from_attributes=True)
 
-
-# Asset return schema
-class CloudImageResponseSchema(BaseModel):
-    secure_url: str = Field(..., description="The secure URL of the image in the cloud storage")
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class CloudImageSchema(BaseModel):
+class CloudImageSchema(ConfigDictSetter):
     cloud_asset_id: str = Field(..., description="asset_id from the cloud")
     format: str = Field(..., description="The format of the image (e.g. jpg, png)")
     bytes: int = Field(..., description="The size of the image in bytes")
@@ -36,7 +25,12 @@ class CloudImageSchema(BaseModel):
     public_id: str = Field(..., description="The public ID of the image in the cloud storage")
     secure_url: str = Field(..., description="The secure URL of the image in the cloud storage")
 
-    model_config = ConfigDict(from_attributes=True)
+
+# Asset return schema
+class CloudImageResponseSchema(ConfigDictSetter):
+    id: int
+    public_id: str
+    secure_url: str = Field(..., description="The secure URL of the image in the cloud storage")
 
 
 class AssetFeatureSchema(ConfigDictSetter):
@@ -44,11 +38,17 @@ class AssetFeatureSchema(ConfigDictSetter):
     cloud_images: List[CloudImageSchema] = Field(..., description="The cloud images of each asset feature")
 
 
+class AssetFeatureResponseSchema(AssetFeatureSchema):
+    id: int
+    cloud_images: List[CloudImageResponseSchema] = Field(..., description="The cloud images of each asset feature")
+
+
 class NoFeatureSchema(ConfigDictSetter):
     cloud_images: List[CloudImageSchema] = Field(..., description="The cloud images of each asset feature")
 
 
 class TagSchema(BaseModel):
+    id: int
     name: str = Field(..., description="Tag associated with the asset")
 
     model_config = ConfigDict(from_attributes=True)
@@ -68,7 +68,7 @@ class AssetSchema(ConfigDictSetter):
     area: AreaSchema
 
     # Updated fields to allow for multiple entries
-    tags: List[TagSchema] = Field(..., description="Tags associated with the asset")
+    tags: Optional[List[TagSchema]] = Field(..., description="Tags associated with the asset")
     cover_image: CloudImageSchema = Field(..., description="The main image of the asset")
     features: Optional[List[AssetFeatureSchema]] = Field(None, description="A list of features of the asset")
     cloud_images: Optional[List[CloudImageSchema]] = Field(None, description="Fallback images for assets without features")
@@ -80,12 +80,10 @@ class AssetSchema(ConfigDictSetter):
         return values
 
 
-class AssetFetchResponseSchema(AssetSchema):
-    cover_image: CloudImageResponseSchema
-
-
 class AssetResponseSchema(AssetSchema):
     cover_image: CloudImageResponseSchema
+    features: Optional[List[AssetFeatureResponseSchema]]
+    cloud_images: Optional[Optional[List[CloudImageResponseSchema]]]
     agent: AgentResponseSchema
 
 
@@ -95,3 +93,12 @@ class LatestAssetsFetchResponseSchema(ConfigDictSetter):
 
 class AssetFetchByIdResponseSchema(ConfigDictSetter):
     asset: AssetResponseSchema
+
+
+class ProcessAssetSchema(ConfigDictSetter):
+    tags_to_remove_object: Optional[dict] = None
+    asset_data_to_process: Optional[dict] = None
+
+
+class AssetFetchResponseSchema():
+    pass

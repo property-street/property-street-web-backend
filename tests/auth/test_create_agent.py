@@ -7,7 +7,7 @@ from property_street_backend.app.schemas.auth_schemas import (
     UserRegistrationSchema,
 )
 from property_street_backend.app.models import Agent, User
-from property_street_backend.app.controllers.auth import (
+from property_street_backend.app.controllers.auth.services import (
     create_agent,
     verify_password,
 )
@@ -34,7 +34,7 @@ async def test_create_agent(get_test_db__fixture):
         test_db: AsyncSession
         break
     try:
-        created_agent = await create_test_agent(test_db)
+        created_agent: Agent = await create_test_agent(test_db)
 
         query = (
             select(Agent)

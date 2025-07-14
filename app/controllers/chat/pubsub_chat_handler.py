@@ -37,7 +37,10 @@ async def pubsub_chat_handler(websocket: WebSocket, chat_obj: dict, redis_client
     try:
         if websocket:
             await websocket.send_json({
-                'event': message_type,
+                'event': {
+                    'type': message_type,
+                    'class': 'chat'
+                },
                 'data': chat_obj
             })
             if DEBUG:

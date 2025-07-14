@@ -128,6 +128,7 @@ class Message(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     text_content = Column(String, nullable=True)
+    fmt_msg_txt = Column(String, nullable=True)
     status = Column(String, nullable=False)
     timestamp = Column(Integer, nullable=False)
     updated_timestamp = Column(Integer, nullable=True)

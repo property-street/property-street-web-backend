@@ -17,7 +17,7 @@ from property_street_backend.log_config.logger_config import (
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.models import UserSetting, User
-from property_street_backend.app.controllers.auth import get_password_hash
+from property_street_backend.app.controllers.auth.services import get_password_hash
 
 
 async def user_record_update(

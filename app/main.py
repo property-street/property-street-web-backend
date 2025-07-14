@@ -18,15 +18,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from property_street_backend.app.database import (
     get_db,
 )
+from property_street_backend.app.controllers.auth import routes as auth_routes
+from property_street_backend.app.controllers.chat import routes as chat_routes
 from property_street_backend.app.controllers.assets import routes as assets_routes
 from property_street_backend.app.controllers.settings import routes as settings_routes
 from property_street_backend.app.controllers.asset_request import routes as asset_request_routes
-from property_street_backend.app.controllers.roommate_finder import routes as roommates_fineder_routes
+from property_street_backend.app.controllers.roommate_finder import routes as roommates_finder_routes
 from property_street_backend.app.routers import (
     ws,
-    auth, 
     search,
-    assets,
     activity,
     google_oauth,
     rating_review,
@@ -123,14 +123,15 @@ async def test_database(
 
 # Include routers
 app.include_router(ws.router)
-app.include_router(auth.router)
 app.include_router(search.router)
-app.include_router(assets.router)
 app.include_router(activity.router)
+app.include_router(auth_routes.router)
+app.include_router(chat_routes.router)
 app.include_router(google_oauth.router)
 app.include_router(rating_review.router)
 app.include_router(assets_routes.router)
+app.include_router(assets_routes.router)
 app.include_router(settings_routes.router)
 app.include_router(asset_request_routes.router)
-app.include_router(roommates_fineder_routes.router)
+app.include_router(roommates_finder_routes.router)
 app.include_router(home_router)

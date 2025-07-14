@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from httpx import AsyncClient
 
 from property_street_backend.app.models import User
-from property_street_backend.app.controllers.auth import create_user, authenticate_user
+from property_street_backend.app.controllers.auth.services import create_user, authenticate_user
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
 
 
@@ -25,7 +25,7 @@ async def test_controller_authenticate_user(get_test_db__fixture):
         )
 
         # Call the create_user function
-        created_user = await create_user(test_db, user_data)
+        created_user: User = await create_user(test_db, user_data)
 
         # Assertions
         assert created_user is not None
@@ -56,7 +56,7 @@ async def test_controller_authenticate_user(get_test_db__fixture):
 
 @pytest.mark.asyncio
 async def test_route_signin(client__fixture):
-    # Extract the fixture object
+    # Extract the fisxture object
     async for fixture_obj in client__fixture:
         test_db = fixture_obj.get("db")
         client = fixture_obj.get("http_client")
@@ -90,7 +90,7 @@ async def test_route_signin(client__fixture):
         "/auth/signin",
         json=signin_post_data  # Use json instead of data for a JSON body
     )
-    
+    s
     # Assertions
     assert response.status_code == 200
     json_response = response.json()
