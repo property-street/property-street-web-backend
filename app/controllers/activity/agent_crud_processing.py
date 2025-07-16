@@ -1,3 +1,4 @@
+import traceback
 from typing import Dict
 from sqlalchemy import delete
 import redis.asyncio as redis
@@ -32,6 +33,7 @@ from property_street_backend.log_config.logger_config import (
 from property_street_backend.app.controllers.activity.asset_routine_methods import (
     create_or_update_newly_created_asset_cache
 )
+from property_street_backend.app.controllers.assets.services import eager_asset_load
 
 async def remove_tags_from_asset(session: AsyncSession, asset_id: int, tag_ids: list[int]) -> bool:
     """
@@ -70,6 +72,7 @@ async def process_asset(
     db: AsyncSession,
     redis_client: redis.Redis,
     ttl_in_seconds: int,
+    agent: Agent
 ):
     """
     Processes a batch of assets. Deletes or creates/updates instances as necessary.
@@ -81,84 +84,56 @@ async def process_asset(
     Returns:
         Dict: The result of the processing.
     """
-    newly_created = None
-    # variable to hold asset instance
-    asset_instance_before_commit = None
-    created_asset = None
-    # Initialize proxy object
-    proxy = {}
-    # Convert keys to integers for predictable ordering
-    data = {int(k): v for k, v in data_to_be_processed.items()}
+
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized access to carry out this operation!"
+        )
+    
 
     try:
-        # Attempt to retrieve the agent instance
-        agent_obj = data.get(0)
-        if agent_obj:
-            try:
-                if DEBUG:
-                    # Log received agent object
-                    print(f"Processing agent with ID: {agent_obj['db_table_id']}, and id type {type(agent_obj['db_table_id'])}")
-                
-                # Ensure db_table_id is integer
-                agent_id = int(agent_obj.get("db_table_id", -1))
-                
-                # Retrieve the agent instance
-                agent_instance = await db.execute(
-                    select(Agent).filter(Agent.id == agent_id)
-                )
-                agent_instance = agent_instance.scalars().first()
-
-                # Check if agent instance was found
-                if not agent_instance:
-                    raise HTTPException(
-                        status_code=status.HTTP_404_NOT_FOUND,
-                        detail="Agent not found"
-                    )
-
-                # Assign this to the proxy object 
-                proxy[0] = agent_instance
-
-                # Remove the agent entry from data as it's now in the proxy
-                data.pop(0)
-
-            except SQLAlchemyError as e:
-                await db.rollback()
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Database error occurred while retrieving agent instance"
-                ) from e
-            except Exception as e:
-                await db.rollback()
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="An unexpected error occurred while retrieving agent instance"
-                ) from e
+        # Initialize proxy object and put the agent instance at -1
+        proxy = {}
+        # Convert keys to integers for predictable ordering
+        data = {int(k): v for k, v in data_to_be_processed.items()}
+        newly_created = None
+        asset = None
+        asset_instance_before_commit = None
 
         # Process the rest of the items
         for key, value in data.items():
-            # delete the entry
-            if value.get('db_delete') and value.get('db_table_id') > 0:
+            value: dict
+            db_delete: bool = value.get('db_delete',False)
+            if db_delete and value.get('db_table_id') > 0: # delete the entry
                 await handle_instance_delete(
                     db=db,
                     model=return_model_from_string(value['db_table_name']),
                     id=value['db_table_id']
                 )
             # create or update the entry
-            elif value.get('db_delete') == False:
+            elif db_delete == False:
+                fields = value['fields']
+                table_id = None if value['db_table_id'] == -1 else value['db_table_id']
+                
+                # Handles newly created asset/properties
+                is_asset = value.get('db_table_name') == "Asset"
+                if is_asset and not table_id:
+                        fields['agent_id'] = agent.id
+                        # modify newly_created to True
+                        newly_created = True
+                
                 instance = await create_or_update_object(
-                    db=db,
-                    model=return_model_from_string(value['db_table_name']),
-                    fields=value['fields'],
-                    proxyObject=proxy,
-                    table_id=None if value['db_table_id'] == -1 else value['db_table_id']
+                    db = db,
+                    model = return_model_from_string(value['db_table_name']),
+                    fields = fields,
+                    proxyObject = proxy,
+                    table_id = table_id
                 )
                 proxy[key] = instance # bind the created or modified instance to the proxy of the data_to_be_processed
 
                 # check if the instance is an Asset model instance
                 if isinstance(instance, Asset): 
-                    # check if the asset is new
-                    newly_created = value['db_table_name'] == 'Asset' and value['db_table_id'] == -1
-                    
                     # hold the asset instance id
                     asset_instance_before_commit = instance
 
@@ -167,27 +142,18 @@ async def process_asset(
 
         if asset_instance_before_commit:
             result = await db.execute(
-                select(Asset)
-                .options(
-                    selectinload(Asset.features),
-                    selectinload(Asset.tags),
-                    selectinload(Asset.area),
-                    selectinload(Asset.cloud_images),
-                    selectinload(Asset.agent)
-                    .selectinload(Agent.user)
-                    .selectinload(User.profile_avatar)
-                )
+                eager_asset_load()
                 .filter(Asset.id == asset_instance_before_commit.id)
             )
-            created_asset = result.scalars().first()
+            asset = result.unique().scalars().first()
         
         # Handle caching
-        if created_asset:
+        if asset:
             try:
-                schematized_asset = AssetResponseSchema.model_validate(created_asset) # schema instance of asset
+                schematized_asset = AssetResponseSchema.model_validate(asset) # schema instance of asset
                 schematized_asset_to_dict = schematized_asset.model_dump()
                 await create_or_update_newly_created_asset_cache(
-                    asset_id = created_asset.id,
+                    asset_id = asset.id,
                     asset_data = schematized_asset_to_dict,
                     redis_client = redis_client,
                     newly_created = newly_created,
@@ -197,16 +163,17 @@ async def process_asset(
                 logger.warning(f"Cache update failed: {e}")
                 raise
         
-        return created_asset if created_asset else None
+        return asset if asset else None
 
     except Exception as e:
         await db.rollback()  # Rollback if there's an error to ensure atomicity
-        e_message=f'An error occured on processing of asset. Reason: {e}'
+        f_message=f'An error occured on processing of asset. Reason: {e}'
+        d_message=f'An error occured on processing of asset. Reason: {traceback.format_exc()}'
         if DEBUG:
-            logger.error(e_message)
+            logger.error(d_message)
         log_message(
             log_type = 'error',
-            message = e_message
+            message = f_message
         )
         raise HTTPException(    
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,

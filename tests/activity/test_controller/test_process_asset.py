@@ -8,7 +8,7 @@ from property_street_backend.app.models import (
     AssetFeature, 
     asset_tag_association,
 )
-from property_street_backend.app.controllers.auth import (
+from property_street_backend.app.controllers.auth.services import (
     create_agent
 )
 from property_street_backend.app.schemas.asset_schemas import (
@@ -41,68 +41,6 @@ async def add_created_clientId_to_payload(db,payload):
 
     # modify feature object to include an agent's id
     payload[0]['db_table_id'] = created_agent.id
-
-
-@pytest.mark.asyncio
-async def test_asset_update(client__fixture_with_prod_redis: AsyncSession):
-    # get the yield client objects
-    fixture_obj = await client__fixture_with_prod_redis.__anext__()
-    # extract the database entry
-    test_db = fixture_obj.get("db")
-    # fetch the client fixture
-    redis_client =  await fixture_obj.get("redis_client")
-
-    
-    
-    try:
-        created_asset = await create_test_asset(
-            db=test_db
-        )
-
-        update_obj = {
-            1:{
-                # Asset
-                "db_delete": False,
-                "db_table_id":created_asset.id,
-                "db_table_name": "Asset",
-
-                # fields
-                "fields": {
-                    "title": "4 bedrooms flat",
-                    "country": "Barbados",
-                    "address": "Montenegro",
-                    "status": "Auction",
-                    "category": "Condo",
-                    "description": "<span>bulaba/span>",
-                },
-            }
-        }
-
-        # Process asset for update
-        await process_asset(
-            data_to_be_processed = update_obj, 
-            db = test_db,
-            redis_client = redis_client,
-            newly_created = False,
-            ttl_in_seconds = 0
-        )
-
-        # Fetch of updated asset
-        asset_fields = update_obj[1]["fields"]
-        result = await test_db.execute(
-            select(Asset).filter(Asset.title == asset_fields['title'])
-        )
-        asset = result.scalars().first()
-        
-        # assertions
-        assert asset is not None
-        assert asset.country == asset_fields['country']
-        assert asset.address == asset_fields['address']
-        assert asset.status == asset_fields['status']
-        assert asset.category == asset_fields['category']
-        assert asset.description == asset_fields['description']
-    finally:
-        pass
 
 
 @pytest.mark.asyncio

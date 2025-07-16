@@ -28,16 +28,16 @@ async def fetch_latest_collection(
             session = session
         )
 
-        asset_requests = await fetch_recent_asset_request(
-            page = page,
-            size = size,
-            session = session
-        )
+        # asset_requests = await fetch_recent_asset_request(
+        #     page = page,
+        #     size = size,
+        #     session = session
+        # )
 
         return {
             'properties': properties,
-            'roommates_finder_requests': roommates_finder_requests,
-            'asset_requests': asset_requests
+            'roommates_requests': roommates_finder_requests,
+            # 'asset_requests': asset_requests
         }
     except Exception as e:
         f_message = "An error occurred while retrieving latest collection."

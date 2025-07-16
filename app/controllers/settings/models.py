@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey
 from sqlalchemy.orm import relationship             
+from sqlalchemy import Column, Integer, String, Date, Boolean, ForeignKey, CheckConstraint
 
 from property_street_backend.config.postgres_connection_manager import Base
 
@@ -9,6 +9,7 @@ class UserSetting(Base):
     id = Column(Integer, primary_key=True, index=True)
     date_of_birth = Column(Date, nullable=True)
     phone_number = Column(String, nullable=True)
+    dial_code = Column(String)
     email_notification = Column(Boolean, default=True)
     push_notification = Column(Boolean, default=True)
 

@@ -21,7 +21,7 @@ from property_street_backend.app.controllers.auth.services import (
 from property_street_backend.app.models import User, UserSetting
 from property_street_backend.app.schemas.auth_schemas import TokenData 
 from property_street_backend.log_config.logger_config import log_message
-from property_street_backend.app.controllers.settings.user_update import user_record_update
+from property_street_backend.app.controllers.settings.services import user_record_update
 
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -48,34 +48,17 @@ async def fetch_user_settings(
     return UserSettingResponseSchema.from_orm_with_relations(result)
 
 
-@router.post("/update-user-and-settings", status_code=status.HTTP_200_OK)
+@router.post("/update-user-and-settings", response_model = UserSettingResponseSchema, status_code=status.HTTP_200_OK)
 async def update_user_and_settings(
     data: Dict, 
     db: AsyncSession = Depends(get_db),
-    _: TokenData = Depends(decode_user_from_token)
+    user: TokenData = Depends(decode_user_from_token)
 ):
-    try:
-        await user_record_update(
-            data_to_be_processed=data,
-            db = db,
-        )
-        # log a success message
-        if DEBUG:
-            log_message(
-                log_type='success',
-                message=f'user successfully updated'
-            )
-    except Exception as e:
-        # log the error
-        if DEBUG:
-            log_message(
-                log_type='error',
-                message=f'An error occured while updating user record. Reason: {e}'
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occured on updating user record"
-        )
+    return await user_record_update(
+        data_to_be_processed=data,
+        db = db,
+        user = user
+    )
 
 
 @router.post("/update-password", status_code=status.HTTP_200_OK)

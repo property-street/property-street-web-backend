@@ -1,21 +1,25 @@
 import pytest, json
+from httpx import AsyncClient
 from sqlalchemy.future import select
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
 
-
+from property_street_backend.config.settings import TEST_NEWLY_CREATED_ASSET_TTL
 from property_street_backend.app.models import (
     Asset, 
     AssetFeature, 
+    Agent,
 )
-from property_street_backend.app.schemas.asset_schemas import (
-    AssetSchema
+from property_street_backend.app.controllers.assets.schemas import (
+    AssetResponseSchema
+)
+from property_street_backend.app.controllers.auth.services import (
+    fetch_access_token,
 )
 from property_street_backend.tests.activity.test_controller.test_objects import (
     no_feature_obj as payload,
 )
 from property_street_backend.tests.auth.test_create_agent import create_test_agent
-from property_street_backend.app.controllers.activity.agent_crud_processing import (
-    process_asset,
-)
 from property_street_backend.tests.activity.test_controller.test_newly_created_asset_cache_management import (
     assertions_after_caching,
 )
@@ -25,35 +29,41 @@ from property_street_backend.tests.activity.test_controller.test_newly_created_a
 async def test_create_asset_without_feature(sessions_with_cache_expiry_event_fixture):
     # get the yield client objects
     async for fixture_obj in sessions_with_cache_expiry_event_fixture:
-        test_db = fixture_obj["db"]
-        redis_client = fixture_obj["redis_client"]
+        test_db: AsyncSession = fixture_obj["db"]
+        redis_client: Redis = fixture_obj["redis_client"]
+        httpx_client: AsyncClient = fixture_obj["http_client"]
         break
 
     try:
-        expiry_seconds = 3
-
         # modify feature object to include an agent's id
-        created_agent = await create_test_agent(test_db)
-        payload[0]['db_table_id'] = created_agent.id
+        created_agent: Agent = await create_test_agent(test_db)
+
+        # Generate an access token for authentication
+        token_obj = fetch_access_token(user=created_agent.user)
+        token = token_obj['access_token']
+        headers = {"Authorization": f"Bearer {token}"}
         
+        json_data = {
+            "asset_data_to_process": payload
+        }
         # Process asset with features
-        created_asset: Asset = await process_asset(
-            data_to_be_processed=payload, 
-            db = test_db,
-            redis_client = redis_client,
-            ttl_in_seconds = expiry_seconds,
+        response = await httpx_client.post(
+            "/assets/process-asset", 
+            headers = headers,
+            json = json_data,
         )
 
-        asset_schema = AssetSchema.model_validate(created_asset)
+        created_asset = response.json()
+        asset_schema = AssetResponseSchema.model_validate(created_asset)
         asset_dict = asset_schema.model_dump()
         
         
         # cache assertions
         await assertions_after_caching(
             redis_client=redis_client,
-            asset_id=created_asset.id,
+            asset_id=created_asset['id'],
             asset_data=asset_dict,
-            expiry_seconds = expiry_seconds
+            expiry_seconds = TEST_NEWLY_CREATED_ASSET_TTL
         )
     finally:
         await test_db.close()

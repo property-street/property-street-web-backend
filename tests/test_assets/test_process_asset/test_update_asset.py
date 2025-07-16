@@ -1,7 +1,6 @@
 import pytest, json
 from httpx import AsyncClient
 from redis.asyncio import Redis
-from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -13,9 +12,7 @@ from property_street_backend.tests.test_assets.test_create_asset import (
     create_test_asset,
 )
 from property_street_backend.tests.auth.test_create_agent import create_test_agent
-from property_street_backend.app.controllers.activity.agent_crud_processing import (
-    process_asset,
-)
+
 
 
 @pytest.mark.asyncio

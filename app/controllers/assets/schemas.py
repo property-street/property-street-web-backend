@@ -68,7 +68,7 @@ class AssetSchema(ConfigDictSetter):
     area: AreaSchema
 
     # Updated fields to allow for multiple entries
-    tags: Optional[List[TagSchema]] = Field(..., description="Tags associated with the asset")
+    tags: List[TagSchema] = Field(..., description="Tags associated with the asset")
     cover_image: CloudImageSchema = Field(..., description="The main image of the asset")
     features: Optional[List[AssetFeatureSchema]] = Field(None, description="A list of features of the asset")
     cloud_images: Optional[List[CloudImageSchema]] = Field(None, description="Fallback images for assets without features")
@@ -89,10 +89,6 @@ class AssetResponseSchema(AssetSchema):
 
 class LatestAssetsFetchResponseSchema(ConfigDictSetter):
     assets: List[AssetResponseSchema]
-
-
-class AssetFetchByIdResponseSchema(ConfigDictSetter):
-    asset: AssetResponseSchema
 
 
 class ProcessAssetSchema(ConfigDictSetter):

@@ -44,11 +44,10 @@ async def request_rommmate_finder(
 async def retrieve_latest_roommates_finder_requests(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
-    _: TokenData = Depends(decode_user_from_token),
-    db: AsyncSession = Depends(get_db)
+    session: AsyncSession = Depends(get_db)
 ):
     return await fetch_recent_roommate_finder_request(
         page = page,
         size = size,
-        db = db
+        session = session
     )

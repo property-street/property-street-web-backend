@@ -35,8 +35,6 @@ async def user_record_update(
     Returns:
         Dict: The result of the processing.
     """
-    # Initialize proxy object
-    proxy = {}
 
     # Convert keys to integers for predictable ordering
     try:
@@ -48,25 +46,33 @@ async def user_record_update(
         )
 
     try:
+        # Initialize proxy object
+        proxy = {}
         # Process the data
         for key, value in data.items():
+            fields = value['fields']
+            model_str = value['db_table_name']
+            db_table_id = value['db_table_id']
+            table_id = None if db_table_id == -1 else db_table_id
 
+            if model_str == 'UserSetting':
+                fields['user_id'] = user.id
+                
             # Handle password hashing if updating User model
-            if value['db_table_name'] == 'User':
-                client_id = value['db_table_id']
-                if client_id is None or client_id == -1: # handle missing user id
-                    value['db_table_id'] = user.id
-                if 'password' in value['fields']:
-                    password = value['fields'].pop('password')
-                    value['fields']['password_hash'] = get_password_hash(password)
+            if model_str == "User" :
+                table_id = user.id
 
+                if 'password' in fields:
+                    fields['password_hash'] = get_password_hash(fields['password'])
+
+            logger.info(f"fields: {fields}")
             # Create or update object
             instance = await create_or_update_object(
-                db=db,
-                model=return_model_from_string(value['db_table_name']),
-                fields=value['fields'],
-                proxyObject=proxy,
-                table_id=None if value['db_table_id'] == -1 else value['db_table_id']
+                db = db,
+                model = return_model_from_string(value['db_table_name']),
+                fields = fields,
+                proxyObject = proxy,
+                table_id = table_id
             )
             proxy[key] = instance
 
@@ -89,7 +95,7 @@ async def user_record_update(
         # log a success message
         if DEBUG:
             logger.info(
-                f'user profile thumbnail successfully updated'
+                f'User records successfully updated'
             )
         
         return UserSettingResponseSchema.from_orm_with_relations(result)

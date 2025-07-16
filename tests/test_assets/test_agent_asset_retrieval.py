@@ -17,7 +17,6 @@ async def test_agent_asset_retrieval(client__fixture):
     # Fetch the client 
     async for fixture_obj in client__fixture:
         test_db: AsyncSession = fixture_obj['db']
-        # Get the yielded client object
         httpx_client: AsyncClient = fixture_obj['http_client']
         break
 
@@ -36,8 +35,9 @@ async def test_agent_asset_retrieval(client__fixture):
     size = 7
     # Make the request using the client provided by the fixture
     response = await httpx_client.get(
-        f"/assets/fetch-agent-assets?size={size}",
+        f"/assets/agent-assets",
         headers = headers,
+        params={"size": size}
     )
     
     # Assertions

@@ -44,10 +44,7 @@ async def fetch_recent_roommate_finder_request(
     try:
         for request in raw_requests:
             try:
-                if isinstance(request, dict):
-                    validated_asset = RoommateFinderResponseSchema.from_orm_with_relationship(request)
-                else:
-                    validated_asset = RoommateFinderResponseSchema.from_orm_with_response(request.__dict__)
+                validated_asset = RoommateFinderResponseSchema.from_orm_with_relations(request)
                 valid_requests.append(validated_asset)
             except ValidationError as ve:
                 asset_id = getattr(request, 'id', request.get('id') if isinstance(request, dict) else None)

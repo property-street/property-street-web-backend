@@ -1,4 +1,3 @@
-from typing import List
 
 from property_street_backend.app.enums import AssetCategoryChoice
 from .area_schema import  AreaSchema
@@ -13,7 +12,5 @@ from property_street_backend.app.controllers.assets.schemas import (
     NoFeatureSchema,
     TagSchema,
     AssetSchema,
-    AssetFetchResponseSchema,
-    LatestAssetsFetchResponseSchema,
-    AssetFetchByIdResponseSchema,
+    AssetResponseSchema,
 )

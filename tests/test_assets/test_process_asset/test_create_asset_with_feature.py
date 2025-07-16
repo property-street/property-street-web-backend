@@ -33,7 +33,6 @@ async def test_create_asset_with_feature(sessions_with_cache_expiry_event_fixtur
 
         # modify feature object to include an agent's id
         created_agent: Agent = await create_test_agent(test_db)
-        payload[0]['db_table_id'] = created_agent.id
         
         # Process asset with features
         created_asset: Asset = await process_asset(
@@ -41,22 +40,24 @@ async def test_create_asset_with_feature(sessions_with_cache_expiry_event_fixtur
             db = test_db,
             redis_client = redis_client,
             ttl_in_seconds = expiry_seconds,
+            agent = created_agent
         )
 
         asset_schema = AssetResponseSchema.model_validate(created_asset)
         asset_dict = asset_schema.model_dump()
+        assert len(asset_dict['tags']) == 2
         
         # Check the features
         assert created_asset.features is not None
         assert asset_schema.agent.first_name == created_agent.user.first_name
         
         # cache assertions
-        # await assertions_after_caching(
-        #     redis_client=redis_client,
-        #     asset_id=created_asset.id,
-        #     asset_data=asset_dict,
-        #     expiry_seconds = expiry_seconds
-        # )
+        await assertions_after_caching(
+            redis_client=redis_client,
+            asset_id=created_asset.id,
+            asset_data=asset_dict,
+            expiry_seconds = expiry_seconds
+        )
     finally:
         await test_db.close()
         await redis_client.aclose()

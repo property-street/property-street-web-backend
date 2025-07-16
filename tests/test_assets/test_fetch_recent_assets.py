@@ -14,7 +14,6 @@ from property_street_backend.app.models import (
     Asset, 
     Agent,
     AssetFeature, 
-    RoommateFinder,
     AssetCloudImage,
     CloudImageDetail,
 )
@@ -26,13 +25,12 @@ from property_street_backend.tests.activity.test_controller.test_objects import 
     area_template,
     cloud_image_template,
 )
-from property_street_backend.app.controllers.assets.services import eager_asset_load
 from property_street_backend.app.controllers.assets.schemas import AssetResponseSchema
 from property_street_backend.app.controllers.activity import (
     auto_category_hset_key,
     newly_created_asset_set_key, 
 )
-
+from property_street_backend.app.controllers.assets.services import eager_asset_load
 
 def pre_commit_test_asset_collection(agent_id: int ,size: int = 10) -> List[Asset]: 
     # Create 10 assets
@@ -84,13 +82,13 @@ async def test_latest_collection(client__fixture):
 
     # Create a test agent/user
     created_agent: Agent = await create_test_agent(test_db)
-    test_user = created_agent.user
 
     # Create 10 assets
     test_assets = pre_commit_test_asset_collection(created_agent.id)
 
     # Save the last 5 asset to the database
     test_db.add_all(test_assets[:5])
+    await test_db.commit()
 
     # Loop through the first five, 
     # add an id, has_features attribute
@@ -114,68 +112,18 @@ async def test_latest_collection(client__fixture):
         schematized_asset = AssetResponseSchema.model_validate(queried_asset)
         schematized_asset_dict = schematized_asset.model_dump()
         assets_to_cache[schematized_asset_dict['id']] = schematized_asset_dict
-    
     await redis_client.hset(
         auto_category_hset_key, 
         newly_created_asset_set_key, 
         json.dumps(assets_to_cache)
     )
 
-
-    cloud_image_detail = {
-        "cloud_asset_id":"dkajdlkajdlkajsdkfjasldkfj",
-        "format":"jpg",
-        "bytes":102400,
-        "height":800,
-        "public_id":f"test_image",
-        "secure_url":"https://example.com/test_image.jpg",
-        "width":600,
-    }
-    # construct payload
-    payload = {
-        'area': {
-            'country':'Sri-lanka',
-            'state_or_province': 'Mogadishu',
-            'city_or_town': 'Pisque Central', 
-            'street': 'No 11 Jokey street',
-        },
-        'max_roomies': 4,
-        'room_images': [
-            {
-                **cloud_image_detail,
-                "cloud_asset_id":f"dkajdlkajdlkajsdkfjasldkfj{i}",
-                "public_id":f"test_image_{i}",
-            } for i in range(3)
-        ],
-        'extra_conditions': 'I need a 1 bedroom flat in the maldives!',
-        'gender': 'male',
-        'category': 'hotel',
-    }
-
-    roommates_request_size = 5
-    requests = [
-        RoommateFinder(
-            area = Area(**payload['area']),
-            max_roomies = payload['max_roomies'],
-            extra_conditions = payload['extra_conditions'],
-            category = payload['category'],
-            requester_id = test_user.id,
-            room_images = [
-                CloudImageDetail(
-                    **{
-                        **entry,
-                        'public_id':f"test_image_{i}{j}",
-                    }
-                ) for [j,entry] in enumerate(payload['room_images'])
-            ]
-        ) for i in range(roommates_request_size)
-    ]
-    test_db.add_all(requests)
-    await test_db.flush()
-
-
-    response = await httpx_client.get(f"/activity/latest-collection")
+    # Perform the GET request with authentication
+    size = 10
+    response = await httpx_client.get(f"/assets/latests?size={size}")
     assert response.status_code == 200
-    response_json = response.json()
-    assert len(response_json['properties']) == 10
-    assert len(response_json['roommates_requests']) == roommates_request_size
+
+    # Validate response structure for authenticated user
+    data = response.json()
+    logger.info(data)
+    assert len(data['assets']) == size

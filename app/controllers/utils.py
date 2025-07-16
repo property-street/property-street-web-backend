@@ -14,6 +14,8 @@ from property_street_backend.app.models import (
     AssetCloudImage,
 )
 
+from property_street_backend.app.initiator import logger
+from property_street_backend.config.settings import DEBUG
 
 def return_model_from_string(str_value: str):
     """
@@ -47,35 +49,58 @@ async def get_existing_instance_from_unique_fields(
     model_fields: Dict[str, Any]
 ) -> Any:
     """
-    Automatically find and fetch the instance that violates the uniqueness constraint asynchronously
-    by reflecting on the model's unique fields.
-    
+    Asynchronously fetches an existing instance of a model by dynamically inspecting
+    and querying its unique or primary key fields, if any are present in the provided fields.
+
     Args:
-        db (AsyncSession): SQLAlchemy asynchronous database session.
-        model (Type[Any]): SQLAlchemy model class.
-        obj_data (Dict[str, Any]): Dictionary containing the fields and values for the model instance.
+        db (AsyncSession): SQLAlchemy async session.
+        model (Type[Any]): The SQLAlchemy model class.
+        model_fields (Dict[str, Any]): Dictionary of potential field values to match.
 
     Returns:
-        Any: The existing model instance that violated the uniqueness constraint, or None if not found.
+        Any: The matched instance, or None if not found or if no matchable fields exist.
     """
-    # Get the unique constraints of the model
     mapper = inspect(model)
     unique_columns = []
-    
-    # Get columns marked as unique or part of a unique constraint
+
+    # Get column-level unique fields or primary keys
     for column in mapper.columns:
         if column.unique or column.primary_key:
             unique_columns.append(column.name)
 
-    # Build a query dynamically based on the unique fields found in obj_data
+    # Track if we added any filtering fields
     stmt = select(model)
+    matched_fields = []
+
     for field in unique_columns:
         if field in model_fields:
             stmt = stmt.where(getattr(model, field) == model_fields[field])
+            matched_fields.append(field)
 
-    # Execute the query asynchronously
+    # ✅ If no matched fields, don’t run the query
+    if not matched_fields:
+        if DEBUG:
+            logger.warning(
+                f"Skipped uniqueness lookup for model '{model.__name__}' "
+                f"because none of the unique fields were present in input: {model_fields}"
+            )
+        return None
+
     result = await db.execute(stmt)
-    return result.scalar_one_or_none()  # Return the instance if found, else None
+    matches = result.scalars().all()
+
+    if len(matches) > 1:
+        if DEBUG:
+            logger.error(
+                f"Multiple rows found for model '{model.__name__}' "
+                f"with fields {matched_fields} = {[model_fields[f] for f in matched_fields]}"
+            )
+        raise ValueError(
+            f"Multiple existing {model.__name__} instances found with "
+            f"fields: {matched_fields}. Expected only one or none."
+        )
+
+    return matches[0] if matches else None
 
 
 async def handle_instance_delete(db: AsyncSession, model: Type[Any], id: int):

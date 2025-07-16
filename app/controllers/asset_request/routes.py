@@ -36,7 +36,7 @@ async def asset_request_handler(
     )
 
 
-@router.get("/latest",response_model=List[AssetRequestResponseSchema])
+@router.get("/latests",response_model=List[AssetRequestResponseSchema])
 async def recent_assets(
     session: AsyncSession = Depends(get_db),
     page: int = Query(1, ge=1),

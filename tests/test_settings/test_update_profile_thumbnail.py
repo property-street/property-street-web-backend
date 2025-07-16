@@ -1,10 +1,7 @@
 import pytest
 
-from property_street_backend.app.controllers.auth import (
-    fetched_access_token,
-)
 from property_street_backend.tests.auth.test_user_creation import create_test_user
-from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
+from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.app.controllers.settings.schemas import UserSettingResponseSchema
 
 
@@ -18,11 +15,9 @@ async def test_user_profile_thumbnail_update(client__fixture):
         break
 
     created_user = await create_test_user(test_db)
-    user_id = created_user.id
     update_obj = {
         0: {
             # image for asset feature
-            "db_delete": False,
             "db_table_id": -1,
             "db_table_name": "CloudImageDetail",
 
@@ -40,7 +35,6 @@ async def test_user_profile_thumbnail_update(client__fixture):
         1: {
             # tag 1
             "db_table_id": -1,
-            "db_delete": False,
             "db_table_name": "User",
 
             # fields
@@ -53,14 +47,14 @@ async def test_user_profile_thumbnail_update(client__fixture):
     }
 
     # Generate an access token for authentication
-    token_obj = fetched_access_token(user=created_user)
+    token_obj = fetch_access_token(user=created_user)
     token = token_obj['access_token']
     headers = {"Authorization": f"Bearer {token}"}
 
     # Make a request when no setting instance hasn't been associated with the user
     # assert that the user has no settings
     response = await httpx_client.post(
-        "/activity/update-profile-thumbnail", 
+        "/settings/update-user-and-settings", 
         json = update_obj,
         headers=headers,
     )
@@ -69,4 +63,4 @@ async def test_user_profile_thumbnail_update(client__fixture):
 
 
     recent_settings = UserSettingResponseSchema.model_validate(json_response) 
-    recent_settings.profile_avatar_url == update_obj[0]['fields']['secure_url']
+    recent_settings.user.profile_avatar_url == update_obj[0]['fields']['secure_url']

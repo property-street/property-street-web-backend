@@ -88,10 +88,7 @@ async def fetch_latest_assets(
     try:
         for asset in results:
             try:
-                if isinstance(asset, dict):
-                    validated_asset = AssetResponseSchema.model_validate(asset)
-                else:
-                    validated_asset = AssetResponseSchema.model_validate(asset.__dict__)
+                validated_asset = AssetResponseSchema.model_validate(asset)
                 valid_assets.append(validated_asset)
             except ValidationError as ve:
                 asset_id = getattr(asset, 'id', asset.get('id') if isinstance(asset, dict) else None)
@@ -113,7 +110,6 @@ async def fetch_latest_assets(
                         log_type="error",
                         message=f"Asset ID {asset_id or 'unknown'} failed validation. Reason: {ve}"
                     )
-
     except Exception as e:
         f_message = "An error occurred while validating latest assets."
         d_message = f"{f_message} Reason: {e}"
@@ -125,7 +121,7 @@ async def fetch_latest_assets(
         f"{len(valid_assets)} valid assets returned. {len(skipped_assets)} skipped due to schema errors."
     )
 
-    return {"assets": valid_assets}
+    return valid_assets
 
 
 async def fetch_agent_assets(
@@ -135,12 +131,11 @@ async def fetch_agent_assets(
     page: int,
 ):
     agent: Agent = user.agent_profile
-    if not user.agent_profile:
-        if not agent:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Agent not found"
-            )
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agent not found"
+        )
     
     agent_id = agent.id
     offset  = (page-1) * size
@@ -149,7 +144,7 @@ async def fetch_agent_assets(
         # Query the agent and related assets
         query = await session.execute(
             eager_asset_load()
-            .where(Asset.id == agent_id)
+            .where(Asset.agent_id == agent_id)
             .offset(offset)
             .limit(size)
         )

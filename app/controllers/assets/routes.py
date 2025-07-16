@@ -1,15 +1,13 @@
 from fastapi import Query
 import redis.asyncio as redis
 from redis.asyncio import Redis
-from pydantic import ValidationError
+from typing import Optional, List
 from sqlalchemy.future import select
-from typing import Dict, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
 
-from .services import fetch_agent_assets
-from property_street_backend.app.models import Asset
+from .services import fetch_agent_assets, eager_asset_load
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import (
     logger,
@@ -20,18 +18,12 @@ from property_street_backend.config.settings import (
     NEWLY_CREATED_ASSET_TTL,
     TEST_NEWLY_CREATED_ASSET_TTL,
 )
+from property_street_backend.app.models import Asset, User
 from property_street_backend.app.controllers.auth.services import (
     decode_user_from_token,
     decode_user_from_token_optional,
 )
 from property_street_backend.app.initiator import get_redis
-from property_street_backend.app.schemas.auth_schemas import (
-    TokenData, 
-)
-from property_street_backend.app.schemas.asset_schemas import (
-    LatestAssetsFetchResponseSchema,
-    AssetFetchByIdResponseSchema
-)
 from property_street_backend.app.controllers.assets.schemas import (
     AssetResponseSchema,
     ProcessAssetSchema
@@ -49,8 +41,8 @@ from property_street_backend.app.controllers.activity.agent_assets_retrieval imp
 router = APIRouter(prefix="/assets", tags=["assets"])
 
 
-@router.get("/latest",response_model=LatestAssetsFetchResponseSchema)
-async def recent_assets(
+@router.get("/latests", response_model=List[AssetResponseSchema])
+async def latest(
     session: AsyncSession = Depends(get_db),
     redis_client: Redis = Depends(get_redis),
     page: int = Query(1, ge=1),
@@ -67,13 +59,12 @@ async def recent_assets(
     )
 
 
-
 @router.post("/process-asset", status_code=status.HTTP_200_OK)
 async def process_asset(
     data: ProcessAssetSchema, 
     db: AsyncSession = Depends(get_db),
     redis_client: redis.Redis = Depends(get_redis),
-    _: TokenData = Depends(decode_user_from_token)
+    user: User = Depends(decode_user_from_token)
 ):
     request_data: dict = data.model_dump()
     
@@ -99,7 +90,8 @@ async def process_asset(
                     (TEST_NEWLY_CREATED_ASSET_TTL 
                         if env_is_test() else 
                     NEWLY_CREATED_ASSET_TTL)
-                )
+                ),
+                agent = user.agent_profile
             )
             if processed_asset:
                 schematized_asset = AssetResponseSchema.model_validate(processed_asset)
@@ -131,75 +123,47 @@ async def process_asset(
         )
 
 
-@router.get("/{asset_id}",response_model=AssetFetchByIdResponseSchema)
+@router.get("/agent-assets", response_model=List[AssetResponseSchema])
+async def retrieve_agent_assets(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(decode_user_from_token),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+):
+    try:
+        return await fetch_agent_assets(
+            session = session,
+            user = current_user,
+            page = page,
+            size = size
+        )
+    except Exception as e:
+        logger.error(e)
+        raise e
+    
+
+@router.get("/{asset_id}", response_model=AssetResponseSchema)
 async def fetch_asset_by_id(
     asset_id: int,  # Accept asset ID as a path parameter
     session: AsyncSession = Depends(get_db),
-    current_user: Optional[TokenData] = Depends(decode_user_from_token_optional)
 ):
     """
     Fetches a single asset by its ID.
-    Includes user authentication status in the response.
     """
     # Explicitly handle the 404 logic outside the try block
-    stmt = select(Asset).filter(Asset.id == asset_id)
-    result = await session.execute(stmt)
+    result = await session.execute(
+        eager_asset_load()
+        .where(Asset.id == asset_id)
+    )
     asset = result.scalars().first()
 
     if not asset:
-        log_message(
-            log_type="error",
-            message=f"Asset with ID {asset_id} not found"
+        logger.error(
+            f"Asset with ID {asset_id} not found"
         )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Asset with ID {asset_id} not found"
         )
-
-    try:
-        # Determine user status
-        is_authenticated = current_user is not None
-        user_details = (
-            {
-                "first_name": current_user.first_name,
-                "client_is_agent": True if current_user.agent_profile else False
-            }
-            if is_authenticated else {}
-        )
-
-        log_message(
-            log_type="success",
-            message=f"Asset with ID {asset_id} successfully retrieved"
-        )
-
-        # Return asset and user authentication status
-        return {
-            "asset": asset,
-            "is_authenticated": is_authenticated,
-            **user_details,
-        }
-
-    except Exception as e:
-        log_message(
-            log_type="error",
-            message=f"An unexpected error occurred while retrieving asset ID {asset_id}. Reason: {e}"
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred. Please try again later."
-        )
-
-
-@router.get("/fetch-agent-assets", response_model=List[AssetResponseSchema])
-async def retrieve_agent_assets(
-    session: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(decode_user_from_token),
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-):
-    return await fetch_agent_assets(
-        session = session,
-        user = current_user,
-        page = page,
-        size = size
-    )
+    
+    return asset

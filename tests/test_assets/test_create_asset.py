@@ -14,7 +14,7 @@ from property_street_backend.app.models import (
 from property_street_backend.app.controllers.assets.schemas import (
     AreaSchema,
     CloudImageSchema,
-    AssetFetchResponseSchema,
+    AssetResponseSchema,
 )
 from property_street_backend.app.schemas.asset_schemas import (
     AssetSchema
@@ -64,16 +64,17 @@ async def create_test_asset(db: AsyncSession, agent_id=None):
     AreaSchema.model_validate(area_data)
     asset_area = Area(**area_data)
 
-    created_agent: Agent = await create_test_agent(db)
+    if not agent_id:
+        created_agent: Agent = await create_test_agent(db)
+        agent_id = created_agent.id
 
     # Create the asset
     new_asset = Asset(
         **asset_data_template,
         area = asset_area,
-        agent_id=agent_id,
         cover_image=asset_cover_image,
         cloud_images=[asset_cloud_image],
-        agent_id = created_agent.id if not agent_id else created_agent.id
+        agent_id = agent_id
     )
 
     new_asset.tags = asset_tags
@@ -98,16 +99,13 @@ async def test_create_asset_with_no_feature(get_test_db__fixture):
             test_db: AsyncSession
             break
 
-        # Create a test agent/user
-        created_agent = await create_test_agent(test_db)
-        assert created_agent is not None
 
         # Create a test asset
-        created_asset: Asset = await create_test_asset(test_db,created_agent.id)
+        created_asset: Asset = await create_test_asset(test_db)
         assert created_asset is not None
         assert created_asset.title == asset_data_template['title']
         # direct testing of the AssetSchema schema on an asset instance 
-        AssetFetchResponseSchema.model_validate(created_asset)
+        AssetResponseSchema.model_validate(created_asset)
 
         # set the cloud_images to None, and set a feature
         created_asset.cloud_images = []
@@ -125,6 +123,7 @@ async def test_create_asset_with_no_feature(get_test_db__fixture):
         test_db.add(created_asset)
         await test_db.commit()
         await test_db.refresh(created_asset)
-        AssetSchema.model_validate(created_asset)
+        validated_asset = AssetResponseSchema.model_validate(created_asset)
+        print(validated_asset.model_dump())
     finally: 
         await test_db.close()

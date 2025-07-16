@@ -7,8 +7,8 @@ from property_street_backend.app.controllers.roommate_finder.schemas import Room
 
 class LatestCollectionSchema(ConfigDictSetter):
     properties: list[AssetResponseSchema]
-    roommates_finder_requests: list[RoommateFinderResponseSchema]
-    asset_requests: list[AssetRequestResponseSchema]
+    roommate_requests: list[RoommateFinderResponseSchema]
+    asset_requests: Optional[list[AssetRequestResponseSchema]]
 
 
 class ProcessAssetSchema(ConfigDictSetter):

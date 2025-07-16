@@ -28,10 +28,6 @@ tags_template = ["house", "condo"]
 
 # Test data
 feature_obj = {
-    0: {
-        "db_table_id": -1,
-        "db_table_name": "Agent",
-    },
     1: {
         # tag 1
         "db_table_id": -1,
@@ -79,7 +75,6 @@ feature_obj = {
             "relationship": {
                 "tags": [1, 2],
                 "cover_image": 3,
-                "agent": 0,
             }
         },
     },
@@ -149,11 +144,7 @@ feature_obj = {
     },
 }
 
-no_feature_obj = {
-    0: {
-        "db_table_id": -1,
-        "db_table_name": "Agent",
-    },
+no_feature_obj1 = {
     1: {
         # tag 1
         "db_table_id": -1,
@@ -278,6 +269,136 @@ no_feature_obj = {
 
             "relationship":{
                 "asset": 6,
+            }
+        }
+    },
+}
+
+no_feature_obj = {
+    "1": {
+        "db_table_id": -1,
+        "db_delete": False,
+        "db_table_name": "Asset",
+        
+        "fields": {
+            "title":"Guadalajara Studio",
+            "currency":"MXN",
+            "price":350000,
+            "description":"Modern studio apartment with excellent lighting and near coworking spaces.",
+            "category":"Studio",
+            "status":"lease",
+            "lease_duration": "6 months",
+        }
+    },
+    "2": {
+        "db_table_id": -1,
+        "db_delete": False,
+        "db_table_name": "Tag",
+        "fields": {
+            "name": "Studio",
+            
+            "relationship": {
+                "asset": 1
+            }
+        },
+    },
+    "3": {
+        "db_table_id": -1,
+        "db_delete": False,
+        "db_table_name": "Tag",
+        "fields": {
+            "name": "Mexico",
+
+            "relationship": {
+                "asset": 1
+            }
+        },
+    },
+    "4": {
+        "db_table_id": -1,
+        "db_delete": False,
+        "db_table_name": "CloudImageDetail",
+        "fields": {
+            "cloud_asset_id": "a27193f48caaa82d1755d2fb86d0f9a0",
+            "format": "png",
+            "bytes": 645381,
+            "height": 1058,
+            "public_id": "gzzcyl2egmmopyyqfui4",
+            "secure_url": "https://res.cloudinary.com/dmjtks9zq/image/upload/v1752509909/gzzcyl2egmmopyyqfui4.png",
+            "width": 665,
+
+            "relationship": {
+                "asset": 1
+            }
+        },
+    },
+    "5": {
+        "db_delete": False,
+        "db_table_id": -1,
+        "db_table_name": "AssetCloudImage",
+        "fields": {
+            "cloud_asset_id": "dbb422312d74b5323477fd30c1f656c5",
+            "format": "png",
+            "bytes": 1083289,
+            "height": 780,
+            "public_id": "xuasi3vhdircto6rv7sm",
+            "secure_url": "https://res.cloudinary.com/dmjtks9zq/image/upload/v1752509953/xuasi3vhdircto6rv7sm.png",
+            "width": 1170,
+            
+            "relationship": {
+                "asset": 1
+            }
+        }
+    },
+    "6": {
+        "db_delete": False,
+        "db_table_id": -1,
+        "db_table_name": "AssetCloudImage",
+        "fields": {
+            "cloud_asset_id": "ef0e01dacc3bee938b4c2cd2de9f0d4c",
+            "format": "png",
+            "bytes": 781062,
+            "height": 780,
+            "public_id": "guvtnlmp39m6ex4k7uq4",
+            "secure_url": "https://res.cloudinary.com/dmjtks9zq/image/upload/v1752510001/guvtnlmp39m6ex4k7uq4.png",
+            "width": 1170,
+
+            "relationship": {
+                "asset": 1
+            }
+        }
+    },
+    "7": {
+        "db_delete": False,
+        "db_table_id": -1,
+        "db_table_name": "AssetCloudImage",
+        "fields": {
+            "cloud_asset_id": "6e469d2771de12d067c3021c87d36a4d",
+            "format": "jpg",
+            "bytes": 1073006,
+            "height": 1856,
+            "public_id": "shpnxczlklgjgifscjs1",
+            "secure_url": "https://res.cloudinary.com/dmjtks9zq/image/upload/v1752510059/shpnxczlklgjgifscjs1.jpg",
+            "width": 2784,
+
+            "relationship": {
+                "asset": 1
+            }
+        }
+    },
+    "8": {
+        "db_delete": False,
+        "db_table_id": -1,
+        "db_table_name": "Area",
+
+        "fields": {
+            "country": "Mexico",
+            "state_or_province": "Jalisco",
+            "city_or_town": "Guadalajara",
+            "street": "102 Avenida Chapultepec",
+
+            "relationship":{
+                "asset": 1
             }
         }
     },

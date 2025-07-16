@@ -1,5 +1,5 @@
 import json, time
-import redis.asyncio as redis
+from redis.asyncio import Redis
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,7 +8,6 @@ from property_street_backend.app.models import (
     Tag,
     Asset,
 )
-from property_street_backend.app.schemas.asset_schemas import LatestAssetsFetchResponseSchema
 from property_street_backend.app.schemas.asset_schemas import (
     AssetSchema
 )
@@ -16,7 +15,7 @@ from property_street_backend.app.schemas.asset_schemas import (
 
 async def process_search_entries(
     entries: list, 
-    redis_client: redis.Redis, 
+    redis_client: Redis, 
     db_session: AsyncSession,
     expiry_seconds: int,
 ):
