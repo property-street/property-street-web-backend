@@ -3,12 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
 
-from .models import Thread, Message
-from property_street_backend.app.models import User
 from .get_threads_schemas import (
     ThreadSummarySchema, 
     MessageSummarySchema
 )
+from property_street_backend.app.models import User, Thread, Message
 
 
 async def get_threads_with_latest_message(
@@ -75,3 +74,41 @@ id   ----->  thread_id                    thread_id
             latest_timestamp   ------>    timestamp
 
 """
+
+
+async def get_messages(
+    db: AsyncSession,
+    host_id: int,
+    participant_id: int,
+    page: int = 1,
+    size: int = 100
+):
+    thread_stmt = (
+        select(Thread)
+        .where(
+            (Thread.participants.any(User.id == host_id)) &
+            (Thread.participants.any(User.id == participant_id))
+        )
+    )
+    thread_result = await db.execute(thread_stmt)
+    thread = thread_result.scalars().first()
+
+    if not thread:
+        return []
+
+    offset = (page - 1) * size
+
+    message_stmt = (
+        select(Message)
+        .where(Message.thread_id == thread.id)
+        .order_by(Message.timestamp.desc())  # assuming `timestamp` or `created_at` field
+        .limit(size)
+        .offset(offset)
+    )
+
+    message_result = await db.execute(message_stmt)
+    messages = message_result.scalars().all()
+
+    return messages
+
+    

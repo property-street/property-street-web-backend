@@ -15,6 +15,7 @@ class UserMiniSchema(ConfigDictSetter):
 
 class MessageSummarySchema(ConfigDictSetter):
     id: int
+    text_content: Optional[str] = None
     fmt_msg_txt: Optional[str] = None
     additional_metadata: Optional[str] = None
     timestamp: int

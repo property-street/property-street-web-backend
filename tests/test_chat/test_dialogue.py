@@ -5,11 +5,10 @@ import asyncio
 import websockets
 
 from ..utils import get_user_ws_endpoint
-from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
-from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.app.controllers.chat import chat_dialogue_hset_key
 from property_street_backend.tests.auth.test_user_creation import create_test_user
+from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
 
 

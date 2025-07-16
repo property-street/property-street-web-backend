@@ -3,10 +3,9 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import Thread, Message
-from property_street_backend.app.controllers.auth.services import fetched_access_token
 from property_street_backend.tests.auth.test_user_creation import create_test_user
+from property_street_backend.app.controllers.auth.services import fetched_access_token
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
-from property_street_backend.app.controllers.chat.services import get_threads_with_latest_message  
 from property_street_backend.app.controllers.chat.get_threads_schemas import (
     ThreadSummarySchema,
 )

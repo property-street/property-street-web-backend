@@ -1,7 +1,5 @@
 import json, time
 from redis.asyncio import Redis
-from sqlalchemy.sql import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from .schemas import ChatObjectSchema
 from property_street_backend.config.settings import (
@@ -10,10 +8,8 @@ from property_street_backend.config.settings import (
 from property_street_backend.app.controllers.chat.utils.store import (
     chat_exception_handler,
 )
-from property_street_backend.app.models import Thread, User, Message
 from property_street_backend.app.controllers.ws_init import websocket_logger
 from property_street_backend.app.controllers.ws_init.ws_manager import ConnectionManager
-from property_street_backend.app.controllers.chat.utils.store import chat_exception_handler
 
 
 
@@ -101,41 +97,3 @@ async def cache_message(
     # If no TTL is set, initialize a TTL
     if ttl == -1:
         await redis_client.expire(key, 1800)  # 30 minutes
-
-
-async def get_messages(
-    db: AsyncSession,
-    host_id: int,
-    participant_id: int,
-    page: int = 1,
-    page_size: int = 100
-):
-    thread_stmt = (
-        select(Thread)
-        .where(
-            (Thread.participants.any(User.id == host_id)) &
-            (Thread.participants.any(User.id == participant_id))
-        )
-    )
-    thread_result = await db.execute(thread_stmt)
-    thread = thread_result.scalars().first()
-
-    if not thread:
-        return []
-
-    offset = (page - 1) * page_size
-
-    message_stmt = (
-        select(Message)
-        .where(Message.thread_id == thread.id)
-        .order_by(Message.timestamp.desc())  # assuming `timestamp` or `created_at` field
-        .limit(page_size)
-        .offset(offset)
-    )
-
-    message_result = await db.execute(message_stmt)
-    messages = message_result.scalars().all()
-
-    return messages
-
-    

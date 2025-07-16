@@ -21,7 +21,6 @@ async def create_test_user(
         last_name="Doe",
     )
 ):
-
     return await create_user(db, user_data)
 
 

@@ -24,7 +24,7 @@ class UserRegistrationSchema(BaseModel):
     username: str
     password: str
     first_name: str
-    last_name: str
+    last_name: Optional[str] = None
     other_names: Optional[str] = None
     user_role: Optional[Literal['user','agent']] = None
     # Add other fields as needed
