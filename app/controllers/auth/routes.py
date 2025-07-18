@@ -3,6 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, HTTPException, status, Depends
 
 
+from .schemas import (
+    SendEmailVerificationResponseSchema,
+    ConfirmEmailVerificationCodeSchema
+)
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis, logger
 from property_street_backend.app.schemas.auth_schemas import (
@@ -20,6 +24,7 @@ from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.utils.store import email_verification_code_ttl
 from .services import (
     create_user, 
+    create_agent,
     authenticate_user, 
     fetched_access_token, 
     decode_user_from_token, 
@@ -35,33 +40,36 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # user registeration endpoint
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register_user(user_data: UserRegistrationSchema, db: AsyncSession = Depends(get_db)):
+async def register_user(data: UserRegistrationSchema, db: AsyncSession = Depends(get_db)):
     try:
-        user = await create_user(db, user_data)
+        is_agent = data.user_role and data.user_role == 'agent'
+        if is_agent:
+           await create_agent(db, data)
+        else:
+            await create_user(db, data)
     except HTTPException as e:
         raise e
-    return fetched_access_token(user)
 
 # probe user existence endpoint
 @router.post("/probe-user-existence", status_code=status.HTTP_200_OK)
 async def probe_user_existence(
-    user_data: ProbeUserExistenceSchema,    
+    data: ProbeUserExistenceSchema,    
     db: AsyncSession = Depends(get_db)
 ):
-    return await check_username_email_availability(db, user_data)
+    return await check_username_email_availability(db, data.model_dump())
 
 
 # send email verification for signup endpoint
-@router.post("/send-email-verification-code", status_code=status.HTTP_200_OK)
+@router.post("/send-email-verification-code", response_model = SendEmailVerificationResponseSchema )
 async def send_email_verification_code(
-    requester_data: SendEmailCodeSchema, 
+    data: SendEmailCodeSchema, 
     redis_client: Redis = Depends(get_redis),
     expiry_time_in_secs: int = Depends(email_verification_code_ttl)
 ):
     return await controller_send_email_verification_code(
-        requester_data = requester_data,
+        requester_data = data.model_dump(),
         redis_client = redis_client,
-        expiry_time_in_secs = expiry_time_in_secs
+        ttl_in_secs = expiry_time_in_secs
     )
 
 
@@ -82,7 +90,7 @@ async def handle_email_verification_code_and_register(
 # confirm email verification endpoint
 @router.post("/confirm-email-verification-code", status_code=status.HTTP_200_OK)
 async def handle_email_verification_code(
-    data: VerifyEmailCodeSchema, 
+    data: ConfirmEmailVerificationCodeSchema, 
     redis_client: Redis = Depends(get_redis),
 ):
     return await confirm_email_verification_code(

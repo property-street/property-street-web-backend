@@ -94,30 +94,33 @@ async def authenticate_user(db: AsyncSession, login: str, password: str):
 
 
 # user existence
-async def check_username_email_availability(db: AsyncSession, user_data: ProbeUserExistenceSchema) -> dict:
-    username = user_data.username
-    email = user_data.email
-
-    result = {
-        "username": "available",
-        "email": "available"
-    }
+async def check_username_email_availability(db: AsyncSession, data: dict):
+    username = data['username']
+    email = data['email']
     
     # Check if the username exists
-    user_by_username = await db.execute(select(User).filter(User.username == username))
-    user_by_username = user_by_username.scalars().first()
+    username_query = await db.execute(
+        select(User)
+        .where(User.username == username)
+    )
+    username_exists = username_query.scalars().first()
+    if username_exists:
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail = f"Username {username} already exists"
+        )
     
-    if user_by_username:
-        result["username"] = "unavailable"
-    
-    # Check if the email exists
-    user_by_email = await db.execute(select(User).filter(User.email == email))
-    user_by_email = user_by_email.scalars().first()
-    
-    if user_by_email:
-        result["email"] = "unavailable"
-    
-    return result
+
+    email_query = await db.execute(
+        select(User)
+        .where(User.email == email)
+    )
+    email_exists = email_query.scalars().first()
+    if email_exists:
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail = f"Email {email} already exists"
+        )
 
 
 # Signup
@@ -127,7 +130,11 @@ async def create_user(
 ):
     username = user_data.username or user_data.email.strip().split('@')[0]
     existing_user = await db.execute(
-        select(User).filter((User.email == user_data.email) | (User.username == username))
+        select(User)
+        .filter(
+            (User.email == user_data.email) 
+            | (User.username == username)
+        )
     )
     existing_user = existing_user.scalars().first()
     
@@ -244,12 +251,12 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
 
 
 async def send_email_verification_code(
-    requester_data: SendEmailCodeSchema, 
+    requester_data: dict, 
     redis_client: redis.Redis,
-    expiry_time_in_secs: int,
+    ttl_in_secs: int,
 ):
-    email_address = requester_data.email
-    user_name = requester_data.username if requester_data.username else "User"
+    email_address = requester_data['email']
+    user_name = requester_data['username']
     reason = "email_verification"
 
     """
@@ -263,12 +270,17 @@ async def send_email_verification_code(
     user_email_code = await redis_client.hget(user_key, reason)
 
     if user_email_code: #When a result is found
-        ttl = await redis_client.hget(user_key, "ttl")
-        return {
-            "email_status": "Dispatched",
-            "message": "Please wait before requesting a new code.",
-            "ttl": ttl
-        }
+        expiry = await redis_client.hget(user_key, "ttl")
+
+        raise HTTPException(
+            status_code=status.HTTP_302_FOUND,
+            detail = {
+                "message" : "Please wait before requesting a new code.",
+                "expiry" : (expiry.decode() 
+                        if isinstance(expiry,bytes) 
+                        else expiry)
+                }
+        )
     else: # When no result is found
         try:
             # Generate a new five-digit code
@@ -305,20 +317,19 @@ async def send_email_verification_code(
 
             # get the current time and add the ttl
             current_time = datetime.now(timezone.utc)
-            ttl_time = (current_time + timedelta(seconds=expiry_time_in_secs)).isoformat()
+            expiry_time = (current_time + timedelta(seconds=ttl_in_secs)).isoformat()
 
             # save the ttl_time in the ttl field of the user's key
-            await redis_client.hset(user_key, "ttl", ttl_time)
+            await redis_client.hset(user_key, "ttl", expiry_time)
 
             # set an expiry for the user key
             # explicitly convert the expiry_time_in_secs to int
             # to avoid `value is not an integer or out of range` error
-            await redis_client.expire(user_key, int(expiry_time_in_secs)) 
+            await redis_client.expire(user_key, int(ttl_in_secs)) 
 
             return {
-                "email_status":"DispatchedNow",
                 "message":"A new verification code has been sent to your email.",
-                "ttl": ttl_time
+                "expiry": expiry_time
             }
         except Exception as e:
             raise HTTPException(
@@ -333,7 +344,7 @@ async def confirm_email_verification_code(
     redis_client: redis.Redis,
 ):
     email_address = requester_data['email']
-    input_code = requester_data['verification_code']
+    input_code = requester_data['code']
     if DEBUG:
         logger.info(f"**Requesting code: {input_code}")
     reason = "email_verification"
@@ -370,8 +381,7 @@ async def confirm_email_verification_code(
         await redis_client.delete(user_key)
 
         return {
-            "detail" : "The email has been successfully verified.",
-            "email_status": "Verified",
+            "message" : "The email address has been successfully verified.",
         }
 
     except Exception as e:

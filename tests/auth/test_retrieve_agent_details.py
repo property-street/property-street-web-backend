@@ -1,6 +1,6 @@
 import pytest
 
-from property_street_backend.app.controllers.auth import (
+from property_street_backend.app.controllers.auth.services import (
     fetched_access_token,
     create_user
 )
@@ -36,7 +36,7 @@ async def test_retrieve_user_details(client__fixture_with_onlyDB_fixture: tuple)
 
     agent = user.agent_profile
 
-    # fetch a token for the user
+    # fetch a token fors the user
     tokenObj = fetched_access_token(user=user)
 
     # Generate an access token for authentication
