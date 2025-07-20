@@ -3,6 +3,7 @@ from redis.asyncio import Redis
 from typing import Callable, Awaitable
 from redis.exceptions import ConnectionError
 
+from .enums import MessageTypes, MessageStatus
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.controllers.ws_init import (
     websocket_logger,
@@ -27,10 +28,11 @@ async def pubsub_chat_handler(websocket: WebSocket, chat_obj: dict, redis_client
     dialogue_hset_key = chat_dialogue_hset_key(sender_id, recipient_id)
 
     # change the status of the chat object to sent, and add a timestamp
-    if chat_obj['status'] == 'unsent':
-        chat_obj['status'] = 'sent'
+    if message_type == MessageTypes.outbound_message.value:
+        chat_obj['msg_type'] = MessageTypes.inbound_message.value
 
-    # get new chat status
+    # get updated message_type and status
+    message_type = chat_obj['message_type']
     chat_status = chat_obj['status']
 
     # send the message
@@ -50,14 +52,14 @@ async def pubsub_chat_handler(websocket: WebSocket, chat_obj: dict, redis_client
                 websocket_logger.info(f"Instance's socket disconnected at the moment!")
             raise ConnectionError
     except Exception as e:
-        if chat_status == 'sent':
-            # when message fails to reach the recipient
+        if chat_status == MessageStatus.unsent.value:
+            # Message fails to reach the recipient
             exc_msg = f"Failed to send message to user_{recipient_id}: {e}"
             cache_for_user_id = recipient_id,
-        elif chat_status == 'delivered':
+        elif chat_status == MessageStatus.delivered.value:
             exc_msg = f"delivered receipt fails to hit sender's socket. Reason: {e}!"
             cache_for_user_id = sender_id,
-        elif chat_status == 'read':
+        elif chat_status == MessageStatus.read.value:
             exc_msg = f"read receipt fails to hit sender's socket. Reason: {e}!"
             cache_for_user_id = sender_id,
         # call the exception handler
@@ -69,9 +71,10 @@ async def pubsub_chat_handler(websocket: WebSocket, chat_obj: dict, redis_client
         )
         raise e # This is raised so the remaining function body is not executed
 
-    if chat_status == 'sent': # means an incoming-message was just sent to the recipient
-        chat_obj['status'] = 'delivered'
-        chat_obj['msg_type'] = 'delivered_message'
+
+    # in case of no exception
+    if chat_status == MessageStatus.unsent.value: # means an outbound-message was just sent to the recipient
+        chat_obj['status'] = MessageStatus.sent.value
 
         # publish the new chat status to the sender's channel
         try:
@@ -81,7 +84,7 @@ async def pubsub_chat_handler(websocket: WebSocket, chat_obj: dict, redis_client
 
         except Exception as e:
             # when the receipt fails to reach the sender's channel
-            exc_msg = f"Receipt failed to hit sender's channel. Reason: {e}!"
+            exc_msg = f"Sent receipt failed to hit sender's channel. Reason: {e}!"
             await chat_exception_handler(
                 cache_hset_key = dialogue_hset_key,
                 redis_client = redis_client,

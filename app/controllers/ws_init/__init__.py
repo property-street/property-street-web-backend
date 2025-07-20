@@ -1,3 +1,4 @@
+import time
 import logging
 
 agent_pend_pool_key = "pend_pool_agent_notification"
@@ -32,3 +33,6 @@ def user_pend_pool_key(user_id:int,/)->str:
 
 def get_client_channel_key(client_id):
     return f'channel_{client_id}'
+
+def get_timestamp_milliseconds():
+    return int(time.time() * 1000)

@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import Thread, User, Message
 
+
+#--* Needs reform *--#
 async def offload_messages(
     redis_client: Redis,
     sender_id: int,

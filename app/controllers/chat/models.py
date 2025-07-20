@@ -6,9 +6,11 @@ from sqlalchemy import (
     func,
     Table,
     DateTime,
+    Enum as SQLAlchemyEnum,
 )
 from sqlalchemy.orm import relationship
 
+from .enums import MessageStatus
 from property_street_backend.config.postgres_connection_manager import Base
 
 # message-thread Association Table for many-to-many relationship
@@ -127,13 +129,16 @@ class Message(Base):
     __tablename__ = "messages"
     
     id = Column(Integer, primary_key=True, index=True)
-    text_content = Column(String, nullable=True)
-    fmt_msg_txt = Column(String, nullable=True)
-    status = Column(String, nullable=False)
-    timestamp = Column(Integer, nullable=False)
-    updated_timestamp = Column(Integer, nullable=True)
-    media_urls = Column(String) # This would hold a serialized array of urls
-    additional_metadata = Column(String) # This would hold non-formal data
+    fmt_msg = Column(String, nullable=True)
+    status = Column(
+        SQLAlchemyEnum(
+            MessageStatus, name='message_status',
+        ), 
+        nullable=False,
+        default=MessageStatus.unsent
+    )
+    server_timestamp_ms = Column(Integer, nullable=False)
+    updated_timestamp_ms = Column(Integer, nullable=True)
 
     # Foreign key relationship to Thread
     thread_id = Column(

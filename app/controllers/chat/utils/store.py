@@ -31,8 +31,8 @@ async def cache_dialogue(
     loaded_cached_chat_new = loaded_cached_chat == {}
     # get or create the timestamp of the chat object
     # assign the chat_obj to the timestamp in the loaded_cached_chat
-    unix_timestamp_ms = chat_obj.get('unix_timestamp_ms',None)
-    loaded_cached_chat[str(unix_timestamp_ms)] = chat_obj
+    server_timestamp_ms = chat_obj['server_timestamp_ms']
+    loaded_cached_chat[str(server_timestamp_ms)] = chat_obj
     # get the chat dialogue key and make a mapping object for the hset
     cached_hset_key = chat_dialogue_hset_key(sender_id, recipient_id)
     hset_mapping = {
@@ -91,7 +91,7 @@ async def chat_exception_handler(
 
     recipient_id = chat_obj['recipient_id']
     sender_id = chat_obj['sender_id']
-    unix_timestamp_ms = chat_obj.get['unix_timestamp_ms']
+    server_timestamp_ms = chat_obj.get['server_timestamp_ms']
     cache_hset_key = chat_dialogue_hset_key(sender_id, recipient_id)
     
     # cache the message
@@ -101,7 +101,7 @@ async def chat_exception_handler(
     await add_pending_msg_lookup_token_to_user_pool(
         cache_for_user_id, 
         cache_hset_key, 
-        unix_timestamp_ms, 
+        server_timestamp_ms, 
         redis_client
     )
 

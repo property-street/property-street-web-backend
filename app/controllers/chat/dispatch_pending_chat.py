@@ -34,23 +34,30 @@ async def dispatch_pending_chat(
         if messages:
             msg_to_dispatch = []
             token_list = json.loads(messages)
-            for token in token_list:
+            for token in token_list: # token -> dialogue_key:timestamp
+                token: str
                 splitted_token = token.split(':')
                 dialogue_key = splitted_token[0]
                 dialogue_keys.append(dialogue_key)
                 timestamp = splitted_token[1]
                 loaded_serialized_chat:dict = json.loads(await redis_client.hget(dialogue_key, 'chat_object'))
                 if loaded_serialized_chat:
-                    chat_obj = loaded_serialized_chat.get(str(timestamp),None)
+                    chat_obj = loaded_serialized_chat.get(str(timestamp))
                     if chat_obj:
                         msg_to_dispatch.append(chat_obj)
             if msg_to_dispatch:
                 websocket.send_json({
-                    'event': 'pending messages',
+                    'event': {
+                        'class': 'chat',
+                        'type': 'pending messages'
+                    },
                     'data': msg_to_dispatch 
                 })
 
+
+            # lazy offload
             for key in dialogue_keys:
+                key: str # chat_(min_id)_(max_id)
                 timestamp = await redis_client.hget(key, 'lazy_timestamp')
                 if timestamp: 
                     if int(timestamp) > int(datetime.now(timezone.utc).timestamp()):

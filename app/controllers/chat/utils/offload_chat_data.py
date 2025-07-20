@@ -90,19 +90,19 @@ async def offload_chat_data(
 
         for timestamp, item in loaded_chat_obj.items():
             item: dict
-            if item.get('db_id'):
+            if item.get('id'):
                 update_data.append({
-                    'id': item['db_id'],
-                    'text_content': item['fmt_msg_txt'],
+                    'id': item['id'],
+                    'fmt_msg': item['fmt_msg'],
                     'status': item['status'],
-                    'timestamp': int(timestamp),
+                    'server_timestamp_ms': int(timestamp),
                 })
             else:
                 create_data.append({
                     'recipient_id': item['recipient_id'],
                     'sender_id': item['sender_id'],
-                    'timestamp': int(timestamp),
-                    'text_content': item['fmt_msg_txt'],
+                    'server_timestamp_ms': int(timestamp),
+                    'fmt_msg': item['fmt_msg'],
                     'status': item['status'],
                     'thread_id': thread_id,
                 })
@@ -120,8 +120,8 @@ async def offload_chat_data(
                 update(Message)
                 .where(Message.id == data['id'])
                 .values(
-                    text_content=data['text_content'],
-                    created_at=datetime.fromtimestamp(data['timestamp'], tz=timezone.utc),
+                    fmt_msg=data['fmt_msg'],
+                    server_timestamp_ms=data['server_timestamp_ms'],
                     status=data['status'],
                 )
             )
@@ -131,9 +131,9 @@ async def offload_chat_data(
 
         # Add db_id and thread_id to the offloaded object
         for msg in messages:
-            ts = str(msg.timestamp)
+            ts = str(msg.server_timestamp_ms)
             if ts in loaded_chat_obj:
-                loaded_chat_obj[ts]['db_id'] = msg.id
+                loaded_chat_obj[ts]['id'] = msg.id
                 loaded_chat_obj[ts]['thread_id'] = thread_id
 
         # Final Redis updates
@@ -144,7 +144,7 @@ async def offload_chat_data(
         await redis_client.hdel(dialogue_key, 'offloading')
 
     except Exception as e:
-        # On failure, return chat object to Redis
+        # On failure, return chat object 
         await redis_client.hset(dialogue_key, 'chat_object', chat_obj)
         raise e  # Optionally re-raise or log
 
