@@ -32,7 +32,7 @@ async def pubsub_chat_handler(websocket: WebSocket, chat_obj: dict, redis_client
         chat_obj['msg_type'] = MessageTypes.inbound_message.value
 
     # get updated message_type and status
-    message_type = chat_obj['message_type']
+    message_type = chat_obj['msg_type']
     chat_status = chat_obj['status']
 
     # send the message

@@ -2,20 +2,30 @@ from pydantic import (
     BaseModel, 
 )
 from typing import Literal, Optional
+from property_street_backend.app.schemas import ConfigDictSetter
 
-class ChatObjectSchema(BaseModel):
-    # mandatory fields
-    category: Literal['chat'] = 'chat'
+
+class MessageSchema(ConfigDictSetter):
+    id: int
     recipient_id: int
     sender_id: int
-    msg_type: Literal['outbound_message','incoming_message', 'read_message']
     status: Literal['unsent', 'sent', 'delivered', 'read']
-    fmt_msg_txt: Optional[str]
-    text_content: str
+    fmt_msg: dict
+    server_timestamp_ms: int
+    thread_id: int
 
-    # optional fields
-    unix_timestamp_ms: Optional[int] = None
-    media_urls: Optional[str] = None
-    db_id: Optional[int] = None
+
+class ChatObjectSchema(BaseModel):
+    pass
+
+
+class CachedMessageSchema(MessageSchema):
+    id: Optional[int] = None
+    server_timestamp_ms: Optional[int] = None
+
+    category: Literal['chat'] = 'chat'
+    msg_type: Literal['outbound_message','incoming_message', 'delivered_message', 'read_message', 'completed']
+    
     thread_id: Optional[int] = None
-    additional_metadata: Optional[str] = None
+    ui_inbound_timestamp_ms: Optional[int] = None
+    ui_outbound_timestamp_ms: Optional[int] = None

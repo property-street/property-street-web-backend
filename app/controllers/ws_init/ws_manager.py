@@ -1,14 +1,15 @@
 import json
 import asyncio
 from typing import Dict
-from fastapi import WebSocket, WebSocketException, status
 from redis.asyncio import Redis, client
+from fastapi import WebSocket, WebSocketException, status
 
-from .utils import handle_pending_trx
-from . import agent_specific_channels, generic_channels
+
+from .utils import handle_pending_trx, require_user_online
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.controllers.ws_init import websocket_logger
-from property_street_backend.config.redis_connection_manager import redis_pool_instance
+from . import agent_specific_channels, generic_channels, aa_actors_set_key
+from property_street_backend.config.redis_connection_manager import get_redis_from_pool
 from property_street_backend.config.postgres_connection_manager import get_async_session
 from property_street_backend.app.controllers.chat.pubsub_chat_handler import pubsub_chat_handler
 from property_street_backend.app.controllers.asset_request.pubsub_request_handler import pubsub_request_handler
@@ -17,7 +18,7 @@ from property_street_backend.app.controllers.roommate_finder.pubsub_roommate_han
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[int, WebSocket] = {}
-        self.redis: Redis = redis_pool_instance()
+        self.redis: Redis = get_redis_from_pool()
         self.user_pubsubs: Dict[int, client.PubSub] = {}
         self.listener_tasks: Dict[int, asyncio.Task] = {}
         self.pending_trx_tasks: Dict[int, asyncio.Task] = {}
@@ -34,6 +35,9 @@ class ConnectionManager:
         channel_list = list(generic_channels.values())
 
         if user_id != -1: # for authenticated users
+            # add the user_id to `active_actors`
+            await self.redis.sadd(aa_actors_set_key , user_id)
+            
             # addition of the user specific channel
             channel_list.append(f"user:{user_id}")
 
@@ -74,6 +78,7 @@ class ConnectionManager:
 
         # Cancel tasks for authenticated sockets
         if user_id != -1:
+            await self.redis.srem(aa_actors_set_key, user_id)
             # Cancel pending trx task
             task: asyncio.Task = self.pending_trx_tasks.pop(user_id, None)
             if task:
@@ -102,9 +107,11 @@ class ConnectionManager:
             print(f"Redis listener error for {user_id}: {e}")
             await self.disconnect(user_id)
 
+    @require_user_online(redis_client=get_redis_from_pool())
     async def send_to_user(self, user_id: int, message: dict):
         if user_id == -1:
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
+        
         await self.redis.publish(f"user:{user_id}", json.dumps(message))
 
     async def pubsub_message_dispatcher(self, websocket: WebSocket, data: str):

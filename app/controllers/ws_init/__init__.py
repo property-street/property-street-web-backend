@@ -4,6 +4,9 @@ import logging
 agent_pend_pool_key = "pend_pool_agent_notification"
 # score -> unix-timestamp in milliseconds
 
+# active_authenticated_actors_set_key
+aa_actors_set_key = "active_authenticated_actors"
+
 agent_specific_channels = {
     'asset_request':'asset-request'
 }
@@ -36,3 +39,4 @@ def get_client_channel_key(client_id):
 
 def get_timestamp_milliseconds():
     return int(time.time() * 1000)
+    # int(datetime.now(timezone.utc).timestamp())

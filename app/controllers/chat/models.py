@@ -7,8 +7,10 @@ from sqlalchemy import (
     Table,
     DateTime,
     Enum as SQLAlchemyEnum,
+    BigInteger,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import JSONB
 
 from .enums import MessageStatus
 from property_street_backend.config.postgres_connection_manager import Base
@@ -129,7 +131,7 @@ class Message(Base):
     __tablename__ = "messages"
     
     id = Column(Integer, primary_key=True, index=True)
-    fmt_msg = Column(String, nullable=True)
+    fmt_msg = Column(JSONB, nullable=True)
     status = Column(
         SQLAlchemyEnum(
             MessageStatus, name='message_status',
@@ -137,8 +139,8 @@ class Message(Base):
         nullable=False,
         default=MessageStatus.unsent
     )
-    server_timestamp_ms = Column(Integer, nullable=False)
-    updated_timestamp_ms = Column(Integer, nullable=True)
+    server_timestamp_ms = Column(BigInteger, nullable=False)
+    updated_timestamp_ms = Column(BigInteger, nullable=True)
 
     # Foreign key relationship to Thread
     thread_id = Column(

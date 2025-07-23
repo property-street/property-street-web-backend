@@ -26,5 +26,5 @@ async def get_or_create_cached_chat(recipient_id:int, sender_id:int, /, redis_cl
         dict: hash map of timestamp in milliseconds or an empty one
     """
     cached_hset_key = chat_dialogue_hset_key(sender_id, recipient_id)
-    cached_chat = await redis_client.hget(cached_hset_key, 'chat_object')
-    return json.loads(cached_chat) if cached_chat else {}           
+    cached_chat = await redis_client.hget(cached_hset_key, 'messages')
+    return json.loads(cached_chat) if cached_chat else {}

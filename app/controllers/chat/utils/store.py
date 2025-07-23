@@ -23,28 +23,35 @@ async def cache_dialogue(
     chat_obj: dict,
     redis_client: Redis,
 ):
+    # retrieve ids
     recipient_id = chat_obj['recipient_id']
     sender_id = chat_obj['sender_id']
+    
     # get or create a cached hset for the dialogue
     # initialize an indicator to determine if it's new
     loaded_cached_chat = await get_or_create_cached_chat(recipient_id, sender_id, redis_client=redis_client) 
-    loaded_cached_chat_new = loaded_cached_chat == {}
+    loaded_cached_chat_is_new = loaded_cached_chat == {}
+    
     # get or create the timestamp of the chat object
     # assign the chat_obj to the timestamp in the loaded_cached_chat
     server_timestamp_ms = chat_obj['server_timestamp_ms']
     loaded_cached_chat[str(server_timestamp_ms)] = chat_obj
+    
     # get the chat dialogue key and make a mapping object for the hset
     cached_hset_key = chat_dialogue_hset_key(sender_id, recipient_id)
-    hset_mapping = {
-        "chat_object": json.dumps(loaded_cached_chat),
-    }
+    await redis_client.hset(
+        cached_hset_key, "messages", json.dumps(loaded_cached_chat)
+    )
+
     # add a lazy timestamp to the hset_mapping if the loaded_chat is new
-    # cache the data and set an expiry
-    if loaded_cached_chat_new:
+    if loaded_cached_chat_is_new:
         lazy_timestamp_unix_ms = get_chat_next_offload_schedule()
-        hset_mapping["lazy_timestamp"] = lazy_timestamp_unix_ms
-    await redis_client.hset(cached_hset_key, mapping = hset_mapping)
-    await redis_client.expire(cached_hset_key, get_chat_ttl())
+        await redis_client.hset(
+            cached_hset_key, "lazy_timestamp", lazy_timestamp_unix_ms
+        )
+    
+    # cache the data and set an expiry
+    # await redis_client.expire(cached_hset_key, get_chat_ttl())
 
 
 async def add_pending_msg_lookup_token_to_user_pool(
@@ -91,7 +98,7 @@ async def chat_exception_handler(
 
     recipient_id = chat_obj['recipient_id']
     sender_id = chat_obj['sender_id']
-    server_timestamp_ms = chat_obj.get['server_timestamp_ms']
+    server_timestamp_ms = chat_obj['server_timestamp_ms']
     cache_hset_key = chat_dialogue_hset_key(sender_id, recipient_id)
     
     # cache the message

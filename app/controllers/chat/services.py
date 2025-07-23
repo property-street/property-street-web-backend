@@ -101,7 +101,7 @@ async def get_messages(
     message_stmt = (
         select(Message)
         .where(Message.thread_id == thread.id)
-        .order_by(Message.timestamp.desc())  # assuming `timestamp` or `created_at` field
+        .order_by(Message.server_timestamp_ms.desc())  # assuming `timestamp` or `created_at` field
         .limit(size)
         .offset(offset)
     )

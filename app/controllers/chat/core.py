@@ -1,23 +1,19 @@
-import json, time
-from redis.asyncio import Redis
-
 from .enums import MessageTypes
-from .schemas import ChatObjectSchema
+from .schemas import CachedMessageSchema
 from property_street_backend.config.settings import (
     DEBUG,
 )
 from property_street_backend.app.controllers.chat.utils.store import (
-    cache_dialogue,
     chat_exception_handler,
 )
 from property_street_backend.app.controllers.ws_init import websocket_logger
-from property_street_backend.app.controllers.ws_init.ws_manager import ConnectionManager
 from property_street_backend.app.controllers.ws_init import get_timestamp_milliseconds
+from property_street_backend.app.controllers.ws_init.ws_manager import ConnectionManager
 
 
 
 async def handle_chat(
-    chat_obj: ChatObjectSchema,
+    chat_obj: CachedMessageSchema,
     manager: ConnectionManager,
 ):
     """Called when a chat object is sent to the server socket.
@@ -54,7 +50,7 @@ async def handle_chat(
                 exc_msg = exc_msg,
                 chat_obj = chat_obj
             )
-    elif (message_type==MessageTypes.delivered_message.value) or (message_type == MessageTypes.read_message.value):
+    elif (message_type==MessageTypes.delivered_message.value) or (message_type == MessageTypes.completed.value):
         try:
             # send the data to the sender
             await manager.send_to_user(sender_id, chat_obj)

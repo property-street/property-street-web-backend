@@ -59,7 +59,7 @@ async def websocket_endpoint( websocket: WebSocket ):
         while True:
             data = await websocket.receive_text()
             if DEBUG:
-                websocket_logger.info(f'**data received from client socket:{data}')
+                websocket_logger.info(f'**data received from client socket:{data if (len(data)<20) else (data[:20]+'...')}')
             await ws_reception_handler(data, manager)
     except WebSocketDisconnect:
         await manager.disconnect(client_id)

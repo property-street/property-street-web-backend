@@ -14,7 +14,7 @@ from property_street_backend.app.models import User
 from .auth.test_user_creation import create_test_user
 from property_street_backend.app.database import get_db
 from property_street_backend.config.settings import TEST_REDIS_CACHE_DB
-from property_street_backend.app.controllers.auth import fetched_access_token
+from property_street_backend.app.controllers.auth.services import fetch_access_token
 
 
 @pytest.mark.asyncio
@@ -113,7 +113,7 @@ async def test_websocket_client(app_subprocess, get_test_db__fixture):
     test_user = await create_test_user(test_db)
     await test_user.become_agent(test_db)
 
-    token_obj = fetched_access_token(test_user)
+    token_obj = fetch_access_token(test_user)
     token = token_obj['access_token']
     timestamp = int(time.time())
     uri = f'ws://localhost:8001/ws?last_n_timestamp={timestamp}&sesion_ts={timestamp}&test_ping=true&access_token={token}'

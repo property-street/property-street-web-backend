@@ -43,5 +43,5 @@ oauth.register(
 #         await client.aclose()
 
 async def get_redis():
-    async for redis_client in get_redis_instance():
+    async with get_redis_instance() as redis_client:
         yield redis_client
