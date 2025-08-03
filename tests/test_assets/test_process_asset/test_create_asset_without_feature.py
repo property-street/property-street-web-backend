@@ -56,6 +56,10 @@ async def test_create_asset_without_feature(sessions_with_cache_expiry_event_fix
         created_asset = response.json()
         asset_schema = AssetResponseSchema.model_validate(created_asset)
         asset_dict = asset_schema.model_dump()
+        tags = asset_dict['tags'] 
+        assert len(tags) >= 1
+        assert tags[0]['name']
+        assert tags[1]['name']
         
         
         # cache assertions

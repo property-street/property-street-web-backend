@@ -28,28 +28,6 @@ tags_template = ["house", "condo"]
 
 # Test data
 feature_obj = {
-    1: {
-        # tag 1
-        "db_table_id": -1,
-        "db_delete": False,
-        "db_table_name": "Tag",
-
-        # fields
-        "fields": {
-            "name": "tag_value1"
-        }
-    },
-    2: {
-        # tag 2
-        "db_table_id": -1,
-        "db_delete": False,
-        "db_table_name": "Tag",
-
-        # fields
-        "fields": {
-            "name": "tag_value2"
-        }
-    },
     3: {
         # cover image
         "db_delete": False,
@@ -73,7 +51,6 @@ feature_obj = {
             **asset_data_template,
 
             "relationship": {
-                "tags": [1, 2],
                 "cover_image": 3,
             }
         },
@@ -139,6 +116,34 @@ feature_obj = {
 
             "relationship":{
                 "asset": 4,
+            }
+        }
+    },
+    1: {
+        # tag 1
+        "db_table_id": -1,
+        "db_delete": False,
+        "db_table_name": "Tag",
+
+        # fields
+        "fields": {
+            "name": "tag_value1",
+            "relationship":{
+                "assets": [4]
+            }
+        }
+    },
+    2: {
+        # tag 2
+        "db_table_id": -1,
+        "db_delete": False,
+        "db_table_name": "Tag",
+
+        # fields
+        "fields": {
+            "name": "tag_value2",
+            "relationship":{
+                "assets": [4]
             }
         }
     },
@@ -298,7 +303,7 @@ no_feature_obj = {
             "name": "Studio",
             
             "relationship": {
-                "asset": 1
+                "assets": [1]
             }
         },
     },
@@ -310,7 +315,7 @@ no_feature_obj = {
             "name": "Mexico",
 
             "relationship": {
-                "asset": 1
+                "assets": [1]
             }
         },
     },
@@ -402,46 +407,4 @@ no_feature_obj = {
             }
         }
     },
-}
-
-agent_assets = {
-    0:{
-        'category': str,
-        'cover_image':{
-            'db_table_id': int,
-            'cloud_details':dict,
-        },
-        'country': str,
-        'address': str,
-        'currency': str,
-        'amount': float,
-        'status': str,
-        'tags':[
-            {
-                'db_table_id': int,
-                'name': str
-            },
-            # ...
-        ],
-        'feature':{
-            0:{
-                'title':str,
-                'db_table_id': int,
-                'cloud_images':{
-                    'public_id':dict, # dictionary of the cloud image details with the entries including database table id
-                    # ...
-                }
-            }
-            # ...
-        },
-        # or
-        'no_feature':{
-            0:{
-                'cloud_detais':{
-                    'public_id':dict, # dictionary of the cloud image details with the entries including the database table id
-                    # ...
-                }
-            }
-        }
-    }
 }

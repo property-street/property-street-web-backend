@@ -2,9 +2,9 @@
 #Utilizes Pydantic for data validation and serialization.
 #Ensures data consistency between the client and the server.
 
-from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import Optional, Literal
-
+from pydantic import BaseModel, ConfigDict, EmailStr
+from property_street_backend.app.schemas.route_based_asset_schemas import UserUIMetaDataSchema
 
 class UserSigninSchema(BaseModel):
     username: Optional[str] = None
@@ -44,8 +44,11 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
-class SigninResponse(Token):
-    user_id: int
+class SigninResponse(Token, UserUIMetaDataSchema):
+    id: int
+    first_name: str
+    client_is_agent: bool
+    is_authenticated: bool = True
 
 class TokenData(BaseModel):
     username: str | None = None

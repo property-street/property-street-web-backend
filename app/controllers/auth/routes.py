@@ -118,7 +118,10 @@ async def signin_for_access_token(
         )
     return {
         **fetched_access_token(user),
-        "user_id":user.id, 
+        "id":user.id, 
+        'first_name': user.first_name,
+        'client_is_agent': True if user.agent_profile else False,
+        'profile_avatar_url': user.profile_avatar.secure_url if user.profile_avatar else None  
     }
 
 

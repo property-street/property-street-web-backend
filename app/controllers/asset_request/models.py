@@ -31,7 +31,7 @@ request_agent_association = Table(
         'agent_id',
         Integer,
         ForeignKey(
-            'agents.id',
+            'users.id',
             name = 'fk_request_agent_association_agents',
             ondelete = 'CASCADE'
         ),
@@ -93,7 +93,7 @@ class AssetRequest(Base):
 
     # many to many relationship to agents
     resolvers = relationship(
-        'Agent',
+        'User',
         secondary='request_agent_association',
         lazy='selectin',
         back_populates = 'resolved_asset_requests'

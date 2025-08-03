@@ -1,6 +1,8 @@
-from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from typing import Optional, Any
+from pydantic import field_validator
+
+from property_street_backend.app.models import User, CloudImageDetail
 from property_street_backend.app.schemas import ConfigDictSetter
 
 class CloudImageSchema(ConfigDictSetter):
@@ -10,15 +12,19 @@ class CloudImageSchema(ConfigDictSetter):
 class UserMiniSchema(ConfigDictSetter):
     id: int
     first_name: str
-    profile_avatar: Optional[CloudImageSchema] = None
+    profile_avatar: Optional[dict] = None
+    
+    @field_validator('profile_avatar', mode='before')
+    def transform_field_validator(cls, value):
+        if isinstance(value, CloudImageDetail) and hasattr(value, 'secure_url'):
+            return {'url': value.secure_url}
+        return None
 
 
 class MessageSummarySchema(ConfigDictSetter):
     id: int
-    text_content: Optional[str] = None
-    fmt_msg_txt: Optional[str] = None
-    additional_metadata: Optional[str] = None
-    timestamp: int
+    fmt_msg: Any
+    server_timestamp_ms: int
     status: str
     sender: UserMiniSchema
     recipient: UserMiniSchema

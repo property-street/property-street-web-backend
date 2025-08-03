@@ -21,7 +21,7 @@ async def get_threads_with_latest_message(
     latest_message_subq = (
         select(
             Message.thread_id,
-            func.max(Message.timestamp).label("latest_timestamp")
+            func.max(Message.server_timestamp_ms).label("latest_timestamp")
         )
         .group_by(Message.thread_id)
         .subquery()
@@ -42,7 +42,7 @@ async def get_threads_with_latest_message(
             LatestMessage,
             and_(
                 LatestMessage.thread_id == latest_message_subq.c.thread_id,
-                LatestMessage.timestamp == latest_message_subq.c.latest_timestamp
+                LatestMessage.server_timestamp_ms == latest_message_subq.c.latest_timestamp
             )
         )
         .options(

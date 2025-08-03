@@ -64,15 +64,16 @@ class Asset(Base):
     agent_id = Column(
         Integer, 
         ForeignKey(
-            'agents.id', 
-            name='fk_assets_agent_id', 
+            'users.id', 
+            name='fk_assets_agent_id_users', 
             ondelete='CASCADE'
         )
     )
     agent = relationship(
-        'Agent', 
-        back_populates='assets',
+        'User', 
+        backref='assets',
         lazy="selectin",  # Ensures relationship loads in async contexts
+        uselist=False
     )
 
     # One-to-one relationship for cover image (no cascade)
@@ -140,9 +141,9 @@ class Asset(Base):
     def has_features(self):
         return bool(self.features)  # works in Python
 
-    @has_features.expression
-    def has_features(cls):
-        return func.count(AssetFeature.id) > 0  # for SQL use, if needed
+    # @has_features.expression
+    # def has_features(cls):
+    #     return func.count(AssetFeature.id) > 0  # for SQL use, if needed
 
 
 class AssetFeature(Base):

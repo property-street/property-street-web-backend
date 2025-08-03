@@ -4,10 +4,10 @@ from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import Agent
+from property_street_backend.app.initiator import logger
 from property_street_backend.tests.auth.test_create_agent import create_test_agent
 from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.tests.activity.test_latest_collection import pre_commit_test_asset_collection
-
 
 
 
@@ -44,3 +44,4 @@ async def test_agent_asset_retrieval(client__fixture):
     assert response.status_code == 200
     json_response = response.json()
     assert len(json_response) == size
+    assert [tag['name'] for tag in json_response[0]['tags']]

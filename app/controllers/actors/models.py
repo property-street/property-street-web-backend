@@ -17,36 +17,12 @@ from .enums import (
     UserRoleChoice,
     ClientGenderChoice,
 )
-from property_street_backend.config.postgres_connection_manager import Base
 from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
 
 
 class Agent(AggregateRatingAClass):
-    __tablename__ = 'agents'
+    __abstract__ = True
 
-    id = Column(
-        Integer, 
-        primary_key=True, 
-        index=True,
-        autoincrement=True,
-    )
-    
-    # reverse relationship with the User model
-    user = relationship(
-        'User', 
-        back_populates='agent_profile',
-        uselist=False  # explicitly tell SQLAlchemy it's a one-to-one
-    )
-    
-    # Reverse relationship to Asset (cascade on delete)
-    assets = relationship(
-        'Asset',
-        back_populates='agent',
-        cascade="all, delete-orphan",  # Cascade deletion from Agent to Asset
-        lazy="selectin",  # Ensures relationship loads in async contexts
-
-    )
-   
    # many-to-many relationship to AssetRequest
     resolved_asset_requests = relationship(
         'AssetRequest',
@@ -55,15 +31,17 @@ class Agent(AggregateRatingAClass):
         back_populates = 'resolvers'
     )
 
+
     # relationship to ratings
-    ratings = relationship(
+    agent_ratings = relationship(
         'Rating',
         lazy='selectin',
-        back_populates = 'agent'
+        back_populates = 'agent',
+        foreign_keys="Rating.agent_id",
     )
 
 
-class User(Base):
+class User(AggregateRatingAClass):
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True, index=True)
@@ -106,26 +84,6 @@ class User(Base):
         back_populates='user',
         uselist=False, # explicitly tell SQLAlchemy it's a one-to-one
         foreign_keys=[profile_avatar_id],
-        lazy="selectin",  # Ensures relationship loads in async contexts
-    )
-  
-    # Foreign key to Agent for one-to-one relationship (nullable until user becomes agent)
-    agent_profile_id = Column(
-        Integer, 
-        ForeignKey(
-            'agents.id', 
-            name='fk_users_agent_profile_id', 
-            use_alter=True, 
-            ondelete='SET NULL'
-        ), 
-        unique=True, 
-        nullable=True
-    )
-    agent_profile = relationship(
-        'Agent', 
-        back_populates = 'user',
-        uselist=False, # explicitly tell SQLAlchemy it's a one-to-one
-        foreign_keys=[agent_profile_id],
         lazy="selectin",  # Ensures relationship loads in async contexts
     )
 
@@ -174,16 +132,6 @@ class User(Base):
         uselist = False,
     )
 
-        # Reverse relationship to the CartItem
-    
-    # relationship to CartItem
-    cart_items = relationship(
-        'CartItem', 
-        back_populates='user',
-        cascade="all, delete-orphan", # cascade from User to CartItem
-        lazy="selectin",  # Ensures relationship loads in async contexts
-    )
-
     # relationship to AssetRequest
     requested_assets = relationship(
         'AssetRequest',
@@ -198,13 +146,6 @@ class User(Base):
         back_populates = 'user'
     )
 
-    # one-to-many relationship to rooommates_finder
-    roommates_finder = relationship(
-        'RoommateFinder',
-        lazy='selectin',
-        back_populates = 'requester',
-    )
-
     # many-to-many relationship to rooomies_application
     roomies_application = relationship(
         'RoomieApplication',
@@ -214,18 +155,11 @@ class User(Base):
     )
 
     # relationship to ratings
-    rating_id = Column(
-        Integer,
-        ForeignKey(
-            'ratings.id',
-            name = "fk_users_ratings",
-            ondelete="CASCADE"
-        )
-    )
     ratings = relationship(
         'Rating',
         lazy='selectin',
-        back_populates = 'commenter'
+        back_populates = 'rater',
+        foreign_keys="Rating.rater_id"
     )
 
     
@@ -233,13 +167,10 @@ class User(Base):
     # method for a user to become an agent
     async def become_agent(self, session: AsyncSession):
         """Method to convert a user into an agent."""
-        if not self.agent_profile:
-            # Create a new Agent instance associated with this user
-            agent = Agent(user=self)
-            session.add(agent)
-            await session.flush()  # Ensures the new `agent` has an `id` before committing
+        if not self.user_role == 'agent':
+            self.agent_role = UserRoleChoice.agent
+            session.add(self)
             await session.commit()
-            await session.refresh(self)  # Refresh `self` to update the `agent_profile`
 
 
 @event.listens_for(User, 'before_insert')

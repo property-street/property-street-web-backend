@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..utils import get_user_ws_endpoint
 from property_street_backend.app.initiator import logger
 from property_street_backend.app.models import User, CloudImageDetail
-from property_street_backend.app.controllers.auth import fetched_access_token
+from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.controllers.roommate_finder.models import RoommateFinder
 from property_street_backend.app.controllers.roommate_finder.schemas import RoommateFinderResponseSchema
@@ -40,7 +40,7 @@ async def test_roommates_finder_request(app_subprocess, client__fixture):
         await test_db.commit()
 
         # retrieve access token for requests
-        token = fetched_access_token(test_user)['access_token']
+        token = fetch_access_token(test_user)['access_token']
         auth_header = {
             'Authorization': f'Bearer {token}',
             "Content-Type": "application/json"

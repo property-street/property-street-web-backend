@@ -42,7 +42,7 @@ async def fetch_user_ui_metadata(
             {
                 "first_name": current_user.first_name,
                 "client_is_agent": True if current_user.agent_profile else False,
-                "user_id": current_user.id,
+                "id": current_user.id,
                 "profile_avatar_url": current_user.profile_avatar.secure_url if current_user.profile_avatar else None
             }
             if is_authenticated else {}

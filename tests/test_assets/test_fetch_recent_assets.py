@@ -124,6 +124,7 @@ async def test_latest_collection(client__fixture):
     assert response.status_code == 200
 
     # Validate response structure for authenticated user
-    data = response.json()
-    logger.info(data)
-    assert len(data['assets']) == size
+    assets = response.json()
+    # logger.info(data)
+    assert len(assets) == size
+    assert [tag['name'] for tag in assets[0]['tags']]

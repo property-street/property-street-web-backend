@@ -72,8 +72,8 @@ class AssetComponentSchema(RootModel[Dict[int, TableObject]]):
     pass
 
 class UserUIMetaDataSchema(BaseModel):
-    user_id: Optional[int] = None
+    id: Optional[int] = None
     first_name: Optional[str] = None
     client_is_agent: Optional[bool] = None
-    is_authenticated: bool
+    is_authenticated: Optional[bool] = False
     profile_avatar_url: Optional[str] = None

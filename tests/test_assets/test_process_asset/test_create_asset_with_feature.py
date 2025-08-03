@@ -45,7 +45,10 @@ async def test_create_asset_with_feature(sessions_with_cache_expiry_event_fixtur
 
         asset_schema = AssetResponseSchema.model_validate(created_asset)
         asset_dict = asset_schema.model_dump()
-        assert len(asset_dict['tags']) == 2
+        tags = asset_dict['tags'] 
+        assert len(tags) == 2
+        assert tags[0]['name']
+        assert tags[1]['name']
         
         # Check the features
         assert created_asset.features is not None

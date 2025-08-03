@@ -15,7 +15,7 @@ from property_street_backend.app.controllers.auth.services import decode_user_fr
 router = APIRouter(prefix='/chat', tags=['chat'])
 
 
-@router.get('/get_threads_meta', response_model=List[ThreadSummarySchema])
+@router.get('/get-threads-meta', response_model=List[ThreadSummarySchema])
 async def threads_meta_getter(
     session: AsyncSession = Depends(get_db),
     user: User = Depends(decode_user_from_token),

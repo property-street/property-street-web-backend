@@ -73,7 +73,7 @@ class RoomieApplication(Base):
     roommates_finder = relationship(
         'RoommateFinder',
         lazy = 'selectin',
-        back_populates='roomies_application',
+        backref='roomies_application',
         uselist = False,
     )
 
@@ -107,7 +107,7 @@ class RoommateFinder(Base):
     requester = relationship(
         'User',
         lazy='selectin',
-        back_populates='roommates_finder',
+        backref='roommates_finder',
         uselist = False
     )
     
@@ -126,13 +126,6 @@ class RoommateFinder(Base):
         lazy = 'selectin',
         back_populates='roommates_finder',
         uselist=False,   
-    )
-
-    # relationship to roomie application
-    roomies_application = relationship(
-        'RoomieApplication',
-        lazy='selectin',
-        back_populates='roommates_finder'
     )
 
 

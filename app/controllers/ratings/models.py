@@ -27,17 +27,35 @@ class Rating(Base):
     agent_id = Column(
         Integer,
         ForeignKey(
-            'agents.id',
-            name='fk_ratings_agents',
+            'users.id',
+            name='fk_ratings_agent_id_users',
             ondelete='CASCADE',
             use_alter=True,
         )
-    )
+    ) # who received the rating
     agent = relationship(
-        'Agent',
+        'User',
         lazy='selectin',
-        back_populates='ratings'
+        back_populates='agent_ratings',
+        uselist=False
     )
+
+    rater_id = Column(
+        Integer, 
+        ForeignKey(
+            "users.id",
+            name='fk_ratings_rater_id_users',
+            ondelete='CASCADE',
+            use_alter=True
+        )
+    )  # who gave the rating
+    rater = relationship(
+        "User", 
+        back_populates="ratings", 
+        foreign_keys=[rater_id],
+        lazy='selectin'
+    )
+
 
     # relationship to Area
     area_id = Column(
