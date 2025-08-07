@@ -11,6 +11,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
+
 class Rating(Base):
     __tablename__ = 'ratings'
 
@@ -37,7 +38,8 @@ class Rating(Base):
         'User',
         lazy='selectin',
         back_populates='agent_ratings',
-        uselist=False
+        uselist=False,
+        foreign_keys=[agent_id],
     )
 
     rater_id = Column(
@@ -53,7 +55,8 @@ class Rating(Base):
         "User", 
         back_populates="ratings", 
         foreign_keys=[rater_id],
-        lazy='selectin'
+        lazy='selectin',
+        uselist=False,
     )
 
 
@@ -72,14 +75,6 @@ class Rating(Base):
         lazy='selectin',
         back_populates='ratings',
         uselist = False
-    )
-
-    # relationship to Commenter
-    commenter = relationship(
-        "User",
-        back_populates = "ratings",
-        lazy = "selectin",
-        uselist = False # one-to-many relationship
     )
     
     __table_args__ = (

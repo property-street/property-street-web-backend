@@ -1,16 +1,15 @@
-import pytest, json
-from sqlalchemy.future import select
-
+import pytest
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import (
+    User,
     Asset, 
-    Agent,
-    AssetFeature, 
 )
 from property_street_backend.tests.activity.test_controller.test_objects import (
     feature_obj as payload,
 )
-from property_street_backend.tests.auth.test_create_agent import create_test_agent
+from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.controllers.activity.agent_crud_processing import (
     process_asset,
 )
@@ -24,15 +23,15 @@ from property_street_backend.tests.activity.test_controller.test_newly_created_a
 async def test_create_asset_with_feature(sessions_with_cache_expiry_event_fixture):
     # get the yield client objects
     async for fixture_obj in sessions_with_cache_expiry_event_fixture:
-        test_db = fixture_obj["db"]
-        redis_client = fixture_obj["redis_client"]
+        test_db: AsyncSession = fixture_obj["db"]
+        redis_client: Redis = fixture_obj["redis_client"]
         break
 
     try:
         expiry_seconds = 3
 
         # modify feature object to include an agent's id
-        created_agent: Agent = await create_test_agent(test_db)
+        created_agent: User = await create_test_user(test_db)
         
         # Process asset with features
         created_asset: Asset = await process_asset(
@@ -52,7 +51,7 @@ async def test_create_asset_with_feature(sessions_with_cache_expiry_event_fixtur
         
         # Check the features
         assert created_asset.features is not None
-        assert asset_schema.agent.first_name == created_agent.user.first_name
+        assert asset_schema.agent.first_name == created_agent.first_name
         
         # cache assertions
         await assertions_after_caching(

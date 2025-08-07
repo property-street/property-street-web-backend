@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from property_street_backend.app.models import (
     Tag,
     Area, 
-    Asset, 
-    Agent,
+    User, 
+    Asset,
     AssetFeature,
     AssetCloudImage,
     CloudImageDetail,
@@ -65,7 +65,7 @@ async def create_test_asset(db: AsyncSession, agent_id=None):
     asset_area = Area(**area_data)
 
     if not agent_id:
-        created_agent: Agent = await create_test_agent(db)
+        created_agent: User = await create_test_agent(db)
         agent_id = created_agent.id
 
     # Create the asset

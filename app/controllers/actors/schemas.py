@@ -2,23 +2,23 @@ from typing import Optional
 from pydantic import Field, model_validator
 from property_street_backend.app.schemas import ConfigDictSetter
 
-from .models import Agent
+from .models import User
 
 class AgentResponseSchema(ConfigDictSetter):
     id: int
-    first_name: str
+    username: str
     profile_avatar_url: Optional[str] = Field(None, description="Agent's avatar URL from the related user")
 
     @model_validator(mode='before')
     @classmethod
     def transform_agent_data(cls, data):
-        if isinstance(data, Agent):  # Handle ORM object
+        if isinstance(data, User):  # Handle ORM object
             return {
                 'id': data.id,
-                'first_name': data.user.first_name if data.user else "",
+                'first_name': data.first_name,
                 'profile_avatar_url': (
-                    data.user.profile_avatar.secure_url 
-                    if data.user and data.user.profile_avatar 
+                    data.profile_avatar.secure_url 
+                    if data and data.profile_avatar 
                     else ""
                 )
             }

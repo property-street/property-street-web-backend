@@ -7,12 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from property_street_backend.app.controllers.auth.services import (
     fetch_access_token,
 )
-from property_street_backend.app.models import Asset, Agent
+from property_street_backend.app.models import Asset, User
 from property_street_backend.tests.test_assets.test_create_asset import (
     create_test_asset,
 )
 from property_street_backend.tests.auth.test_create_agent import create_test_agent
-
 
 
 @pytest.mark.asyncio
@@ -24,8 +23,10 @@ async def test_asset_update(client__fixture):
         httpx_client: AsyncClient = fixture_obj["http_client"]
         break
     
-    created_asset = await create_test_asset(
-        db = test_db
+    created_agent: User = await create_test_agent(test_db)
+    created_asset: Asset = await create_test_asset(
+        db = test_db,
+        agent_id = created_agent.id
     )
 
 
@@ -47,7 +48,7 @@ async def test_asset_update(client__fixture):
     }
 
         # fetch a token for the user
-    tokenObj = fetch_access_token(user=created_asset.agent.user)
+    tokenObj = fetch_access_token(user=created_agent)
 
     # Define the payload for the request
     payload = {
@@ -65,9 +66,8 @@ async def test_asset_update(client__fixture):
         json=payload,  # Use json instead of data for a JSON body
         headers=headers
     )
-    updated_asset: Asset = response.json()
-    
-    # assertions
+    assert response.status_code == 200
+    updated_asset = response.json()
     asset_fields = update_obj[1]['fields']
     assert updated_asset is not None
     assert updated_asset['title'] == asset_fields['title']

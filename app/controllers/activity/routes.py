@@ -1,12 +1,10 @@
+from typing import Dict
 import redis.asyncio as redis
-from typing import Dict, Optional
-from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
 from property_street_backend.app.models import (
     User,
-    Asset,
 )
 from property_street_backend.app.database import get_db
 from property_street_backend.app.controllers.auth.services import (
@@ -14,13 +12,10 @@ from property_street_backend.app.controllers.auth.services import (
     decode_user_from_token_optional,
 )
 from property_street_backend.app.initiator import get_redis
-from property_street_backend.app.schemas.auth_schemas import (
-    TokenData, 
-)
 from property_street_backend.log_config.logger_config import log_message
+from property_street_backend.app.schemas.auth_schemas import UserUIMetaDataSchema
 from property_street_backend.app.controllers.settings.services import user_record_update
 from property_street_backend.app.controllers.activity.schemas import LatestCollectionSchema
-from property_street_backend.app.schemas.route_based_asset_schemas import UserUIMetaDataSchema
 from property_street_backend.app.controllers.activity.latest_collection import fetch_latest_collection
 
 
@@ -30,27 +25,23 @@ router = APIRouter(prefix="/activity", tags=["activity"])
 
 @router.get("/user-ui-metadata",response_model=UserUIMetaDataSchema)
 async def fetch_user_ui_metadata(
-    current_user: Optional[TokenData] = Depends(decode_user_from_token_optional)
+    user: User = Depends(decode_user_from_token_optional)
 ):
     """
     Fetches the user's ui metadata
     """
     try:
         # Determine user status
-        is_authenticated = current_user is not None
+        is_authenticated = user is not None
         user_details = (
             {
-                "first_name": current_user.first_name,
-                "client_is_agent": True if current_user.agent_profile else False,
-                "id": current_user.id,
-                "profile_avatar_url": current_user.profile_avatar.secure_url if current_user.profile_avatar else None
+                "username": user.username,
+                "client_is_agent": True if (user.user_role.value == "agent") else False,
+                "id": user.id,
+                "profile_avatar_url": user.profile_avatar.secure_url if user.profile_avatar else None,
+                "user_role": user.user_role,
             }
             if is_authenticated else {}
-        )
-
-        log_message(
-            log_type="success",
-            message="User ui metadata successfully retrieved"
         )
 
         # Return assets and user authentication status

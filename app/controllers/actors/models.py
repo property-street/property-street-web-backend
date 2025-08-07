@@ -20,8 +20,9 @@ from .enums import (
 from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
 
 
-class Agent(AggregateRatingAClass):
-    __abstract__ = True
+
+class User(AggregateRatingAClass):
+    __tablename__ = 'users'
 
    # many-to-many relationship to AssetRequest
     resolved_asset_requests = relationship(
@@ -39,10 +40,6 @@ class Agent(AggregateRatingAClass):
         back_populates = 'agent',
         foreign_keys="Rating.agent_id",
     )
-
-
-class User(AggregateRatingAClass):
-    __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
@@ -168,7 +165,7 @@ class User(AggregateRatingAClass):
     async def become_agent(self, session: AsyncSession):
         """Method to convert a user into an agent."""
         if not self.user_role == 'agent':
-            self.agent_role = UserRoleChoice.agent
+            self.user_role = UserRoleChoice.agent
             session.add(self)
             await session.commit()
 

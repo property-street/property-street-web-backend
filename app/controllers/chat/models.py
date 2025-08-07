@@ -12,7 +12,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 
-from .enums import MessageStatus
+from .enums import MessageStatus, MessageTypes
 from property_street_backend.config.postgres_connection_manager import Base
 
 # message-thread Association Table for many-to-many relationship
@@ -132,6 +132,13 @@ class Message(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     fmt_msg = Column(JSONB, nullable=True)
+    msg_type = Column(
+        SQLAlchemyEnum(
+            MessageTypes, name='message_types',
+        ), 
+        nullable=True,
+        default=MessageTypes.outbound_message
+    )
     status = Column(
         SQLAlchemyEnum(
             MessageStatus, name='message_status',

@@ -11,7 +11,6 @@ from .schemas import AssetResponseSchema
 from property_street_backend.app.models import (
     User,
     Asset, 
-    Agent, 
 )
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
@@ -30,7 +29,6 @@ def eager_asset_load():
             selectinload(Asset.area),
             selectinload(Asset.cloud_images),
             selectinload(Asset.agent)
-            .selectinload(Agent.user)
             .selectinload(User.profile_avatar)
 
         )
@@ -126,29 +124,28 @@ async def fetch_latest_assets(
 
 async def fetch_agent_assets(
     session: AsyncSession,
-    user: User,
     size: int,
     page: int,
+    agent_id: int,
 ):
-    agent: Agent = user.agent_profile
-    if not agent:
+    offset  = (page-1) * size
+    # Query the agent and related assets
+    query = await session.execute(
+        eager_asset_load()
+        .where(Asset.agent_id == agent_id)
+        .offset(offset)
+        .limit(size)
+    )
+    assets = query.scalars().all()
+
+    if not assets:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Agent not found"
+            detail="Assets not found"
         )
-    
-    agent_id = agent.id
-    offset  = (page-1) * size
 
     try:
-        # Query the agent and related assets
-        query = await session.execute(
-            eager_asset_load()
-            .where(Asset.agent_id == agent_id)
-            .offset(offset)
-            .limit(size)
-        )
-        return query.scalars().all()
+        return assets
     except Exception as e:
         f_message = "An error occured while retrieving your assets."
         d_message = f"An error occured while retrieving agent {agent_id} asset. Reason {e}" 

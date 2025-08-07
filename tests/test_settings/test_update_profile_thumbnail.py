@@ -1,6 +1,9 @@
 import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.tests.auth.test_user_creation import create_test_user
+from property_street_backend.app.controllers.auth.services import authenticate_user
 from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.app.controllers.settings.schemas import UserSettingResponseSchema
 
@@ -10,11 +13,18 @@ async def test_user_profile_thumbnail_update(client__fixture):
     
     # Extract the fixture object
     async for fixture_obj in client__fixture:
-        test_db = fixture_obj["db"]
-        httpx_client = fixture_obj["http_client"]
+        test_db: AsyncSession = fixture_obj["db"]
+        httpx_client: AsyncClient = fixture_obj["http_client"]
         break
 
     created_user = await create_test_user(test_db)
+    
+    new_details = {
+        "first_name": "McKlintok",
+        "password": "whatchamacallu",
+        "avatar_url": "https://example.com/test_image.jpg"
+    }
+
     update_obj = {
         0: {
             # image for asset feature
@@ -28,7 +38,7 @@ async def test_user_profile_thumbnail_update(client__fixture):
                 "bytes": 102400,
                 "height": 800,
                 "public_id": "test_image_123",
-                "secure_url": "https://example.com/test_image.jpg",
+                "secure_url": new_details['avatar_url'],
                 "width": 600,
             }
         },
@@ -39,6 +49,9 @@ async def test_user_profile_thumbnail_update(client__fixture):
 
             # fields
             "fields": {
+                'first_name': new_details['first_name'],
+                'password': new_details['password'],
+
                 "relationship":{
                     "profile_avatar": 0,
                 }
@@ -63,4 +76,6 @@ async def test_user_profile_thumbnail_update(client__fixture):
 
 
     recent_settings = UserSettingResponseSchema.model_validate(json_response) 
-    recent_settings.user.profile_avatar_url == update_obj[0]['fields']['secure_url']
+    recent_settings.user.profile_avatar_url == new_details['avatar_url']
+    recent_settings.user.first_name == new_details['first_name']
+    assert await authenticate_user(test_db, created_user.email, new_details['password'])

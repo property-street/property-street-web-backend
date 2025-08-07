@@ -65,7 +65,8 @@ async def user_record_update(
                 if 'password' in fields:
                     fields['password_hash'] = get_password_hash(fields['password'])
 
-            logger.info(f"fields: {fields}")
+            if DEBUG:
+                logger.info(f"fields: {fields}")
             # Create or update object
             instance = await create_or_update_object(
                 db = db,

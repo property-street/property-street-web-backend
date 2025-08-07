@@ -28,7 +28,6 @@ from .services import (
     authenticate_user, 
     fetched_access_token, 
     decode_user_from_token, 
-    decode_user_from_token_optional, 
     check_username_email_availability,
     send_email_verification_code as controller_send_email_verification_code,
     confirm_email_verification_code_and_sign_user_up as controller_confirm_email_verification_code_and_sign_user_up,
@@ -119,9 +118,10 @@ async def signin_for_access_token(
     return {
         **fetched_access_token(user),
         "id":user.id, 
-        'first_name': user.first_name,
-        'client_is_agent': True if user.agent_profile else False,
-        'profile_avatar_url': user.profile_avatar.secure_url if user.profile_avatar else None  
+        'username': user.username,
+        'client_is_agent': True if (user.user_role.value == 'agent') else False,
+        'profile_avatar_url': user.profile_avatar.secure_url if user.profile_avatar else None,
+        'user_role': user.user_role 
     }
 
 

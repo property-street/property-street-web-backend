@@ -1,8 +1,7 @@
+from typing import List
 from fastapi import Query
 import redis.asyncio as redis
 from redis.asyncio import Redis
-from typing import Optional, List
-from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
@@ -20,8 +19,8 @@ from property_street_backend.config.settings import (
 )
 from property_street_backend.app.models import Asset, User
 from property_street_backend.app.controllers.auth.services import (
+    require_roles,
     decode_user_from_token,
-    decode_user_from_token_optional,
 )
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.controllers.assets.schemas import (
@@ -35,7 +34,6 @@ from property_street_backend.app.controllers.activity.agent_crud_processing impo
     remove_tags_from_asset,
 )
 from property_street_backend.app.controllers.assets.services import fetch_latest_assets
-from property_street_backend.app.controllers.activity.agent_assets_retrieval import get_agent_assets
 
 
 router = APIRouter(prefix="/assets", tags=["assets"])
@@ -64,7 +62,7 @@ async def process_asset(
     data: ProcessAssetSchema, 
     db: AsyncSession = Depends(get_db),
     redis_client: redis.Redis = Depends(get_redis),
-    user: User = Depends(decode_user_from_token)
+    user: User = Depends(require_roles("agent", "staff", "admin"))
 ):
     request_data: dict = data.model_dump()
     
@@ -91,7 +89,7 @@ async def process_asset(
                         if env_is_test() else 
                     NEWLY_CREATED_ASSET_TTL)
                 ),
-                agent = user.agent_profile
+                agent = user
             )
             if processed_asset:
                 schematized_asset = AssetResponseSchema.model_validate(processed_asset)
@@ -123,23 +121,35 @@ async def process_asset(
         )
 
 
-@router.get("/agent-assets", response_model=List[AssetResponseSchema])
+@router.get("/agent-assets/{agent_id}", response_model=List[AssetResponseSchema])
 async def retrieve_agent_assets(
+    agent_id: int,
     session: AsyncSession = Depends(get_db),
-    current_user: User = Depends(decode_user_from_token),
+    # _: User = Depends(decode_user_from_token),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
 ):
-    try:
-        return await fetch_agent_assets(
-            session = session,
-            user = current_user,
-            page = page,
-            size = size
-        )
-    except Exception as e:
-        logger.error(e)
-        raise e
+    return await fetch_agent_assets(
+        session = session,
+        agent_id = agent_id,
+        page = page,
+        size = size
+    )
+    
+
+@router.get("/my-assets", response_model=List[AssetResponseSchema])
+async def retrieve_agent_assets(
+    session: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_roles("agent", "staff", "admin")),
+):
+    return await fetch_agent_assets(
+        session = session,
+        agent_id = current_user.id,
+        page = page,
+        size = size
+    )
     
 
 @router.get("/{asset_id}", response_model=AssetResponseSchema)

@@ -4,8 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from httpx import AsyncClient
 
 from property_street_backend.app.models import User
+from .test_user_creation import create_test_user, user_data
 from property_street_backend.app.controllers.auth.services import create_user, authenticate_user
-from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
+from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema, SigninResponse
 
 
 @pytest.mark.asyncio
@@ -21,7 +22,9 @@ async def test_controller_authenticate_user(get_test_db__fixture):
         user_data = UserRegistrationSchema(
             email="test@example.com",
             username="testuser",
-            password="password123"
+            password="password123",
+            first_name='John',
+            last_name='Doe'
         )
 
         # Call the create_user function
@@ -58,42 +61,22 @@ async def test_controller_authenticate_user(get_test_db__fixture):
 async def test_route_signin(client__fixture):
     # Extract the fisxture object
     async for fixture_obj in client__fixture:
-        test_db = fixture_obj.get("db")
-        client = fixture_obj.get("http_client")
+        test_db: AsyncSession = fixture_obj['db']
+        client: AsyncClient = fixture_obj['http_client']
         break
 
-    # Define a post data
-    post_data = {
-        "email": "testuser@example.com",
-        "username": "testuser",
-        "password": "password123",
-    }
-
-    user_data = UserRegistrationSchema(
-        email=post_data['email'],
-        username=post_data['username'],
-        password=post_data['password']
-    )
-
     # Call the create_user function
-    created_user = await create_user(
-        test_db, 
-        user_data
-    )
-
-
+    created_user = await create_test_user(test_db)
     signin_post_data = {
         'email': created_user.email,
-        'password': post_data.get("password")
+        'password': user_data.password
     }
     response = await client.post(
         "/auth/signin",
         json=signin_post_data  # Use json instead of data for a JSON body
     )
-    s
+
     # Assertions
     assert response.status_code == 200
     json_response = response.json()
-    assert json_response.get("token_type") == "bearer"
-    assert "access_token" in json_response
-    assert json_response.get("user_id") == created_user.id
+    SigninResponse.model_validate(json_response)

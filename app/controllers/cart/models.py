@@ -11,22 +11,6 @@ class CartItem(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-
-    user_id = Column(
-        Integer,
-        ForeignKey(
-            "users.id",
-            name="fk_cart_items_user",
-            ondelete='CASCADE',
-        ), 
-        nullable=False
-    )
-    user = relationship(
-        "User",
-        back_populates="cart_items",
-        lazy="selectin",
-        uselist=False,
-    )
     
     # asset Relationships
     asset_id = Column(

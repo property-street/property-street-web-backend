@@ -15,7 +15,6 @@ from property_street_backend.config.postgres_connection_manager import Base
 class AbstractCloudImage(Base):
     __abstract__ = True  # Ensure this class is not mapped to its own table
 
-    id = Column(Integer, primary_key=True, index=True)
     format = Column(String, nullable=False)
     cloud_asset_id = Column(String, nullable=False)
     bytes = Column(Integer, nullable=False)

@@ -31,7 +31,7 @@ async def websocket_endpoint( websocket: WebSocket ):
                 websocket_logger.info(f'** Error decoding user from token. Reason: {e}')
 
     client_id = current_user.id if current_user else -1
-    is_agent = True if current_user and current_user.agent_profile else False
+    is_agent = True if current_user and (current_user.user_role.value == 'agent') else False
 
     if test_ping == 'true':
         await websocket.send_json({

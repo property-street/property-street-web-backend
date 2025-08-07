@@ -61,6 +61,15 @@ async def update_user_and_settings(
     )
 
 
+@router.post("/delete-account", status_code=status.HTTP_200_OK)
+async def delete_account(
+    db: AsyncSession = Depends(get_db),
+    user: TokenData = Depends(decode_user_from_token)
+):
+    await db.delete(user)
+    await db.commit()
+
+
 @router.post("/update-password", status_code=status.HTTP_200_OK)
 async def update_password(
     data: Dict = Body(...),  # Ensures the request body is required

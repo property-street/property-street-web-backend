@@ -34,8 +34,7 @@ from property_street_backend.app.controllers.assets.models import (
     AssetCloudImage,
 ) 
 from property_street_backend.app.controllers.actors.models import (
-    User,
-    Agent
+    User
 ) 
 from property_street_backend.app.controllers.ratings.models import Rating
 from property_street_backend.app.controllers.notification.models import Notification
@@ -141,6 +140,8 @@ class EmailManagementModel(Base):
 
 class CloudImageDetail(AbstractCloudImage):  # Inherit the abstract base
     __tablename__ = 'cloud_image_details'
+
+    id = Column(Integer, primary_key=True, index=True)
 
     # Reverse relationship to user
     user = relationship(
@@ -266,12 +267,10 @@ class AddOn(Base):
 models = [
     Tag,
     User,
-    Agent,
     Asset,
     Thread,
     Rating,
     Message,
-    CartItem,
     ChatSession,
     UserSetting,
     AssetRequest,

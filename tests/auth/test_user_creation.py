@@ -6,20 +6,22 @@ from redis.asyncio import Redis
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from property_street_backend.app.models import User, Agent
+from property_street_backend.app.models import User
 from property_street_backend.app.controllers.auth.services import create_user
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
 
 
+user_data = UserRegistrationSchema(
+    email="test@example.com",
+    username="testuser",
+    password="password123",
+    first_name="John",
+    last_name="Doe",
+)
+
 async def create_test_user(
     db: AsyncSession,
-    user_data = UserRegistrationSchema(
-        email="test@example.com",
-        username="testuser",
-        password="password123",
-        first_name="John",
-        last_name="Doe",
-    )
+    user_data = user_data
 ):
     return await create_user(db, user_data)
 
@@ -46,11 +48,11 @@ async def test_register_user(
         '/auth/register',
         json = payload
     )
-    # asert the user exists
     stmt = await test_db.execute(
         select(User)
         .where(User.email == payload['email'])
     )
+    # asert the user exists
     user = stmt.scalars().one()
     assert user
     await test_db.delete(user)
@@ -63,45 +65,18 @@ async def test_register_user(
         '/auth/register',
         json = payload
     )
-    # asert the ugent exists
+    # asert the agent exists
     stmt = await test_db.execute(
         select(User)
         .where(User.email == payload['email'])
     )
     user: User = stmt.scalars().one()
-    assert user.agent_profile
+    assert user.user_role == 'agent'
 
 
 
 @pytest.mark.asyncio
-async def test_route_create_user(client__fixture_with_onlyDB_fixture: tuple):
-    # fetch the client generator
-    client_gen =  client__fixture_with_onlyDB_fixture
-    # get the yield client object
-    client, test_db = await client_gen.__anext__()
-
-    # Define a post data
-    post_data = {
-        "email": "testuser@example.com",
-        "username": "testuser",
-        "password": "password123",
-    }
-
-    # Make the request using the client provided by the fixture
-    response = await client.post(
-        "/auth/register",
-        json=post_data  # Use json instead of data for a JSON body
-    )
-
-    # Assertions
-    assert response.status_code == 201
-    json_response = response.json()
-    assert json_response.get("token_type") == "bearer"
-    assert "access_token" in json_response
-
-
-@pytest.mark.asyncio
-async def test_route_probe_user_existence(client__fixture):
+async def test_probe_user_existence(client__fixture):
     # fetch the client generator
     async for fixture_obj in client__fixture:
         # get the yield client object

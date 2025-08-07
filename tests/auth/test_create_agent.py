@@ -3,29 +3,25 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .test_user_creation import user_data
 from property_street_backend.app.schemas.auth_schemas import (
     UserRegistrationSchema,
 )
-from property_street_backend.app.models import Agent, User
+from property_street_backend.app.models import User
 from property_street_backend.app.controllers.auth.services import (
+    create_user,
     create_agent,
     verify_password,
 )
 from property_street_backend.app.controllers.actors.schemas import AgentResponseSchema
 
-user_data = UserRegistrationSchema(
-    email="agent@example.com",
-    username="agentuser",
-    password="password123",
-    first_name = "Nike",
-    last_name = "Addidas"
-)
 
 async def create_test_agent(db:AsyncSession):
     return await create_agent(
         db = db, 
         user_data = user_data
     )
+
 
 @pytest.mark.asyncio
 async def test_create_agent(get_test_db__fixture):
@@ -34,29 +30,18 @@ async def test_create_agent(get_test_db__fixture):
         test_db: AsyncSession
         break
     try:
-        created_agent: Agent = await create_test_agent(test_db)
+        created_agent: User = await create_test_agent(test_db)
 
-        query = (
-            select(Agent)
-            .options(
-                selectinload(Agent.user)
-                .selectinload(User.profile_avatar)
-            )
-            .where(Agent.id == created_agent.id)
-        )
-
-        query = await test_db.execute(query)
-        agent = query.scalars().first()
-        AgentResponseSchema.model_validate(agent)
         
         # assertions 
-        assert created_agent.user.username == user_data.username
-        assert created_agent.user.email == user_data.email
-        assert created_agent.user.first_name == user_data.first_name
-        assert created_agent.user.last_name == user_data.last_name
+        assert created_agent.username == user_data.username
+        assert created_agent.email == user_data.email
+        assert created_agent.first_name == user_data.first_name
+        assert created_agent.last_name == user_data.last_name
+        assert created_agent.user_role.value == 'agent'
         assert verify_password(
             plain_password = user_data.password,
-            hashed_password = created_agent.user.password_hash        
+            hashed_password = created_agent.password_hash        
         )
     finally: 
         # close the session

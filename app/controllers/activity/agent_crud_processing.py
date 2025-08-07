@@ -1,7 +1,7 @@
 import traceback
 from typing import Dict
-from sqlalchemy import delete
-import redis.asyncio as redis
+from redis.asyncio import Redis
+from sqlalchemy import delete, and_
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
@@ -15,7 +15,6 @@ from property_street_backend.app.controllers.assets.schemas import (
 from property_street_backend.app.models import (
     User,
     Asset, 
-    Agent,
     asset_tag_association,
 )
 from property_street_backend.config.settings import (
@@ -70,9 +69,9 @@ async def remove_tags_from_asset(session: AsyncSession, asset_id: int, tag_ids: 
 async def process_asset(
     data_to_be_processed: Dict, 
     db: AsyncSession,
-    redis_client: redis.Redis,
+    redis_client: Redis,
     ttl_in_seconds: int,
-    agent: Agent
+    agent: User
 ):
     """
     Processes a batch of assets. Deletes or creates/updates instances as necessary.
@@ -122,6 +121,21 @@ async def process_asset(
                         fields['agent_id'] = agent.id
                         # modify newly_created to True
                         newly_created = True
+                else:
+                    query = await db.execute(
+                        select(Asset).where(
+                            and_(
+                                Asset.id == table_id,
+                                Asset.agent_id == agent.id
+                            )
+                        )
+                    )
+                    result = query.scalar_one_or_none()
+                    if not result:
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail="The db_table_id or requesting agent is incorrect!"
+                        )
                 
                 instance = await create_or_update_object(
                     db = db,
@@ -164,7 +178,8 @@ async def process_asset(
                 raise
         
         return asset if asset else None
-
+    except HTTPException:
+        raise  
     except Exception as e:
         await db.rollback()  # Rollback if there's an error to ensure atomicity
         f_message=f'An error occured on processing of asset. Reason: {e}'

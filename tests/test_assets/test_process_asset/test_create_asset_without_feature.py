@@ -8,7 +8,7 @@ from property_street_backend.config.settings import TEST_NEWLY_CREATED_ASSET_TTL
 from property_street_backend.app.models import (
     Asset, 
     AssetFeature, 
-    Agent,
+    User,
 )
 from property_street_backend.app.controllers.assets.schemas import (
     AssetResponseSchema
@@ -19,7 +19,7 @@ from property_street_backend.app.controllers.auth.services import (
 from property_street_backend.tests.activity.test_controller.test_objects import (
     no_feature_obj as payload,
 )
-from property_street_backend.tests.auth.test_create_agent import create_test_agent
+from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.tests.activity.test_controller.test_newly_created_asset_cache_management import (
     assertions_after_caching,
 )
@@ -36,10 +36,10 @@ async def test_create_asset_without_feature(sessions_with_cache_expiry_event_fix
 
     try:
         # modify feature object to include an agent's id
-        created_agent: Agent = await create_test_agent(test_db)
+        created_agent: User = await create_test_user(test_db)
 
         # Generate an access token for authentication
-        token_obj = fetch_access_token(user=created_agent.user)
+        token_obj = fetch_access_token(user=created_agent)
         token = token_obj['access_token']
         headers = {"Authorization": f"Bearer {token}"}
         

@@ -23,7 +23,8 @@ request_agent_association = Table(
         ForeignKey(
             'asset_requests.id',
             name = 'fk_request_agent_association_asset_requests',
-            ondelete='CASCADE'
+            ondelete='CASCADE',
+            use_alter=True
         ),
         primary_key = True
     ),
@@ -32,8 +33,9 @@ request_agent_association = Table(
         Integer,
         ForeignKey(
             'users.id',
-            name = 'fk_request_agent_association_agents',
-            ondelete = 'CASCADE'
+            name='fk_request_agent_association_agents',
+            ondelete='CASCADE',
+            use_alter=True
         ),
         primary_key=True
     )
@@ -48,7 +50,8 @@ request_asset_association = Table(
         ForeignKey(
             'asset_requests.id',
             name = 'fk_request_agent_association_asset_requests',
-            ondelete='CASCADE'
+            ondelete='CASCADE',
+            use_alter=True
         ),
         primary_key = True
     ),
@@ -57,8 +60,9 @@ request_asset_association = Table(
         Integer,
         ForeignKey(
             'assets.id',
-            name = 'fk_request_agent_association_assets',
-            ondelete = 'CASCADE'
+            name='fk_request_agent_association_assets',
+            ondelete='CASCADE',
+            use_alter=True
         ),
         primary_key=True
     )

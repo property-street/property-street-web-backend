@@ -7,7 +7,6 @@ from property_street_backend.app.models import (
     Area,
     User,
     Asset, 
-    Agent,
     UserSetting,
     CloudImageDetail,
     AssetFeature, 
@@ -28,7 +27,7 @@ def return_model_from_string(str_value: str):
     elif str_value == 'User':
         return User
     elif str_value == 'Agent':
-        return Agent
+        return User
     elif str_value == 'Asset':
         return Asset
     if str_value == 'UserSetting':

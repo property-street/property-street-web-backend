@@ -2,18 +2,19 @@ from sqlalchemy import select
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from property_street_backend.config.settings import DEBUG
-from property_street_backend.app.controllers.utils import return_model_from_string
 from property_street_backend.app.initiator import logger
-from property_street_backend.app.models import Rating, Area, Agent
+from property_street_backend.config.settings import DEBUG
+from property_street_backend.app.models import Rating, Area, User
 from property_street_backend.log_config.logger_config import log_message
+from property_street_backend.app.controllers.utils import return_model_from_string
+
 
 async def rate_asset(
     data: dict,
     db: AsyncSession,
 ):
     asset_to_rate = data.pop('asset_to_rate')
-    Model: Area|Agent = return_model_from_string(asset_to_rate)
+    Model: Area|User = return_model_from_string(asset_to_rate)
     asset_id = data.get('agent_id') or data.get('area_id')
     
     not_found_exception = HTTPException(

@@ -15,7 +15,7 @@ from property_street_backend.tests.activity.test_controller.test_objects import 
 
 
 @pytest.mark.asyncio
-async def test_user_record_update(client__fixture):
+async def test_fetch_user_settings(client__fixture):
     # Extract the fixture object
     async for fixture_obj in client__fixture:
         test_db: AsyncSession = fixture_obj["db"]

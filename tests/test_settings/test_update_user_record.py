@@ -52,7 +52,6 @@ async def test_user_record_update(
             # fields
             "fields": {
                 **user_data_template,
-                # "password": "password_hash",
                 "relationship":{
                     "settings": 0
                 }
@@ -89,8 +88,6 @@ async def test_user_record_update(
         headers = headers,
         json = update_obj
     )
-
-
     await test_db.refresh(created_user)
     user_record = response.json()
     # user assertions

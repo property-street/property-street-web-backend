@@ -1,19 +1,16 @@
 import json
 import pytest
 from typing import List
-from sqlalchemy import select
 from httpx import AsyncClient
 from redis.asyncio import Redis
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+
 
 from property_street_backend.app.models import (
     Tag,
     Area,
     User,
     Asset, 
-    Agent,
-    AssetFeature, 
     AssetCloudImage,
     CloudImageDetail,
 )
@@ -81,7 +78,7 @@ async def test_latest_collection(client__fixture):
         break
 
     # Create a test agent/user
-    created_agent: Agent = await create_test_agent(test_db)
+    created_agent: User = await create_test_agent(test_db)
 
     # Create 10 assets
     test_assets = pre_commit_test_asset_collection(created_agent.id)

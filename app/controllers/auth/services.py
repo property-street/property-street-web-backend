@@ -1,6 +1,7 @@
 import random 
 import redis.asyncio as redis
 from jose import jwt, JWTError
+from typing import List, Callable
 from sqlalchemy.future import select
 from passlib.context import CryptContext
 from sqlalchemy.exc import IntegrityError
@@ -13,10 +14,8 @@ from property_street_backend.app.models import (
     User,
 )
 from property_street_backend.app.schemas.auth_schemas import (
-    UserRegistrationSchema, 
     TokenData, 
-    ProbeUserExistenceSchema,
-    SendEmailCodeSchema,
+    UserRegistrationSchema, 
     SignupCodeVerificationSchema
 )
 from property_street_backend.app.initiator import logger
@@ -141,18 +140,12 @@ async def create_user(
     if existing_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email or Username already exists")
 
-    hashed_password = get_password_hash(user_data.password)
-    # clone the model so deleting the password entry wont affect the original schema
-    cloned_data = user_data.model_copy()
-    # convert the user_data to a dictionary
-    user_map = vars(cloned_data)
-    # remove the password field
-    user_map.pop('password')
-
+    user_data_to_dict = user_data.model_dump(exclude={"password"})
+    user_data_to_dict['password_hash'] = get_password_hash(user_data.password)
+    
     # instantiate a user object
     user = User(
-        password_hash=hashed_password,
-        **user_map,
+        **user_data_to_dict,
     )
     
     try:
@@ -188,8 +181,19 @@ async def create_agent(
     )
 
     # return the newly created agent
-    return created_user.agent_profile  
+    await db.refresh(created_user)
+    return created_user
 
+
+def require_roles(*allowed_roles: List[str]) -> Callable:
+    async def wrapper(current_user: User = Depends(decode_user_from_token)):
+        if current_user.user_role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action"
+            )
+        return current_user  # Optionally return for access
+    return wrapper
 
 # Session token validity
 async def decode_user_from_token(
