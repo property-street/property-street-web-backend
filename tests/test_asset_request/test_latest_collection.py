@@ -1,7 +1,5 @@
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -9,7 +7,6 @@ from property_street_backend.app.initiator import logger
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.models import User, CloudImageDetail, AssetRequest, Area
 from property_street_backend.tests.activity.test_controller.test_objects import area_template, cloud_image_template
-from property_street_backend.app.controllers.asset_request.schemas import AssetRequestResponseSchema
 
 @pytest.mark.asyncio
 async def test_latest_collection(client__fixture):
@@ -45,7 +42,7 @@ async def test_latest_collection(client__fixture):
 
 
     size = 7
-    response = await httpx_client.get(f"/asset-requests/latest?size={size}")
+    response = await httpx_client.get(f"/asset-requests/latests?size={size}")
     assert response.status_code == 200
     logger.info(response.json())
     assert len(response.json()) == size

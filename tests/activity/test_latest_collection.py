@@ -12,8 +12,6 @@ from property_street_backend.app.models import (
     Area,
     User,
     Asset, 
-    Agent,
-    AssetFeature, 
     RoommateFinder,
     AssetCloudImage,
     CloudImageDetail,
@@ -83,8 +81,7 @@ async def test_latest_collection(client__fixture):
         break
 
     # Create a test agent/user
-    created_agent: Agent = await create_test_agent(test_db)
-    test_user = created_agent.user
+    created_agent: User = await create_test_agent(test_db)
 
     # Create 10 assets
     test_assets = pre_commit_test_asset_collection(created_agent.id)
@@ -159,7 +156,7 @@ async def test_latest_collection(client__fixture):
             max_roomies = payload['max_roomies'],
             extra_conditions = payload['extra_conditions'],
             category = payload['category'],
-            requester_id = test_user.id,
+            requester_id = created_agent.id,
             room_images = [
                 CloudImageDetail(
                     **{

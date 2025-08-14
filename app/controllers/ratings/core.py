@@ -13,7 +13,7 @@ async def rate_asset(
     data: dict,
     db: AsyncSession,
 ):
-    asset_to_rate = data.pop('asset_to_rate')
+    asset_to_rate = data.pop('asset_to_rate') # pop out the asset_to_rate field
     Model: Area|User = return_model_from_string(asset_to_rate)
     asset_id = data.get('agent_id') or data.get('area_id')
     
@@ -30,7 +30,7 @@ async def rate_asset(
     # retrieve the asset and raise a 404 
     # if not found error if the asset is not found
     stmt = await db.execute(
-        select(Model).filter(Model.id == asset_id)
+        select(Model).where(Model.id == asset_id)
     )
     asset = stmt.scalars().first()
     if not asset:

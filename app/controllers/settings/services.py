@@ -103,7 +103,7 @@ async def user_record_update(
 
     except Exception as e:
         await db.rollback()  # Rollback if there's an error to ensure atomicity
-        f_message = "An error occured while updating user record"
+        f_message = "An error occured while deleting user account"
         d_message=f'{f_message}: {traceback.format_exc()}'
         
         log_message(

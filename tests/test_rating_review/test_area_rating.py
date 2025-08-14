@@ -3,9 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import Area, User, Rating
-from property_street_backend.app.initiator import logger
-from property_street_backend.app.controllers.auth import fetched_access_token
 from property_street_backend.tests.auth.test_user_creation import create_test_user
+from property_street_backend.app.controllers.auth.services import fetch_access_token
 
 
 async def test_area_rating(client__fixture):
@@ -17,7 +16,7 @@ async def test_area_rating(client__fixture):
     test_user: User = await create_test_user(test_db)
 
     # retrieve access token for requests
-    token = fetched_access_token(test_user)['access_token']
+    token = fetch_access_token(test_user)['access_token']
     auth_header = {
         'Authorization': f'Bearer {token}',
         "Content-Type": "application/json"

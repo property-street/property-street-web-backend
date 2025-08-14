@@ -20,7 +20,6 @@ from property_street_backend.config.settings import (
 from property_street_backend.app.models import Asset, User
 from property_street_backend.app.controllers.auth.services import (
     require_roles,
-    decode_user_from_token,
 )
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.controllers.assets.schemas import (
@@ -137,7 +136,9 @@ async def retrieve_agent_assets(
     )
     
 
-@router.get("/my-assets", response_model=List[AssetResponseSchema])
+@router.get("/my-properties", 
+# response_model=List[AssetResponseSchema]
+)
 async def retrieve_agent_assets(
     session: AsyncSession = Depends(get_db),
     page: int = Query(1, ge=1),

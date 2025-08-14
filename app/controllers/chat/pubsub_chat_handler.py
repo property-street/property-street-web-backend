@@ -8,7 +8,6 @@ from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.controllers.ws_init import (
     websocket_logger,
 )
-from . import chat_dialogue_hset_key
 from property_street_backend.app.controllers.chat.utils.store import (
     cache_dialogue,
     chat_exception_handler,
@@ -24,12 +23,14 @@ async def pubsub_chat_handler(websocket: WebSocket, chat_obj: dict, redis_client
     sender_id = chat_obj['sender_id']
     message_type = chat_obj['msg_type']
     
-    # cached_hset_key of the dialogue
-    dialogue_hset_key = chat_dialogue_hset_key(sender_id, recipient_id)
-
     # change the status of the chat object to sent, and add a timestamp
     if message_type == MessageTypes.outbound_message.value:
         chat_obj['msg_type'] = MessageTypes.inbound_message.value
+        chat_obj['status'] = MessageStatus.sent.value
+    elif message_type == MessageTypes.delivered_message.value:
+        chat_obj['status'] = MessageStatus.delivered.value
+    elif message_type == MessageTypes.read_message.value:
+        chat_obj['msg_type'] = MessageTypes.completed.value
 
     # get updated message_type and status
     message_type = chat_obj['msg_type']
@@ -52,7 +53,7 @@ async def pubsub_chat_handler(websocket: WebSocket, chat_obj: dict, redis_client
                 websocket_logger.info(f"Instance's socket disconnected at the moment!")
             raise ConnectionError
     except Exception as e:
-        if chat_status == MessageStatus.unsent.value:
+        if chat_status == MessageStatus.sent.value:
             # Message fails to reach the recipient
             exc_msg = f"Failed to send message to user_{recipient_id}: {e}"
             cache_for_user_id = recipient_id,
@@ -70,27 +71,6 @@ async def pubsub_chat_handler(websocket: WebSocket, chat_obj: dict, redis_client
             chat_obj = chat_obj
         )
         raise e # This is raised so the remaining function body is not executed
-
-
-    # in case of no exception
-    if chat_status == MessageStatus.unsent.value: # means an outbound-message was just sent to the recipient
-        chat_obj['status'] = MessageStatus.sent.value
-
-        # publish the new chat status to the sender's channel
-        try:
-            await send_to_user(sender_id, chat_obj)
-            if DEBUG:
-                websocket_logger.info('**published to sender\'s channel')
-
-        except Exception as e:
-            # when the receipt fails to reach the sender's channel
-            exc_msg = f"Sent receipt failed to hit sender's channel. Reason: {e}!"
-            await chat_exception_handler(
-                cache_hset_key = dialogue_hset_key,
-                redis_client = redis_client,
-                cache_for_user_id = sender_id,
-                exc_msg = exc_msg
-            )
 
     # cache the dialogue
     await cache_dialogue( chat_obj, redis_client )

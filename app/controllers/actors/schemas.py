@@ -15,7 +15,7 @@ class AgentResponseSchema(ConfigDictSetter):
         if isinstance(data, User):  # Handle ORM object
             return {
                 'id': data.id,
-                'first_name': data.first_name,
+                'username': data.username,
                 'profile_avatar_url': (
                     data.profile_avatar.secure_url 
                     if data and data.profile_avatar 

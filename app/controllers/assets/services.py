@@ -28,11 +28,44 @@ def eager_asset_load():
             selectinload(Asset.tags),
             selectinload(Asset.area),
             selectinload(Asset.cloud_images),
+            selectinload(Asset.cover_image),
             selectinload(Asset.agent)
             .selectinload(User.profile_avatar)
-
         )
-    ) 
+    )
+
+
+async def validate_assets(
+    session: AsyncSession, 
+    assets: list[Asset],
+):
+    valid_assets = []
+    skipped_assets = []
+
+    for asset in assets:
+        try:
+            validated_asset = AssetResponseSchema.model_validate(asset)
+            valid_assets.append(validated_asset)
+        except ValidationError as ve:
+            asset_id = getattr(asset, 'id', asset.get('id') if isinstance(asset, dict) else None)
+
+            # refresh the asset
+            try:
+                result = await session.execute(
+                    eager_asset_load().where(Asset.id == asset_id)
+                )
+                refreshed_asset = result.scalars().one()
+                valid_assets.append(
+                    AssetResponseSchema.model_validate(refreshed_asset)
+                )
+            except:
+                skipped_assets.append(asset_id)
+                log_message(
+                    log_type="error",
+                    message=f"Asset ID {asset_id or 'unknown'} failed validation. Reason: {ve}"
+                )
+    
+    return valid_assets, skipped_assets
 
 
 async def fetch_latest_assets(
@@ -43,6 +76,7 @@ async def fetch_latest_assets(
 ):
     offset = (page - 1) * size
     results = []
+    seen_ids = set()  # Track IDs to avoid duplication
 
     # === Step 1: Try Redis Cache ===
     newly_created_asset_serialized_cache_dict = await redis_client.hget(
@@ -54,6 +88,7 @@ async def fetch_latest_assets(
         if newly_created_asset_serialized_cache_dict
         else {}
     )
+
     if newly_created_asset_cache_dict:
         asset_list = list(newly_created_asset_cache_dict.values())
         asset_list.reverse()
@@ -62,52 +97,37 @@ async def fetch_latest_assets(
         cache_slice = asset_list[offset:offset + size]
         results.extend(cache_slice)
 
+        # Record their IDs to skip in DB fetch
+        for asset in cache_slice:
+            if isinstance(asset, dict):
+                seen_ids.add(asset.get("id"))
+            else:
+                seen_ids.add(getattr(asset, "id", None))
+
     cache_result_length = len(results)
     size -= cache_result_length
 
     # === Step 2: Fill remaining slots from DB ===
     if size > 0:
-        # db_offset = max(0, offset - len(asset_list))  # Adjust offset to avoid skipping
-        db_offset = offset + cache_result_length  # Adjust offset to avoid skipping
+        db_offset = offset + cache_result_length
         stmt = (
-            eager_asset_load() # Eager load relationships
+            eager_asset_load()
             .order_by(Asset.created_at.desc())
             .offset(db_offset)
             .limit(size)
         )
+
+        # Skip already retrieved IDs
+        if seen_ids:
+            stmt = stmt.where(~Asset.id.in_(seen_ids))
+
         result = await session.execute(stmt)
         raw_assets = result.scalars().all()
         results.extend(raw_assets)
 
     # === Step 3: Manual Schema Validation ===
-    valid_assets = []
-    skipped_assets = []
-
     try:
-        for asset in results:
-            try:
-                validated_asset = AssetResponseSchema.model_validate(asset)
-                valid_assets.append(validated_asset)
-            except ValidationError as ve:
-                asset_id = getattr(asset, 'id', asset.get('id') if isinstance(asset, dict) else None)
-                
-                # refresh the asset
-                try:
-                    result = await session.execute(
-                        eager_asset_load() # Eager load relationships
-                        .where(Asset.id == asset_id)
-                    )
-                    refreshed_asset = result.scalars().one()
-                    valid_assets.append(
-                        AssetResponseSchema.model_validate(refreshed_asset)
-                    )
-                except:
-                    skipped_assets.append(asset_id)
-                
-                    log_message(
-                        log_type="error",
-                        message=f"Asset ID {asset_id or 'unknown'} failed validation. Reason: {ve}"
-                    )
+        valid_assets, skipped_assets = await validate_assets(session, results)
     except Exception as e:
         f_message = "An error occurred while validating latest assets."
         d_message = f"{f_message} Reason: {e}"
@@ -120,6 +140,7 @@ async def fetch_latest_assets(
     )
 
     return valid_assets
+
 
 
 async def fetch_agent_assets(

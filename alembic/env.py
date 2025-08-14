@@ -1,14 +1,16 @@
-from logging.config import fileConfig
-
-from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-
 from alembic import context
+from logging.config import fileConfig
+from sqlalchemy import engine_from_config
 
 
-from property_street_backend.config.postgres_connection_manager import Base  # Adjust this import as needed
 from property_street_backend.app.models import *  # Import all models to ensure they're registered
+from property_street_backend.config.settings import DATABASE_URL
+from property_street_backend.config.postgres_connection_manager import Base  # Adjust this import as needed
 
+
+URL: str = DATABASE_URL
+DB_URL = URL.replace('postgresql+asyncpg','postgresql')
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -43,7 +45,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = DB_URL or config.get_main_option("sqlalchemy.url")
+
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -62,6 +65,9 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    url = DB_URL or config.get_main_option("sqlalchemy.url")
+    config.set_main_option("sqlalchemy.url", url)
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

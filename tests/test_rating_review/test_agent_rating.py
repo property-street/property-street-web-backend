@@ -2,10 +2,9 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from property_street_backend.app.models import Agent, User, Rating
-from property_street_backend.app.initiator import logger
-from property_street_backend.app.controllers.auth import fetched_access_token
-from property_street_backend.tests.auth.test_user_creation import create_test_user
+from property_street_backend.app.models import User, Rating
+from property_street_backend.tests.auth.test_create_agent import create_test_agent
+from property_street_backend.app.controllers.auth.services import fetch_access_token
 
 
 async def test_area_rating(client__fixture):
@@ -14,13 +13,11 @@ async def test_area_rating(client__fixture):
     http_client: AsyncClient = fixture_obj.get('http_client')
     
     # create test_user and make user agent
-    test_user: User = await create_test_user(test_db)
-    await test_user.become_agent(test_db)
-    test_agent: Agent = test_user.agent_profile
+    test_agent: User = await create_test_agent(test_db)
     test_agent_id = test_agent.id
 
     # retrieve access token for requests
-    token = fetched_access_token(test_user)['access_token']
+    token = fetch_access_token(test_agent)['access_token']
     auth_header = {
         'Authorization': f'Bearer {token}',
         "Content-Type": "application/json"

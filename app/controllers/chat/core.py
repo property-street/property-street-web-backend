@@ -50,7 +50,7 @@ async def handle_chat(
                 exc_msg = exc_msg,
                 chat_obj = chat_obj
             )
-    elif (message_type==MessageTypes.delivered_message.value) or (message_type == MessageTypes.completed.value):
+    elif (message_type==MessageTypes.delivered_message.value) or (message_type == MessageTypes.read_message.value):
         try:
             # send the data to the sender
             await manager.send_to_user(sender_id, chat_obj)
@@ -62,7 +62,7 @@ async def handle_chat(
             exc_msg = f"Failed to send message to user_{recipient_id}: {e}"
             await chat_exception_handler(
                 redis_client = manager.redis,
-                cache_for_user_id = recipient_id,
+                cache_for_user_id = sender_id,
                 exc_msg = exc_msg,
                 chat_obj = chat_obj
             )

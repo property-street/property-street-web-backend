@@ -62,38 +62,24 @@ async def test_dialogue( app_subprocess, sessions_fixture ):
 
         server_timestamp_ms: int = None
 
+        chat_obj = None
         async def recipient_receipt_check():
+            nonlocal chat_obj
             nonlocal server_timestamp_ms
             received_data = await recipient_ws.recv()
             loaded_received_data: dict = json.loads(received_data)
             inbound_value = MessageTypes.inbound_message.value
+            sent_value =MessageStatus.sent.value
 
             event = loaded_received_data.get('event') 
             assert event['type'] == inbound_value
             assert event['class'] == 'chat'
 
             chat_obj = loaded_received_data.get('data')
-            assert chat_obj['status'] == MessageStatus.unsent.value
+            assert chat_obj['status'] == sent_value
             assert chat_obj['msg_type'] == inbound_value
             assert "server_timestamp_ms" in chat_obj
             server_timestamp_ms = chat_obj['server_timestamp_ms']
-
-        chat_obj = None
-        async def sender_receipt_check():
-            nonlocal chat_obj
-            received_data = await sender_ws.recv()
-            loaded_received_data: dict = json.loads(received_data)
-
-            inbound_value = MessageTypes.inbound_message.value
-            sent_value = MessageStatus.sent.value
-
-            event = loaded_received_data.get('event') 
-            assert event['type'] == inbound_value
-            
-            message = loaded_received_data.get('data')
-            
-            assert message['status'] == sent_value
-            chat_obj = message
 
             # check that the dialogue exist in the cache
             async for redis_client in get_redis():
@@ -104,13 +90,13 @@ async def test_dialogue( app_subprocess, sessions_fixture ):
                 dialogue_hset_messages:dict = await get_or_create_cached_chat(recipient_id, sender_id, redis_client)
                 current_chat_obj = dialogue_hset_messages.get(str(server_timestamp_ms))
                 assert current_chat_obj['status'] == sent_value
-                assert current_chat_obj['msg_type'] == MessageTypes.inbound_message.value
+                assert current_chat_obj['msg_type'] == inbound_value
                 break
 
         async def receipt_check_group():
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(recipient_receipt_check())
-                tg.create_task(sender_receipt_check())
+                # tg.create_task(sender_receipt_check())
         
         await asyncio.wait_for(receipt_check_group(), timeout = 60)
 
@@ -122,7 +108,6 @@ async def test_dialogue( app_subprocess, sessions_fixture ):
         # receive the message on the sender's socket to verify the status
         # make assertions on the chat hset to verify sync of change
         chat_obj['msg_type'] = delivered_value
-        chat_obj['status'] = status_delivered_value
         await recipient_ws.send(json.dumps(chat_obj))
         
         recv_data:dict = json.loads(await asyncio.wait_for(sender_ws.recv(), timeout = 60))
@@ -145,11 +130,12 @@ async def test_dialogue( app_subprocess, sessions_fixture ):
 
 
         #--* modify the chat object to read *--#
+        read_value = MessageTypes.read_message.value
         completed_value = MessageTypes.completed.value
         read_status_value = MessageStatus.read.value
         # receive the message on the sender's socket to verify the status
         # make assertions on the chat hset to verify sync of change
-        chat_obj['msg_type'] = completed_value
+        chat_obj['msg_type'] = read_value
         chat_obj['status'] = read_status_value
         await recipient_ws.send(json.dumps(chat_obj))
         

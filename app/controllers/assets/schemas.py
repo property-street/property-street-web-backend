@@ -84,7 +84,7 @@ class AssetResponseSchema(AssetSchema):
     cover_image: CloudImageResponseSchema
     features: Optional[List[AssetFeatureResponseSchema]]
     cloud_images: Optional[Optional[List[CloudImageResponseSchema]]]
-    agent: AgentResponseSchema
+    agent: Optional[AgentResponseSchema]
 
 
 class LatestAssetsFetchResponseSchema(ConfigDictSetter):

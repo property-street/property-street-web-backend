@@ -7,18 +7,21 @@ WORKDIR /app
 # Install system-level dependencies
 RUN apt-get update && apt-get install -y gcc libpq-dev && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements.txt into the container
-COPY ./requirements.txt /app/property_street_backend/requirements.txt
+# Copy only the requirements file first (this rarely changes)
+COPY ./requirements.txt /app/requirements.txt
+
+# Upgrade pip and install Python dependencies
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Now copy the full source (code changes don't affect dependency cache)
+COPY . /app/ppgc_backend
 
 # Copy Alembic configuration and migration files
-COPY alembic_production.ini ./alembic.ini
+COPY alembic.ini ./alembic.ini
 COPY ./alembic ./alembic
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r /app/property_street_backend/requirements.txt
+EXPOSE 8000
 
-# Copy the entire backend folder into the container
-COPY . /app/property_street_backend
-
-# Use uvicorn to start the FastAPI application
-CMD ["sh", "-c", "alembic upgrade head && fastapi run property_street_backend/app/main.py --port 8080"]
+# Run migrations and start the app
+CMD ["sh", "-c", "alembic upgrade head && uvicorn property_street_backend.app.main:app --host 0.0.0.0 --port 8000"]

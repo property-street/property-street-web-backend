@@ -121,7 +121,7 @@ async def process_asset(
                         fields['agent_id'] = agent.id
                         # modify newly_created to True
                         newly_created = True
-                else:
+                elif is_asset and table_id:
                     query = await db.execute(
                         select(Asset).where(
                             and_(

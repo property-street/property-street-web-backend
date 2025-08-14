@@ -51,7 +51,7 @@ async def test_create_asset_with_feature(sessions_with_cache_expiry_event_fixtur
         
         # Check the features
         assert created_asset.features is not None
-        assert asset_schema.agent.first_name == created_agent.first_name
+        assert asset_schema.agent.username == created_agent.username
         
         # cache assertions
         await assertions_after_caching(

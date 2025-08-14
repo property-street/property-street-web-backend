@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from property_street_backend.app.models import Agent
+from property_street_backend.app.models import User
 from property_street_backend.app.initiator import logger
 from property_street_backend.tests.auth.test_create_agent import create_test_agent
 from property_street_backend.app.controllers.auth.services import fetch_access_token
@@ -21,7 +21,7 @@ async def test_agent_asset_retrieval(client__fixture):
         break
 
     # Call the create_user function
-    created_agent: Agent = await create_test_agent(test_db)
+    created_agent: User = await create_test_agent(test_db)
 
     # call the create asset and component function
     test_assets = pre_commit_test_asset_collection(created_agent.id)
@@ -29,13 +29,13 @@ async def test_agent_asset_retrieval(client__fixture):
     await test_db.commit()
 
     # fetch a token for the user
-    token = fetch_access_token(created_agent.user)['access_token']
+    token = fetch_access_token(created_agent)['access_token']
     headers = {"Authorization": f"Bearer {token}"}
 
     size = 7
     # Make the request using the client provided by the fixture
     response = await httpx_client.get(
-        f"/assets/agent-assets",
+        f"/assets/my-properties",
         headers = headers,
         params={"size": size}
     )

@@ -7,8 +7,9 @@ from .schemas import (
     SendEmailVerificationResponseSchema,
     ConfirmEmailVerificationCodeSchema
 )
+from property_street_backend.app.models import User
 from property_street_backend.app.database import get_db
-from property_street_backend.app.initiator import get_redis, logger
+from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.schemas.auth_schemas import (
     UserRegistrationSchema, 
     UserSigninSchema, 
@@ -17,7 +18,6 @@ from property_street_backend.app.schemas.auth_schemas import (
     ProbeUserExistenceSchema,
     SendEmailCodeSchema,
     SignupCodeVerificationSchema,
-    VerifyEmailCodeSchema
 )
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.config.settings import DEBUG
@@ -25,6 +25,7 @@ from property_street_backend.app.utils.store import email_verification_code_ttl
 from .services import (
     create_user, 
     create_agent,
+    require_roles,
     authenticate_user, 
     fetched_access_token, 
     decode_user_from_token, 
@@ -112,7 +113,7 @@ async def signin_for_access_token(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect signin credentials!",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return {
@@ -137,11 +138,11 @@ async def fetch_user(
 
 @router.get("/retrieve-agent-details")
 async def fetch_agent(
-    current_user: TokenData = Depends(decode_user_from_token)
+    current_user: User = Depends(require_roles("agent", "staff", "admin"))
 ):
     if current_user.agent_profile:
         return {
-            "agent_id": current_user.agent_profile_id
+            "agent_id": current_user.id
         }
     else:
         raise HTTPException(
