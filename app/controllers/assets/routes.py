@@ -136,9 +136,7 @@ async def retrieve_agent_assets(
     )
     
 
-@router.get("/my-properties", 
-# response_model=List[AssetResponseSchema]
-)
+@router.get("/my-properties", response_model=List[AssetResponseSchema])
 async def retrieve_agent_assets(
     session: AsyncSession = Depends(get_db),
     page: int = Query(1, ge=1),

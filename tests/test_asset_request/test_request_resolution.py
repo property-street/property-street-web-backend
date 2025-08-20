@@ -5,7 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import (
     User,
+    Area,
+    AssetRequest,
 )
+from property_street_backend.app.initiator import logger
 from property_street_backend.app.controllers.assets.schemas import (
     AssetResponseSchema
 )
@@ -14,6 +17,7 @@ from property_street_backend.app.controllers.auth.services import (
 )
 from property_street_backend.config.settings import TEST_NEWLY_CREATED_ASSET_TTL
 from property_street_backend.tests.activity.test_controller.test_objects import (
+    area_template,
     no_feature_obj as payload,
 )
 from property_street_backend.tests.auth.test_create_agent import create_test_agent
@@ -40,10 +44,32 @@ async def test_create_asset_without_feature(sessions_with_cache_expiry_event_fix
         token = token_obj['access_token']
         headers = {"Authorization": f"Bearer {token}"}
         
+        # create asset request
+        request = AssetRequest(
+            description = 'I need a 1 bedroom flat in the maldives!',
+            area = Area(**area_template),
+            requester_id = created_agent.id
+        )
+        test_db.add(request)
+        await test_db.commit()
+
+        # modify payload
+        plength = len(payload)
+        payload[plength+1] = {
+            'db_delete': False,
+            'db_table_id': request.id,
+            'db_table_name': 'AssetRequest',
+            'fields':{
+                'relationship':{
+                    'assets':[1]
+                }
+            }
+        }
         json_data = {
             "asset_data_to_process": payload
         }
-        # Process asset with features
+
+        # call endpoint
         response = await httpx_client.post(
             "/assets/process-asset", 
             headers = headers,
@@ -57,8 +83,6 @@ async def test_create_asset_without_feature(sessions_with_cache_expiry_event_fix
         assert len(tags) >= 1
         assert tags[0]['name']
         assert tags[1]['name']
-        
-        
         # cache assertions
         await assertions_after_caching(
             redis_client=redis_client,
@@ -66,6 +90,15 @@ async def test_create_asset_without_feature(sessions_with_cache_expiry_event_fix
             asset_data=asset_dict,
             expiry_seconds = TEST_NEWLY_CREATED_ASSET_TTL
         )
+
+        # assert change on asset request instance
+        await test_db.refresh(request)
+        request.assets[0].id == created_asset['id']
+
+        # request latest requests
+        response = await httpx_client.get(f"/asset-requests/latests")
+        assert response.status_code == 200
+        logger.info(response.json())
     finally:
         await test_db.close()
         await redis_client.aclose()

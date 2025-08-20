@@ -15,13 +15,13 @@ RUN pip install --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Now copy the full source (code changes don't affect dependency cache)
-COPY . /app/ppgc_backend
+COPY . /app/property_street_backend
 
 # Copy Alembic configuration and migration files
 COPY alembic.ini ./alembic.ini
 COPY ./alembic ./alembic
 
-EXPOSE 8000
+EXPOSE 8001
 
 # Run migrations and start the app
-CMD ["sh", "-c", "alembic upgrade head && uvicorn property_street_backend.app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn property_street_backend.app.main:app --host 0.0.0.0 --port 8001"]

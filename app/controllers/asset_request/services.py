@@ -27,6 +27,7 @@ async def fetch_recent_asset_request(
         select(AssetRequest)
         .options(
             selectinload(AssetRequest.area),
+            selectinload(AssetRequest.assets),
             selectinload(AssetRequest.requester)
             .selectinload(User.profile_avatar)
         )
@@ -48,11 +49,11 @@ async def fetch_recent_asset_request(
             except ValidationError as ve:
                 asset_request_id = getattr(request, 'id', None)
                 skipped_requests.append(asset_request_id)
-                f_message = "An error occurred while retrieving latest Asset-requests."
-                d_message = f"AssetRequest ID {asset_request_id or 'unknown'} failed validation. Reason: {ve}"
-                log_message(log_type="error", message=d_message)
-                logger.error(d_message)
-                raise HTTPException(status_code=500, detail=f_message)
+                # f_message = "An error occurred while retrieving latest Asset-requests."
+                # d_message = f"AssetRequest ID {asset_request_id or 'unknown'} failed validation. Reason: {ve}"
+                # log_message(log_type="error", message=d_message)
+                # logger.error(d_message)
+                # raise HTTPException(status_code=500, detail=f_message)
 
     except Exception as e:
         f_message = "An error occurred while retrieving latest Asset-requests."

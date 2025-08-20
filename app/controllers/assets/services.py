@@ -164,9 +164,11 @@ async def fetch_agent_assets(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Assets not found"
         )
+    
+    v_assets, _ = await validate_assets(session, assets)
 
     try:
-        return assets
+        return v_assets
     except Exception as e:
         f_message = "An error occured while retrieving your assets."
         d_message = f"An error occured while retrieving agent {agent_id} asset. Reason {e}" 

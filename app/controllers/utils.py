@@ -8,9 +8,10 @@ from property_street_backend.app.models import (
     User,
     Asset, 
     UserSetting,
-    CloudImageDetail,
     AssetFeature, 
+    AssetRequest,
     AssetCloudImage,
+    CloudImageDetail,
 )
 
 from property_street_backend.app.initiator import logger
@@ -30,7 +31,9 @@ def return_model_from_string(str_value: str):
         return User
     elif str_value == 'Asset':
         return Asset
-    if str_value == 'UserSetting':
+    elif str_value == 'AssetRequest':
+        return AssetRequest
+    elif str_value == 'UserSetting':
         return UserSetting
     elif str_value == 'AssetFeature':
         return AssetFeature

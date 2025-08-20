@@ -23,22 +23,27 @@ class AssetRequestResponseSchema(BaseSchema):
     
     @classmethod
     def from_orm_with_relations(cls, data: AssetRequest):
-        return cls(
-            id = data.id,
-            requester = ({
-                'name': f"{data.requester.first_name} {data.requester.last_name}",
-                'avatar_url': (
-                    data.requester.profile_avatar.secure_url 
-                    if data.requester and data.requester.profile_avatar 
-                    else ""
-            )}),
-            description = data.description,
-            area = data.area,
-            time_requested = data.created_at.isoformat(), 
-            resolutions = ([
-                {
-                    'id': resolution.id,
-                    'cover_image_url': resolution.cover_image.secure_url,
-                } for resolution in data.assets if data.assets
-            ]),
-        )
+            return cls(
+                id = data.id,
+                requester = ({
+                    'name': f"{data.requester.first_name} {data.requester.last_name}",
+                    'avatar_url': (
+                        data.requester.profile_avatar.secure_url
+                        if data.requester and getattr(data.requester, 'profile_avatar', None) and getattr(data.requester.profile_avatar, 'secure_url', None)
+                        else ""
+                    )
+                }),
+                description = data.description,
+                area = data.area,
+                time_requested = data.created_at.isoformat(),
+                resolutions = ([
+                    {
+                        'id': resolution.id,
+                        'cover_image_url': (
+                            resolution.cover_image.secure_url
+                            if getattr(resolution, 'cover_image', None) and getattr(resolution.cover_image, 'secure_url', None)
+                            else ""
+                        ),
+                    } for resolution in data.assets if data.assets
+                ]),
+            )

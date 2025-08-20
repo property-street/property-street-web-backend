@@ -1,22 +1,28 @@
+import os
+import socket
 from pathlib import Path
-from decouple import config
+from dotenv import load_dotenv
 
+# Explicitly load your custom env file first
+load_dotenv(".backend.env")
 
-ENVIRONMENT = config("ENVIRONMENT")
+DEV_ENV_HOSTNAME = os.getenv("DEV_ENV_HOSTNAME")
 
 # Base directory of the project
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Debug mode
-DEBUG = True if ENVIRONMENT == 'development' else False
+DEBUG = socket.gethostname() == DEV_ENV_HOSTNAME
 
 # Allowed hosts for the application
-ALLOWED_HOSTS = config('ALLOWED_HOSTS').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
+
+ENVIRONMENT = os.getenv('ENVIRONMENT')
 
 # SQLAlchemy database configuration for PostgreSQL
-DATABASE_URL = config('DATABASE_URL')
-
-TEST_DATABASE_URL = config('TEST_DATABASE_URL')
+DATABASE_URL = os.getenv('DATABASE_URL')
+PROD_DATABASE_URL = os.getenv('PROD_DATABASE_URL')
+TEST_DATABASE_URL = os.getenv('TEST_DATABASE_URL')
 
 EMAIL_VERIFICATION_CODE_TTL = 300
 TEST_EMAIL_VERIFICATION_CODE_TTL = 60
@@ -60,16 +66,16 @@ TEST_AGENT_NOTIFICATION_ENTRY_OFFLOAD_SCHEDULE = 7
 AGENT_NOTIFICATION_ENTRY_OFFLOAD_SCHEDULE = 604800 # 7 days
 
 # CORS settings
-CORS_ORIGINS = config('CORS_ORIGINS').split(',')
+CORS_ORIGINS = os.getenv('CORS_ORIGINS').split(',')
 
 # JWT settings
-JWT_SECRET_KEY = config('JWT_SECRET_KEY')
 JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_DELTA=1440
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
 
 # google credentials
-GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID')
-GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET')
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
 TEST_GOOGLE_REDIRECT_URL = "http://localhost:8080/google_oauth/callback"
 PROD_GOOGLE_REDIRECT_URL = "https://propertystreet.ng:8080/google_oauth/callback"
 GOOGLE_REDIRECT_URL = TEST_GOOGLE_REDIRECT_URL if DEBUG else PROD_GOOGLE_REDIRECT_URL

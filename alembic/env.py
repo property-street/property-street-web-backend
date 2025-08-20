@@ -5,11 +5,15 @@ from sqlalchemy import engine_from_config
 
 
 from property_street_backend.app.models import *  # Import all models to ensure they're registered
-from property_street_backend.config.settings import DATABASE_URL
+from property_street_backend.config.settings import (
+    DATABASE_URL,
+    DEBUG,
+    PROD_DATABASE_URL,
+)
 from property_street_backend.config.postgres_connection_manager import Base  # Adjust this import as needed
 
 
-URL: str = DATABASE_URL
+URL: str = DATABASE_URL if DEBUG else PROD_DATABASE_URL
 DB_URL = URL.replace('postgresql+asyncpg','postgresql')
 
 # this is the Alembic Config object, which provides
