@@ -18,10 +18,8 @@ from property_street_backend.app.controllers.roommate_finder.schemas import Room
 
 @pytest.mark.asyncio
 async def test_fetch_latest_requests(client__fixture):
-    async for fixture_obj in client__fixture:
-        test_db: AsyncSession = fixture_obj['db'] 
-        http_client: AsyncClient = fixture_obj['http_client']
-        break
+    test_db: AsyncSession = client__fixture['db'] 
+    http_client: AsyncClient = client__fixture['http_client']
 
     cloud_image_detail = {
         "cloud_asset_id":"dkajdlkajdlkajsdkfjasldkfj",

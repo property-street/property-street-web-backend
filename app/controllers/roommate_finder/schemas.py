@@ -19,7 +19,7 @@ class RoommateFinderRequestSchema(BaseModel):
 
 class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
     room_images: List[str]  # Flattened
-    requester: str
+    requester: dict
     gender: Optional[str] = None
     requester_avatar_url: Optional[str] = None
 
@@ -33,11 +33,11 @@ class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
             room_images=[img.secure_url for img in roommate_finder.room_images],
             max_roomies=roommate_finder.max_roomies,
             category=roommate_finder.category,
-            requester=(
-                f"{roommate_finder.requester.first_name} {roommate_finder.requester.last_name}"
-                if roommate_finder.requester
-                else ""
-            ),
+            requester={
+                "first_name": roommate_finder.requester.first_name,
+                "last_name": roommate_finder.requester.last_name
+            } if roommate_finder.requester
+                else None,
             requester_avatar_url=(
                 roommate_finder.requester.profile_avatar.secure_url
                 if (roommate_finder.requester and roommate_finder.requester.profile_avatar)

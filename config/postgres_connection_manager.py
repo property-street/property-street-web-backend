@@ -35,3 +35,10 @@ async def get_postgres_instance():
 
     async with SessionLocal() as session:
         yield session
+
+@asynccontextmanager
+async def get_db():
+    SessionLocal: sessionmaker = get_async_session()
+
+    async with SessionLocal() as session:
+        yield session

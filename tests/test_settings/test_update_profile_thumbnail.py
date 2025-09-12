@@ -12,10 +12,9 @@ from property_street_backend.app.controllers.settings.schemas import UserSetting
 async def test_user_profile_thumbnail_update(client__fixture):
     
     # Extract the fixture object
-    async for fixture_obj in client__fixture:
-        test_db: AsyncSession = fixture_obj["db"]
-        httpx_client: AsyncClient = fixture_obj["http_client"]
-        break
+    fixture_obj: dict = client__fixture
+    test_db: AsyncSession = fixture_obj["db"]
+    httpx_client: AsyncClient = fixture_obj["http_client"]
 
     created_user = await create_test_user(test_db)
     
@@ -43,7 +42,6 @@ async def test_user_profile_thumbnail_update(client__fixture):
             }
         },
         1: {
-            # tag 1
             "db_table_id": -1,
             "db_table_name": "User",
 

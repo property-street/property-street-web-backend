@@ -27,3 +27,12 @@ async def get_redis_instance():
         yield redis
     finally:
         await redis.aclose()
+
+@asynccontextmanager
+async def get_redis():
+    redis = get_redis_from_pool()
+
+    try:
+        yield redis
+    finally:
+        await redis.aclose()

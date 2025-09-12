@@ -3,6 +3,10 @@ from pydantic import BaseModel, ConfigDict
 
 from property_street_backend.app.controllers.activity.schemas import UserUIMetaDataSchema
 
+
+class Email(BaseModel):
+    email: str
+
 class SendEmailVerificationResponseSchema(BaseModel):
     message: str
     expiry: str
@@ -66,3 +70,11 @@ class UserResponseSchema(BaseModel):
     username: str
 
     model_config = ConfigDict(from_attributes=True)
+
+class SendPasswordResetMail(BaseModel):
+    detail: str
+    expiry: str
+
+class PasswordResetSchema(BaseModel):
+    password: str
+    token: str

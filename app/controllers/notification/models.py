@@ -1,24 +1,29 @@
-from property_street_backend.config.postgres_connection_manager import Base
 from sqlalchemy import (
-    Integer,
+    func,
     Column,
-    String,
+    Integer,
+    DateTime,
     ForeignKey,
-    BigInteger,
     Enum as SQLAlchemyEnum
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import JSONB
 
-from .enum import NotificationStateChoice
+from .enum import NotificationStateChoice, NotificationTypeChoice
+from property_street_backend.config.postgres_connection_manager import Base
 
 class Notification(Base):
     __tablename__ = 'notifications'
 
     id = Column(Integer, primary_key=True, index=True)
 
-    timestamp = Column(BigInteger, nullable=False)
-    n_type = Column(String)
-    n_serialized_obj = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    n_type = Column(
+        SQLAlchemyEnum(NotificationTypeChoice, name='notification_type_choice'), 
+        default='generic',
+        nullable=False
+    )
+    fmt_not = Column(JSONB)
     n_status = Column(
         SQLAlchemyEnum(NotificationStateChoice, name='notification_state_choice'), 
         default='undelivered',

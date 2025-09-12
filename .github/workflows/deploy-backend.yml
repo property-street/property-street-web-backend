@@ -21,8 +21,8 @@ jobs:
 
       - name: Create .env file for deployment
         run: |
-          echo "${{ secrets.DEPLOY_ENV_FILE }}" > .env
-          echo "AWS_SSH_KEY_PATH=$HOME/.ssh/propertystreet_instance_key.pem" >> .env
+          echo "${{ secrets.VARS }}" > .env.backend
+          echo "GIT_ACTION_AWS_SSH_KEY_PATH=$HOME/.ssh/propertystreet_instance_key.pem" >> .env.backend
 
 
       - name: Run deploy script

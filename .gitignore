@@ -105,5 +105,5 @@ target/
 
 
 # Custom
-media/
 z.ini
+propertystreet_instance_key.pem

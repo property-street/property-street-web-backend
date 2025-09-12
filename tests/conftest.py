@@ -7,9 +7,8 @@ import asyncio
 import requests
 import platform
 import subprocess
+import pytest_asyncio
 from sqlalchemy import text
-from redis.asyncio import Redis
-from contextlib import asynccontextmanager
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -18,20 +17,21 @@ from property_street_backend.app.main import app
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.config.settings import TEST_DATABASE_URL
+from property_street_backend.config.redis_connection_manager import get_redis_instance
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
 from property_street_backend.config.postgres_connection_manager import Base, get_postgres_instance
 from property_street_backend.app.controllers.cache_expiration.expiry_pubsub_listener import expiry_pubsub_loop_entered 
 
 
 
-@pytest.fixture
+@pytest_asyncio.fixture(scope="function")
 def test_env_var():
     os.environ["TEST_ENV"] = "true"
     yield
     os.environ.pop("TEST_ENV", None)
+    
 
-
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def get_test_db__fixture(test_env_var):
     # initialize a test engine and store its reference
     async_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
@@ -47,75 +47,58 @@ async def get_test_db__fixture(test_env_var):
         yield session
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def redis_client__fixture(test_env_var):
-    async for redis_client in get_redis():
-        await redis_client.flushdb() # flush the database before each test
+    async with get_redis_instance() as redis_client:
         yield redis_client
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 async def client__fixture(
     get_test_db__fixture, 
     redis_client__fixture,
 ):
-    async for test_db in get_test_db__fixture:
-        break
-
-    async for test_redis_client in redis_client__fixture:
-        break
-
     # overriding the client's get_db dependency
-    app.dependency_overrides[get_db] = lambda: test_db  # Override get_db to use the test session
-    app.dependency_overrides[get_redis] = lambda: test_redis_client  # Override redis_client dependency
+    app.dependency_overrides[get_db] = lambda: get_test_db__fixture  # Override get_db to use the test session
+    app.dependency_overrides[get_redis] = lambda: redis_client__fixture  # Override redis_client dependency
 
     # Use ASGITransport with the app
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield {
             "http_client": ac, 
-            "redis_client": test_redis_client,
-            "db": test_db,
+            "redis_client": redis_client__fixture,
+            "db": get_test_db__fixture,
         }
 
 
-@pytest.fixture(scope='function')
+@pytest_asyncio.fixture(scope="function")
 async def sessions_fixture(get_test_db__fixture, redis_client__fixture):
-    async for test_db in get_test_db__fixture:
-        break
-    async for test_redis_client in redis_client__fixture:
-        break
-
-    app.dependency_overrides[get_db] = lambda: test_db
-    app.dependency_overrides[get_redis] = lambda: test_redis_client
+    app.dependency_overrides[get_db] = lambda: get_test_db__fixture
+    app.dependency_overrides[get_redis] = lambda: redis_client__fixture
 
     yield {
-        "redis_client": test_redis_client,
-        "db": test_db,
+        "redis_client": redis_client__fixture,
+        "db": get_test_db__fixture,
     }
 
 
-@pytest.fixture(scope='function')
+@pytest_asyncio.fixture(scope="function")
 async def sessions_with_cache_expiry_event_fixture(
     request, 
     event_loop,
     get_test_db__fixture, 
     redis_client__fixture, 
 ):
-    async for test_db in get_test_db__fixture:
-        break
-    async for test_redis_client in redis_client__fixture:
-        break
-
-    app.dependency_overrides[get_db] = lambda: test_db
-    app.dependency_overrides[get_redis] = lambda: test_redis_client
+    app.dependency_overrides[get_db] = lambda: get_test_db__fixture
+    app.dependency_overrides[get_redis] = lambda: redis_client__fixture
 
     # ✅ FIXED: Properly await the initializer
     (
         listener_task, 
         stop_event, 
         _
-    ) = await cache_expiry_initializer(test_redis_client)
+    ) = await cache_expiry_initializer(redis_client__fixture)
     
     # ✅ Finalizer for cleanup
     async def finalizer():
@@ -129,7 +112,7 @@ async def sessions_with_cache_expiry_event_fixture(
 
     # ✅ Poll until the listener loop is confirmed to be active
     for _ in range(60):
-        loop_entered = await test_redis_client.exists(expiry_pubsub_loop_entered)
+        loop_entered = await redis_client__fixture.exists(expiry_pubsub_loop_entered)
         if loop_entered:
             break
         await asyncio.sleep(0.1)  # prevent tight loop
@@ -141,12 +124,12 @@ async def sessions_with_cache_expiry_event_fixture(
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield {
             "http_client": ac, 
-            "redis_client": test_redis_client,
-            "db": test_db,
+            "redis_client": redis_client__fixture,
+            "db": get_test_db__fixture,
         }
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 def celery_worker_and_beat():
     env = os.environ.copy()
     env["TEST_ENV"] = "True"
@@ -208,7 +191,7 @@ def celery_worker_and_beat():
     beat.wait()
 
 
-@pytest.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function")
 def app_subprocess(test_env_var):
     # On Windows, use creationflags to create a new process group
     creationflags = subprocess.CREATE_NEW_PROCESS_GROUP

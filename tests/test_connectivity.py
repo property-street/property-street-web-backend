@@ -12,9 +12,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from property_street_backend.app.main import app
 from property_street_backend.app.models import User
 from .auth.test_user_creation import create_test_user
-from property_street_backend.app.database import get_db
+from property_street_backend.config import env_is_test
 from property_street_backend.config.settings import TEST_REDIS_CACHE_DB
 from property_street_backend.app.controllers.auth.services import fetch_access_token
+from property_street_backend.config.postgres_connection_manager import get_postgres_instance
+
+
+@pytest.mark.asyncio
+async def test_get_env_a(test_env_var):
+    assert env_is_test()
+
+@pytest.mark.asyncio
+async def test_get_env_b():
+    assert not env_is_test()
 
 
 @pytest.mark.asyncio
@@ -22,48 +32,42 @@ async def test_db_connectivity(
     get_test_db__fixture
 ):
     # fetch the testdb
-    async for test_db in get_test_db__fixture:
-        assert isinstance(test_db, AsyncSession)
+    test_db = get_test_db__fixture
+    assert isinstance(test_db, AsyncSession)
+
 
 @pytest.mark.asyncio
 async def test_db_persistence_multi_session(
     get_test_db__fixture
 ):
-    try:
-        test_db = await anext(get_test_db__fixture)
-        assert isinstance(test_db, AsyncSession)
-        test_user: User = await create_test_user(test_db)
-        
-        test_db2 = await anext( get_db( 
-            metadata_test_routine = False,
-            skip_session_close = True,
-        ))
+    test_db = get_test_db__fixture
+    assert isinstance(test_db, AsyncSession)
+    test_user: User = await create_test_user(test_db)
+    
+    async with get_postgres_instance() as test_db2:
+        test_db2: AsyncSession
         stmt = await test_db2.execute(
             select(User).filter(User.email == test_user.email)
         )
         result = stmt.scalars().first()
         assert result
-    finally:
-        await test_db2.close()
-        await test_db.close() # explicitly close; it's finally hasn't been called
 
 
 @pytest.mark.asyncio
 async def test_redis_connectivity(redis_client__fixture):
-    async for redis_client in redis_client__fixture:
-        redis_client: Redis
-        assert redis_client.connection_pool.connection_kwargs['db'] == TEST_REDIS_CACHE_DB
-        assert isinstance(redis_client, Redis)
+    redis_client: Redis = redis_client__fixture
+    assert redis_client.connection_pool.connection_kwargs['db'] == TEST_REDIS_CACHE_DB
+    assert isinstance(redis_client, Redis)
 
 
 @pytest.mark.asyncio
 async def test_client_connectivity(client__fixture):
     
     # get the yield client objects
-    fixture_obj: dict = await anext(client__fixture)
-    redis_client = fixture_obj.get("redis_client")
-    http_client = fixture_obj.get("http_client")
-    test_db = fixture_obj.get("db")
+    fixture_obj: dict = client__fixture
+    redis_client: Redis = fixture_obj.get("redis_client")
+    http_client: AsyncClient = fixture_obj.get("http_client")
+    test_db: AsyncSession = fixture_obj.get("db")
 
     # environment varible assertion
     assert os.getenv("TEST_ENV") == "true"
@@ -81,7 +85,7 @@ async def test_client_connectivity(client__fixture):
     # Making a request to a URL
     # asserting response
     url = "/"
-    response: dict = await http_client.get(url)
+    response = await http_client.get(url)
     assert response.status_code == 200
     assert response.json() == {
         "message": "Hello, World!",
@@ -91,14 +95,14 @@ async def test_client_connectivity(client__fixture):
     # Making a request to a URL
     # making assertions
     url = "/test-database"
-    response: dict = await http_client.get(url)
+    response = await http_client.get(url)
     assert response.status_code == 200
     assert response.json().get("database_connected")
 
     # Making a request to a URL
     # making assertions
     url = "/test-redis"
-    response: dict = await http_client.get(url)
+    response = await http_client.get(url)
     assert response.status_code == 200
     assert response.json().get("test_key") == "value"
 
@@ -106,9 +110,7 @@ async def test_client_connectivity(client__fixture):
 @pytest.mark.asyncio
 async def test_websocket_client(app_subprocess, get_test_db__fixture):
     # get the yield client objects
-    async for test_db in get_test_db__fixture:
-        test_db : AsyncSession
-        break
+    test_db : AsyncSession = get_test_db__fixture
 
     test_user = await create_test_user(test_db)
     await test_user.become_agent(test_db)

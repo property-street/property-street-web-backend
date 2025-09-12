@@ -1,5 +1,7 @@
-import random 
+import random
+import secrets 
 import redis.asyncio as redis
+from redis.asyncio import Redis
 from jose import jwt, JWTError
 from typing import List, Callable
 from sqlalchemy.future import select
@@ -29,7 +31,10 @@ from property_street_backend.config.settings import (
     JWT_SECRET_KEY,
     JWT_EXPIRATION_DELTA,
     JWT_ALGORITHM,
+    PASSWORD_LINK_TTL,
+    TEST_PASSWORD_LINK_TTL,
 )
+from property_street_backend.config import env_is_test
 from property_street_backend.app.database import get_db
 
 # Constants for JWT
@@ -83,11 +88,11 @@ async def authenticate_user(db: AsyncSession, login: str, password: str):
     user = result.scalars().first()
 
     if not user:
-        return False
+        return None
 
     # Verify the provided password against the stored password hash
     if not verify_password(password, user.password_hash):
-        return False
+        return None
 
     return user
 
@@ -488,3 +493,190 @@ async def confirm_email_verification_code_and_sign_user_up(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while creating the user."
         )
+    
+
+#-- password reset --#
+sec_field_name = 'secret'
+exp_field_name = 'expiry'
+password_reset_reason = "password_reset"
+
+def get_password_reset_link_ttl():
+    return TEST_PASSWORD_LINK_TTL if env_is_test() else PASSWORD_LINK_TTL
+
+async def send_password_reset_mail(
+    email: str, 
+    session: AsyncSession,
+    redis_client: redis.Redis,
+    ttl_in_secs: int = get_password_reset_link_ttl(),
+):
+    """
+        `email:reason` is the hset's key 
+        the reason is the field
+        the code is the value
+    """
+    query = await session.execute(
+        select(User)
+        .where(User.email == email)
+    )
+    user = query.scalars().one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found!"
+        )
+
+
+    # Check if the code exists in the cache
+    user_key = hset_password_reset_key(email)
+    secret_exists = await redis_client.hget(user_key, sec_field_name)
+
+    if secret_exists: #When a result is found
+        expiry = await redis_client.hget(user_key, exp_field_name)
+
+        raise HTTPException(
+            status_code=status.HTTP_302_FOUND,
+            detail = {
+                "message" : "Please wait before requesting a new password link.",
+                "expiry" : (expiry.decode() 
+                        if isinstance(expiry,bytes) 
+                        else expiry)
+                }
+        )
+    else: # When no result is found
+        try:
+            # Generate a new five-digit code
+            secret = secrets.token_urlsafe()
+
+            # call the email function and send the email
+            # extract the email content from the template
+            email_template_content = read_email_from_html_template_name('password_reset_template')
+            property_street_address = "Port Harcourt"
+            
+            email_string = substituted_string(
+                email_template_content,
+                {
+                    "reset_link":f"https://propertystreet.ng/reset-password?token={user.id}_{secret}",
+                    "property_street_address": property_street_address
+                }
+            )
+            from_address="team@stackfinancialsolutions.com"
+            subject="Password Reset Request"
+            from_name="Property street"
+            #to_name="Customer"
+
+            send_email(
+                from_email=from_address,
+                to_email=email,
+                from_name=from_name,
+                subject=subject,
+                html_email=email_string
+            )
+
+            # create an instance of the user with the data
+            await redis_client.hset(user_key, sec_field_name, secret)
+
+            # get the current time and add the ttl
+            current_time = datetime.now(timezone.utc)
+            expiry_time = (current_time + timedelta(seconds=ttl_in_secs)).isoformat()
+
+            # save the ttl_time in the ttl field of the user's key
+            await redis_client.hset(user_key, exp_field_name, expiry_time)
+
+            # set an expiry for the user key
+            # explicitly convert the expiry_time_in_secs to int
+            # to avoid `value is not an integer or out of range` error
+            await redis_client.expire(user_key, int(ttl_in_secs)) 
+
+            return {
+                "detail":"Password reset email sent!",
+                "expiry": expiry_time
+            }
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong sending a password reset mail. Please try again later.",
+                headers={"X-Error": "Server error"},
+            )
+
+
+_exc = HTTPException(
+    status_code=status.HTTP_400_BAD_REQUEST,
+    detail = "Malformed request or link expired."
+)
+
+def hset_password_reset_key(email):
+    return f'{email}:{password_reset_reason}'
+
+
+async def check_password_reset_email_validity(
+    email: str,
+    secret: str,
+    redis_client: Redis,
+):
+
+    """
+        `email:reason` is the hset's key 
+        the reason is the field
+        the code is the value
+    """
+    # Check if the secret exists in the cache
+    user_key = hset_password_reset_key(email)
+    cached_secret = await redis_client.hget(user_key, sec_field_name)
+
+    decoded_secret = cached_secret.decode() if isinstance(cached_secret, bytes) else cached_secret
+    if not cached_secret or (decoded_secret != secret): #When a result is found
+        if DEBUG:
+            logger.info("Cached_secret malformed.")
+        raise _exc
+    
+
+async def process_token_validate_user(token:str, session: AsyncSession):
+    split_token = token.split('_', maxsplit=1)
+    user_id = int(split_token[0])
+    secret = split_token[1]
+
+    user = await session.get(User, user_id)
+    if not user:
+        raise _exc
+    
+    return user, secret
+    
+
+async def change_password(
+    password: str,
+    token: str,
+    session: AsyncSession,
+    redis_client: Redis,
+):
+    split_token = token.split('_', maxsplit=1)
+    user_id = int(split_token[0])
+    secret = split_token[1]
+
+    
+    user = await session.get(User, user_id)
+    if not user:
+        if DEBUG:
+            logger.info(f'**User not found')
+        raise _exc
+    
+    email = user.email
+
+    # check validity of request
+    await check_password_reset_email_validity(email, secret, redis_client)
+
+    # check that password ain't same
+    result = await authenticate_user(session, email, password)
+    if result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password can't be same as old."
+        )
+    else:
+        hash = get_password_hash(password)
+        user.password_hash = hash
+        session.add(user)
+        await session.commit()
+        # delete the key
+        key = hset_password_reset_key(email)
+        await redis_client.delete(key)
+    

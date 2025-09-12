@@ -4,7 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Explicitly load your custom env file first
-load_dotenv(".backend.env")
+load_dotenv(".env.backend")
 
 DEV_ENV_HOSTNAME = os.getenv("DEV_ENV_HOSTNAME")
 
@@ -26,6 +26,9 @@ TEST_DATABASE_URL = os.getenv('TEST_DATABASE_URL')
 
 EMAIL_VERIFICATION_CODE_TTL = 300
 TEST_EMAIL_VERIFICATION_CODE_TTL = 60
+
+PASSWORD_LINK_TTL = 1800 # 30 minutes
+TEST_PASSWORD_LINK_TTL = 60
 
 # REDIS cache db
 PROD_REDIS_CACHE_DB=0

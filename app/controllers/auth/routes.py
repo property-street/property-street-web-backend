@@ -1,11 +1,14 @@
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Body
 
 
 from .schemas import (
+    Email,
+    PasswordResetSchema,
+    SendPasswordResetMail,
+    ConfirmEmailVerificationCodeSchema,
     SendEmailVerificationResponseSchema,
-    ConfirmEmailVerificationCodeSchema
 )
 from property_street_backend.app.models import User
 from property_street_backend.app.database import get_db
@@ -26,10 +29,15 @@ from .services import (
     create_user, 
     create_agent,
     require_roles,
+    change_password,
     authenticate_user, 
     fetched_access_token, 
     decode_user_from_token, 
+    send_password_reset_mail,
+    process_token_validate_user,
+    get_password_reset_link_ttl,
     check_username_email_availability,
+    check_password_reset_email_validity,
     send_email_verification_code as controller_send_email_verification_code,
     confirm_email_verification_code_and_sign_user_up as controller_confirm_email_verification_code_and_sign_user_up,
     confirm_email_verification_code,
@@ -136,16 +144,33 @@ async def fetch_user(
     }
 
 
-@router.get("/retrieve-agent-details")
-async def fetch_agent(
-    current_user: User = Depends(require_roles("agent", "staff", "admin"))
+@router.post("/send-password-reset-mail", response_model=SendPasswordResetMail)
+async def send_password_reset_mail_endpoint(
+    data: Email = Body(...),
+    session: AsyncSession = Depends(get_db),
+    redis_client: Redis = Depends(get_redis)
 ):
-    if current_user.agent_profile:
-        return {
-            "agent_id": current_user.id
-        }
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are restricted to carry out this action!"
-        )
+    return await send_password_reset_mail(data.email, session, redis_client)
+
+
+@router.get("/check-email-reset-validity")
+async def check_email_reset_validity(
+    token: str,
+    redis_client: Redis = Depends(get_redis),
+    session: AsyncSession = Depends(get_db),
+):
+    user, secret = await process_token_validate_user(token, session)
+    return await check_password_reset_email_validity(user.email, secret, redis_client)
+
+
+@router.post("/change-password")
+async def change_password_endpoint(
+    data: PasswordResetSchema = Body(...),
+    session: AsyncSession = Depends(get_db),
+    redis_client: Redis = Depends(get_redis)
+):
+    return await change_password(
+        redis_client=redis_client,
+        session=session,
+        **data.model_dump()
+    )
