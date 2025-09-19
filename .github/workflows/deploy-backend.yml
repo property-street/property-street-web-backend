@@ -1,0 +1,29 @@
+name: Deploy Backend
+
+on:
+  workflow_dispatch: # 👈 This enables manual trigger from the Actions tab
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+  
+      - name: Create SSH key file
+        run: |
+          mkdir -p ~/.ssh   # Ensure SSH directory exists
+          echo "${{ secrets.AWS_SSH_KEY }}" > ~/.ssh/propertystreet_instance_key.pem
+          chmod 600 ~/.ssh/propertystreet_instance_key.pem
+
+
+      - name: Create .env file for deployment
+        run: |
+          echo "${{ secrets.VARS }}" > .env.backend
+          echo "GIT_ACTION_AWS_SSH_KEY_PATH=$HOME/.ssh/propertystreet_instance_key.pem" >> .env.backend
+
+
+      - name: Run deploy script
+        run: bash deploy.sh

@@ -1,0 +1,123 @@
+services:
+  # ===== Frontend Build Container =====
+  frontend:
+    image: crankgig/property_street_docker_hub_react_repo:latest
+    restart: always
+    container_name: frontend
+    ports:
+     - "3000:80" # for development
+    networks:
+      - app-network
+    volumes:
+      - web-root:/usr/share/nginx/html  # share built files with webserver
+    depends_on:
+      - backend
+
+  # ===== Nginx Web Server =====
+  webserver:
+    image: nginx:mainline-alpine
+    container_name: webserver
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - web-root:/var/www/html
+      - ./nginx-conf:/etc/nginx/conf.d
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - dhparam:/etc/ssl/certs
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - app-network
+
+  # ===== Certbot for SSL =====
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - certbot-var:/var/lib/letsencrypt
+      - web-root:/var/www/html
+    depends_on:
+      - webserver
+    command: certonly --webroot --webroot-path=/var/www/html --email crankgig@gmail.com --agree-tos --no-eff-email --force-renewal -d propertystreet.ng -d www.propertystreet.ng
+    networks:
+      - app-network
+
+  # ===== Backend API =====
+  backend:
+    image: crankgig/property_street_docker_hub_fastapi_repo:latest
+    container_name: backend
+    ports:
+      - "8001:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.backend
+    networks:
+      - app-network
+
+  # ===== PostgreSQL Database =====
+  db:
+    image: crankgig/property_street_docker_hub_postgres_repo:latest
+    container_name: postgres
+    restart: always
+    env_file:
+      - .env.backend
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  # ===== Adminer (DB UI) =====
+  adminer:
+    container_name: postgres_adminer
+    image: adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    networks:
+      - app-network
+
+  # ===== Redis Cache =====
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+volumes:
+  certbot-etc:
+  certbot-var:
+  web-root:
+  postgres_data:
+  dhparam:
+    driver: local
+    driver_opts:
+      type: none
+      device: /home/ec2-user/docker_compose_dir/dhparam/
+      o: bind
+
+networks:
+  app-network:
+    driver: bridge

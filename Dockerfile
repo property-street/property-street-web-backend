@@ -1,23 +1,27 @@
-# Use Python 3.11 slim image
-FROM python:3.11-slim
+# Use Python 3.12 slim image
+FROM python:3.12-slim
 
 # Set working directory inside the container
-WORKDIR /property_street_backend
+WORKDIR /app
 
 # Install system-level dependencies
 RUN apt-get update && apt-get install -y gcc libpq-dev && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements.txt into the container
-COPY ./requirements.txt /property_street_backend/requirements.txt
+# Copy only the requirements file first (this rarely changes)
+COPY ./requirements.txt /app/requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r /property_street_backend/requirements.txt
+# Upgrade pip and install Python dependencies
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Copy the entire backend folder into the container
-COPY ./property_street_backend /property_street_backend
+# Now copy the full source (code changes don't affect dependency cache)
+COPY . /app/property_street_backend
 
-# Expose the port FastAPI will use
-EXPOSE 80
+# Copy Alembic configuration and migration files
+COPY alembic.ini ./alembic.ini
+COPY ./alembic ./alembic
 
-# Use uvicorn to start the FastAPI application
-CMD ["fastapi", "run", "app/main.py", "--port", "80"]
+EXPOSE 8001
+
+# Run migrations and start the app
+CMD ["sh", "-c", "alembic upgrade head && uvicorn property_street_backend.app.main:app --host 0.0.0.0 --port 8001"]

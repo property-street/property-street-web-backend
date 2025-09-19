@@ -105,6 +105,6 @@ target/
 
 
 # Custom
-media/
 z.ini
-utility_scripts
+propertystreet_instance_key.pem.backend.env
+.backend.env
