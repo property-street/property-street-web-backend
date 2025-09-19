@@ -77,6 +77,7 @@ async def latest_collection(
     size: int = 20,
     redis_client: redis.Redis = Depends(get_redis),
     session: AsyncSession = Depends(get_db),
+    requester: User = Depends(decode_user_from_token_optional)
 ):
     """
     Fetches the latest collection of assets, roommate finder requests, and asset requests.
@@ -85,5 +86,6 @@ async def latest_collection(
         page=page,
         size=size,
         session=session,
-        redis_client=redis_client
+        redis_client=redis_client,
+        requester=requester
     )

@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    func,
     Column, 
     Integer, 
     String,
@@ -6,22 +7,22 @@ from sqlalchemy import (
     Boolean, 
     JSON, 
     Enum as SQLAlchemyEnum, 
-    func,
     DateTime,
     event,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import ARRAY
 
 from .enums import (
     UserRoleChoice,
     ClientGenderChoice,
 )
+from .mixin import UniqueIDArrayMixin
 from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
 
 
-
-class User(AggregateRatingAClass):
+class User(AggregateRatingAClass, UniqueIDArrayMixin):
     __tablename__ = 'users'
 
    # many-to-many relationship to AssetRequest
@@ -143,14 +144,6 @@ class User(AggregateRatingAClass):
         back_populates = 'user'
     )
 
-    # many-to-many relationship to rooomies_application
-    roomies_application = relationship(
-        'RoomieApplication',
-        secondary = 'roomies_application_roomies_applicants_association',
-        lazy='selectin',
-        back_populates = 'roomie_applicants',
-    )
-
     # relationship to ratings
     ratings = relationship(
         'Rating',
@@ -159,7 +152,8 @@ class User(AggregateRatingAClass):
         foreign_keys="Rating.rater_id"
     )
 
-    
+    cached_roomies_application_ids = Column(ARRAY(Integer), default=list)
+    array_field_name = "cached_roomies_application_ids"
 
     # method for a user to become an agent
     async def become_agent(self, session: AsyncSession):

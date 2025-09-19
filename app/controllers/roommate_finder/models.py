@@ -1,51 +1,30 @@
 from sqlalchemy import (
     Text, 
+    func,
+    Table,
+    event,
     Column, 
     Integer, 
     DateTime,
-    func,
     ForeignKey,
-    Enum as SqlalchemyEnum,
     CheckConstraint,
-    Table
+    UniqueConstraint,
+    Enum as SqlalchemyEnum,
 )
+from sqlalchemy import literal
+from sqlalchemy.orm import Session
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import array, INTEGER
 
 from .enums import RoomiesApplicationEnumChoice
+from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.config.postgres_connection_manager import Base
-
-# message-thread Association Table for many-to-many relationship
-roomies_application_roomies_applicants_association = Table(
-    'roomies_application_roomies_applicants_association',
-    Base.metadata,
-    Column(
-        'roomies_application_id', 
-        Integer, 
-        ForeignKey(
-            'roomies_application.id', 
-            name='fk_roomies_application_users',
-            ondelete='RESTRICT'
-        ), 
-        primary_key=True
-    ),
-    Column(
-        'user_id', 
-        Integer, 
-        ForeignKey(
-            'users.id', 
-            name='fk_users_roomies_application',
-            ondelete='CASCADE'
-        ), 
-        primary_key=True
-    ),
-)
-
 
 class RoomieApplication(Base):
     __tablename__ = 'roomies_application'
 
     id = Column(Integer, index = True, primary_key = True)
-    date_applied = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     datetime_approved_or_rejected = Column( DateTime(timezone=True) )
     status = Column( 
         SqlalchemyEnum(RoomiesApplicationEnumChoice, name='roomies_application_status_choice'),
@@ -54,11 +33,21 @@ class RoomieApplication(Base):
     )
 
     # relationship to user/applicants
-    roomie_applicants = relationship(
+    applicant_id = Column(
+        Integer,
+        ForeignKey(
+            'users.id',
+            name='fk_roomies_application',
+            use_alter=True,
+            ondelete='CASCADE'
+        ),
+        nullable=False
+    )
+    roomie_applicant = relationship(
         'User',
-        secondary='roomies_application_roomies_applicants_association',
-        back_populates = 'roomies_application',
+        backref = 'roomies_application',
         lazy = 'selectin',
+        uselist=False
     )
 
     # relationship to Roommate finder
@@ -76,6 +65,59 @@ class RoomieApplication(Base):
         backref='roomies_application',
         uselist = False,
     )
+
+    # Enforces Proxy Constraint; 1 User per Roommate_finder in a multi-linked relationship
+    __table_args__ = (
+        UniqueConstraint("roommate_finder_id", "applicant_id", name="uq_applicant_per_finder"),
+    )
+
+"""
+@event.listens_for(Session, "after_flush")
+def after_flush(session, flush_context):
+    for obj in session.new:
+        if isinstance(obj, RoomieApplication):
+            # get applicant (ORM object)
+            applicant = obj.roomie_applicant  
+            if applicant:
+                applicant.add_id(obj.roommate_finder_id)
+                session.add(applicant)  # mark as dirty so it updates
+"""
+
+# When application is created → add RF ID to applicant
+@event.listens_for(RoomieApplication, "after_insert")
+def after_application_insert(mapper, connection, target):
+    user_table = User.__table__
+
+    # Build an integer array literal with the roommate_finder_id
+    new_array = array([literal(target.roommate_finder_id, type_=INTEGER)])
+
+    stmt = (
+        user_table.update()
+        .where(user_table.c.id == target.applicant_id)
+        .values(
+            cached_roomies_application_ids=(
+                User.cached_roomies_application_ids.op("||")(new_array)
+            )
+        )
+    )
+    connection.execute(stmt)
+
+
+# When an application is deleted
+@event.listens_for(RoomieApplication, "after_delete")
+def after_application_delete(mapper, connection, target):
+    user_table = User.__table__
+    stmt = (
+        user_table.update()
+        .where(user_table.c.id == target.applicant_id)
+        .values(
+            cached_roomies_application_ids=func.array_remove(
+                User.cached_roomies_application_ids,
+                target.roommate_finder_id
+            )
+        )
+    )
+    connection.execute(stmt)
 
 
 class RoommateFinder(Base):

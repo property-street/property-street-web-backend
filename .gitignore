@@ -107,3 +107,4 @@ target/
 # Custom
 z.ini
 propertystreet_instance_key.pem.backend.env
+.backend.env

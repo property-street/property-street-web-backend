@@ -9,17 +9,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import RoommateFinder 
 from .schemas import RoommateFinderResponseSchema
-from property_street_backend.app.models import User
+from .services import get_cached_roomies_application_ids
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
+from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.log_config.logger_config import log_message
-
 
 
 async def fetch_recent_roommate_finder_request(
     page: int,
     size: int,
     session: AsyncSession,
+    requester: User,
 ):
     offset = (page - 1) * size
 
@@ -65,4 +66,7 @@ async def fetch_recent_roommate_finder_request(
         f"{len(valid_requests)} valid assets returned. {len(skipped_requests)} skipped due to schema errors."
     )
 
-    return valid_requests
+    return {
+        'requests': valid_requests,
+        'cached_roomies_application_ids': get_cached_roomies_application_ids(requester) if requester else []
+    }

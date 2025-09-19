@@ -18,6 +18,7 @@ class RoommateFinderRequestSchema(BaseModel):
 
 
 class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
+    id: int
     room_images: List[str]  # Flattened
     requester: dict
     gender: Optional[str] = None
@@ -27,6 +28,7 @@ class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
     def from_orm_with_relations(cls, roommate_finder: RoommateFinder):
         """Transform ORM object to response schema with all relationships resolved"""
         return cls(
+            id=roommate_finder.id,
             gender=roommate_finder.requester.gender if roommate_finder.requester else None,
             extra_conditions=roommate_finder.extra_conditions,
             area=roommate_finder.area,
@@ -44,6 +46,10 @@ class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
                 else None
             )
         )
+
+class RFRSListWithCachedIds(BaseModel):
+    requests: list[RoommateFinderResponseSchema] = []
+    cached_roomies_application_ids: Optional[list[int]] = []
 
     #--* Previously used validators *--#
     #@field_validator('room_images', mode='before')

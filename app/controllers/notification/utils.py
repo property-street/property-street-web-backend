@@ -38,12 +38,12 @@ async def dispatch_pending_notification(
         result = await db.execute(
             select(Notification)
             .where(Notification.user_id == user_id)
-            .order_by(desc(Notification.timestamp))
+            .order_by(desc(Notification.created_at))
             .limit(1)
         )
         last_db_entry = result.scalar_one_or_none()
         if last_db_entry:
-            last_timestamp = last_db_entry.timestamp
+            last_timestamp = last_db_entry.created_at
 
     if last_timestamp:
         # === Agent Lazy Notifications (ZSET) ===
@@ -94,7 +94,7 @@ async def dispatch_pending_notification(
                     'data': [
                         {
                             'category': 'notification',
-                            'timestamp': inst.timestamp,
+                            'timestamp': inst.created_at,
                             'db_id': inst.id,
                             'content': inst.n_serialized_obj
                         } for inst in notifications
