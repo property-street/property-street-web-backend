@@ -9,7 +9,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 
-from .enum import NotificationStateChoice, NotificationTypeChoice
+from .enums import NotificationStateChoice, NotificationTypeChoice
 from property_street_backend.config.postgres_connection_manager import Base
 
 class Notification(Base):

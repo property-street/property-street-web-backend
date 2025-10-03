@@ -19,6 +19,7 @@ from .enums import (
     ClientGenderChoice,
 )
 from .mixin import UniqueIDArrayMixin
+from property_street_backend.config.postgres_connection_manager import Base
 from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
 
 
@@ -163,6 +164,33 @@ class User(AggregateRatingAClass, UniqueIDArrayMixin):
             session.add(self)
             await session.commit()
 
+
+class SocialLog(Base):
+    __tablename__ = 'social_logs'
+
+    id  = Column(Integer, index=True, primary_key=True)
+
+    title = Column(String(1024))
+    description = Column(String)
+    media_urls = Column(ARRAY(String), default=list)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    user_id = Column(
+        Integer,
+        ForeignKey(
+            'users.id',
+            name='fk_social_logs_user_id_users',
+            ondelete='CASCADE',
+        ),
+        nullable=False
+    )
+    user = relationship(
+        User,
+        backref='social_logs',
+        lazy='selectin',
+        uselist=False
+    )
+    
 
 @event.listens_for(User, 'before_insert')
 # Listen for the 'before_insert' event to set updated_at

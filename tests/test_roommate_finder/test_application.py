@@ -1,20 +1,28 @@
+import json
 import pytest
+import asyncio
+import websockets
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
+from ..utils import get_user_ws_endpoint
 from property_street_backend.app.models import (
     User,
     CloudImageDetail,
 )
 from property_street_backend.app.initiator import logger
-from property_street_backend.app.controllers.auth.services import fetch_access_token
+from property_street_backend.app.controllers.ws_init import notification_ref
 from property_street_backend.tests.auth.test_user_creation import create_test_user
-from property_street_backend.app.controllers.roommate_finder.models import RoommateFinder, RoomieApplication
-from property_street_backend.app.controllers.roommate_finder.schemas import RoommateFinderResponseSchema
+from property_street_backend.app.controllers.auth.services import fetch_access_token
+from property_street_backend.app.controllers.auth.schemas import UserRegistrationSchema
+from property_street_backend.app.controllers.roommate_finder.models import RoomieApplication
 from property_street_backend.tests.activity.test_controller.test_objects import cloud_image_template
+from property_street_backend.app.controllers.roommate_finder.schemas import RoommateFinderResponseSchema
+
 
 async def create_request(http_client: AsyncClient, auth_header: dict):
 
@@ -49,9 +57,14 @@ async def create_request(http_client: AsyncClient, auth_header: dict):
     assert response_data is not None
     return response_data
 
+def get_headers(token):
+    return {
+        'Authorization': f'Bearer {token}',
+        "Content-Type": "application/json"
+    }
 
 @pytest.mark.asyncio
-async def test_application(client__fixture):
+async def test_application( app_subprocess, client__fixture):
     test_db: AsyncSession = client__fixture['db'] 
     httpx_client: AsyncClient = client__fixture['http_client']
 
@@ -60,38 +73,73 @@ async def test_application(client__fixture):
     }
 
     # create test_user and make user agent
-    test_user: User = await create_test_user(test_db)
+    requester: User = await create_test_user(test_db)
     # give the user a profile avatar
-    test_user.profile_avatar = CloudImageDetail(**cloud_image_detail)
-    test_db.add(test_user)
+    requester.profile_avatar = CloudImageDetail(**cloud_image_detail)
+    test_db.add(requester)
     await test_db.commit()
 
     # retrieve access token for requests
-    token = fetch_access_token(test_user)['access_token']
-    auth_header = {
-        'Authorization': f'Bearer {token}',
-        "Content-Type": "application/json"
-    }
-
-    roommate_finder_request: dict = await create_request(httpx_client, auth_header)
+    requester_token = fetch_access_token(requester)['access_token']
+    requester_header = get_headers(requester_token)
+    roommate_finder_request: dict = await create_request(httpx_client, requester_header)
     roommate_finder_request_id=roommate_finder_request['id']
-    response = await httpx_client.get(
-        f'/roommate-finder/request-to-join/{roommate_finder_request_id}',
-        headers=auth_header
-    )    
-    assert response.status_code == 201
-    data = response.json()
-    assert isinstance(data,list)
-    assert roommate_finder_request_id in data
-
-    query = await test_db.execute(
-        select(RoomieApplication)
-        .where(RoomieApplication.applicant_id == test_user.id)
+    
+    # create an applicant
+    applicant: User = await create_test_user(
+        test_db,
+        UserRegistrationSchema(
+            email = 'requester',
+            password='requesterpassword',
+            username='requester',
+            first_name='requester'
+        )
     )
-    result = query.scalars().all()
-    recent_roomie_application: RoomieApplication = result[0]
-    assert recent_roomie_application
-    await test_db.delete(recent_roomie_application)
-    await test_db.commit()
-    await test_db.refresh(test_user)
-    assert not roommate_finder_request_id in test_user.cached_roomies_application_ids
+    applicant_token = fetch_access_token(applicant)['access_token']
+
+    # connnect the requester's websocket client
+    requester_ws = await websockets.connect(
+        get_user_ws_endpoint( requester_token )
+    )
+    # This delay allows both websocket be fully 
+    # connected and running listener tasks; especially the recipient's ws
+    await asyncio.sleep(5)
+
+    
+    async def applicant_check():
+        response = await httpx_client.get(
+            f'/roommate-finder/request-to-join/{roommate_finder_request_id}',
+            headers=get_headers(applicant_token)
+        )    
+        assert response.status_code == 201
+        data = response.json()
+        assert isinstance(data,list)
+        assert roommate_finder_request_id in data
+
+        # test deletion of roommate_finder id off its cache after deletion of the application
+        query = await test_db.execute(
+            select(RoomieApplication)
+            .where(RoomieApplication.applicant_id == requester.id)
+        )
+        result = query.scalars().all()
+        recent_roomie_application: RoomieApplication = result[0]
+        assert recent_roomie_application
+        await test_db.delete(recent_roomie_application)
+        await test_db.commit()
+        await test_db.refresh(requester)
+        assert not roommate_finder_request_id in requester.cached_roomies_application_ids
+    
+    async def requester_notifiation_reception():
+        recv_data: dict = json.loads(await requester_ws.recv())
+        assert 'event' in recv_data
+        assert 'data' in recv_data
+        data = recv_data['data']
+        assert data['fmt_not']['ref_id'] == roommate_finder_request_id
+        assert data['fmt_not']['ref_model'] == notification_ref['roommates_finder']
+
+
+    async def receipt_check_group():
+        async with asyncio.TaskGroup() as tg:
+            tg.create_task(applicant_check())
+            tg.create_task(requester_notifiation_reception())
+    await asyncio.wait_for(receipt_check_group(), timeout = 60)

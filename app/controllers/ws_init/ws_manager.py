@@ -14,6 +14,7 @@ from property_street_backend.config.postgres_connection_manager import get_async
 from property_street_backend.app.controllers.chat.pubsub_chat_handler import pubsub_chat_handler
 from property_street_backend.app.controllers.asset_request.pubsub_request_handler import pubsub_request_handler
 from property_street_backend.app.controllers.roommate_finder.pubsub_roommate_handler import pubsub_roommate_handler
+from property_street_backend.app.controllers.notification.pubsub_notification_handler import pubsub_notification_handler
 
 class ConnectionManager:
     def __init__(self):
@@ -124,6 +125,8 @@ class ConnectionManager:
             await pubsub_request_handler(websocket, parsed_data, self.redis)
         elif category == 'roommates_finder':
             await pubsub_roommate_handler(websocket, parsed_data)
+        elif category == 'notification':
+            await pubsub_notification_handler(websocket,parsed_data['data'])
 
 
 manager = ConnectionManager()

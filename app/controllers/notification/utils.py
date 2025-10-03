@@ -12,7 +12,8 @@ from property_street_backend.app.controllers.ws_init import (
     websocket_logger,
     user_pend_pool_key, 
     agent_pend_pool_key, 
-    user_pend_pool_fields, 
+    user_pend_pool_fields,
+    add_pending_tokens_to_user_pool, 
 )
 from property_street_backend.log_config.logger_config import log_message
 
@@ -116,3 +117,15 @@ async def dispatch_pending_notification(
                 await db.commit()
                 await redis_client.hdel(_user_pend_pool_key, pending_ids_field)
 
+
+async def add_pending_notification_token_to_user_pool(
+    notification_id: int,
+    redis_client: Redis,
+    client_id: int,        
+):
+    await add_pending_tokens_to_user_pool(
+        user_id=client_id, 
+        token=notification_id, 
+        pool_field=user_pend_pool_fields['notification'], 
+        redis_client=redis_client,
+    )

@@ -1,5 +1,7 @@
 import time
+import json
 import logging
+from redis.asyncio import Redis
 
 agent_pend_pool_key = "pend_pool_agent_notification"
 # score -> unix-timestamp in milliseconds
@@ -13,6 +15,16 @@ agent_specific_channels = {
 generic_channels = {
     'latest_assets': 'latest-assets',
     'roommates_finder': 'roommates-finder'
+}
+
+# references
+channel_categories = {
+    'asset_request':'asset_request',
+    'roommates_finder':'roommates_finder',
+    'notification': 'notification'
+}
+notification_ref = {
+    'roommates_finder': 'roommates_finder'
 }
 
 websocket_logger = logging.getLogger("websocket")
@@ -40,3 +52,25 @@ def get_client_channel_key(client_id):
 def get_timestamp_milliseconds():
     return int(time.time() * 1000)
     # int(datetime.now(timezone.utc).timestamp())
+
+async def add_pending_tokens_to_user_pool(
+    user_id: int,
+    token: str|int,
+    pool_field: str,
+    redis_client: Redis,
+):
+    """adds a given token i.e'chat_key:timestamp' to the messages field of 
+    a user's pend-pool hset in the redis cache.
+
+    Args:
+        user_id (int): id of the user pend-pool to modify
+        token (str): token to be added to the `pool_key` field
+        pool_field: pool field to modify
+        redis_client (Redis): redis session
+    """
+    pend_pool_key = user_pend_pool_key(user_id)
+    token_list = await redis_client.hget(pend_pool_key, pool_field)
+    loaded_keys = json.loads(token_list) if token_list else []
+    loaded_keys.append(token)
+    key_set = set(loaded_keys) # removes duplicates
+    await redis_client.hset(pend_pool_key, pool_field, json.dumps(list(key_set)))

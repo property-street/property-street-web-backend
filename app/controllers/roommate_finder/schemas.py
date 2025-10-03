@@ -22,7 +22,6 @@ class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
     room_images: List[str]  # Flattened
     requester: dict
     gender: Optional[str] = None
-    requester_avatar_url: Optional[str] = None
 
     @classmethod
     def from_orm_with_relations(cls, roommate_finder: RoommateFinder):
@@ -37,14 +36,14 @@ class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
             category=roommate_finder.category,
             requester={
                 "first_name": roommate_finder.requester.first_name,
-                "last_name": roommate_finder.requester.last_name
+                "last_name": roommate_finder.requester.last_name,
+                "avatar_url": (
+                    roommate_finder.requester.profile_avatar.secure_url
+                    if (roommate_finder.requester and roommate_finder.requester.profile_avatar)
+                    else None
+                )
             } if roommate_finder.requester
                 else None,
-            requester_avatar_url=(
-                roommate_finder.requester.profile_avatar.secure_url
-                if (roommate_finder.requester and roommate_finder.requester.profile_avatar)
-                else None
-            )
         )
 
 class RFRSListWithCachedIds(BaseModel):

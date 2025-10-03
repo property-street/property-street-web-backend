@@ -73,9 +73,10 @@ async def retrieve_latest_roommates_finder_requests(
 async def route_roommates_finder_request_application(
     request_id: int,
     session: AsyncSession = Depends(get_db),
+    redis_client: Redis = Depends(get_redis),
     applicant: User = Depends(decode_user_from_token),
 ):
-    return await roommates_finder_request_application(applicant, request_id, session)
+    return await roommates_finder_request_application(applicant, request_id, session, redis_client)
 
 
 @router.get(
