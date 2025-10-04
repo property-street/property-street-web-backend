@@ -8,10 +8,10 @@ from fastapi import WebSocket, WebSocketException, status
 from .utils import handle_pending_trx, require_user_online
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.controllers.ws_init import websocket_logger
-from . import agent_specific_channels, generic_channels, aa_actors_set_key
 from property_street_backend.config.redis_connection_manager import get_redis_from_pool
 from property_street_backend.config.postgres_connection_manager import get_async_session
 from property_street_backend.app.controllers.chat.pubsub_chat_handler import pubsub_chat_handler
+from . import agent_specific_channels, generic_channels, aa_actors_set_key, get_client_channel_key
 from property_street_backend.app.controllers.asset_request.pubsub_request_handler import pubsub_request_handler
 from property_street_backend.app.controllers.roommate_finder.pubsub_roommate_handler import pubsub_roommate_handler
 from property_street_backend.app.controllers.notification.pubsub_notification_handler import pubsub_notification_handler
@@ -40,7 +40,7 @@ class ConnectionManager:
             await self.redis.sadd(aa_actors_set_key , user_id)
             
             # addition of the user specific channel
-            channel_list.append(f"user:{user_id}")
+            channel_list.append(get_client_channel_key(user_id))
 
             if is_agent: # addition of agent specific channel if the user is an agent
                 channel_list += list(agent_specific_channels.values())
@@ -105,7 +105,7 @@ class ConnectionManager:
             # Normal cleanup on disconnect
             pass
         except Exception as e:
-            print(f"Redis listener error for {user_id}: {e}")
+            print(f"Redis listener error for user {user_id}: {e}")
             await self.disconnect(user_id)
 
     @require_user_online(redis_client=get_redis_from_pool())
@@ -113,9 +113,11 @@ class ConnectionManager:
         if user_id == -1:
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
         
-        await self.redis.publish(f"user:{user_id}", json.dumps(message))
+        await self.redis.publish(get_client_channel_key(user_id), json.dumps(message))
 
     async def pubsub_message_dispatcher(self, websocket: WebSocket, data: str):
+        if DEBUG:
+            websocket_logger.info('**In pubsub dispatcher')
         parsed_data: dict = json.loads(data)
         category = parsed_data.get('category')
 
@@ -126,7 +128,7 @@ class ConnectionManager:
         elif category == 'roommates_finder':
             await pubsub_roommate_handler(websocket, parsed_data)
         elif category == 'notification':
-            await pubsub_notification_handler(websocket,parsed_data['data'])
+            await pubsub_notification_handler(websocket,parsed_data['data'],self.redis)
 
 
 manager = ConnectionManager()

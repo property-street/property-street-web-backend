@@ -1,9 +1,11 @@
+import time
 import json
 import pytest
 import asyncio
 import websockets
 from httpx import AsyncClient
 from sqlalchemy import select
+from redis.asyncio import Redis
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,9 +17,14 @@ from property_street_backend.app.models import (
     CloudImageDetail,
 )
 from property_street_backend.app.initiator import logger
-from property_street_backend.app.controllers.ws_init import notification_ref
+from property_street_backend.app.controllers.ws_init import (
+    notification_ref, 
+    user_pend_pool_key,
+    user_pend_pool_fields,
+)
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.controllers.auth.services import fetch_access_token
+from property_street_backend.app.controllers.notification.models import Notification
 from property_street_backend.app.controllers.auth.schemas import UserRegistrationSchema
 from property_street_backend.app.controllers.roommate_finder.models import RoomieApplication
 from property_street_backend.tests.activity.test_controller.test_objects import cloud_image_template
@@ -39,7 +46,7 @@ async def create_request(http_client: AsyncClient, auth_header: dict):
             {
                 **cloud_image_template,
                 "cloud_asset_id":f"dkajdlkajdlkajsdkfjasldkfj{i}",
-                "public_id":f"test_image_{i}",
+                "public_id":f"test_image_{i}_{int(time.time())}",
             } for i in range(3)
         ],
         'extra_conditions': 'I need a 1 bedroom flat in the maldives!',
@@ -67,6 +74,7 @@ def get_headers(token):
 async def test_application( app_subprocess, client__fixture):
     test_db: AsyncSession = client__fixture['db'] 
     httpx_client: AsyncClient = client__fixture['http_client']
+    redis_client: Redis = client__fixture['redis_client']
 
     cloud_image_detail = {
         **cloud_image_template
@@ -106,23 +114,30 @@ async def test_application( app_subprocess, client__fixture):
     await asyncio.sleep(5)
 
     
+    applicant_headers=get_headers(applicant_token)
     async def applicant_check():
         response = await httpx_client.get(
             f'/roommate-finder/request-to-join/{roommate_finder_request_id}',
-            headers=get_headers(applicant_token)
+            headers=applicant_headers
         )    
         assert response.status_code == 201
         data = response.json()
         assert isinstance(data,list)
         assert roommate_finder_request_id in data
 
-        # test deletion of roommate_finder id off its cache after deletion of the application
+        # send in another request
+        response = await httpx_client.get(
+            f'/roommate-finder/request-to-join/{roommate_finder_request_id}',
+            headers=applicant_headers,
+        )    
+        assert response.status_code == 302
+
+        # assert deletion of roommate_finder id off applicant cache after deletion of the application
         query = await test_db.execute(
             select(RoomieApplication)
-            .where(RoomieApplication.applicant_id == requester.id)
+            .where(RoomieApplication.applicant_id == applicant.id)
         )
-        result = query.scalars().all()
-        recent_roomie_application: RoomieApplication = result[0]
+        recent_roomie_application = query.scalars().first()
         assert recent_roomie_application
         await test_db.delete(recent_roomie_application)
         await test_db.commit()
@@ -130,7 +145,7 @@ async def test_application( app_subprocess, client__fixture):
         assert not roommate_finder_request_id in requester.cached_roomies_application_ids
     
     async def requester_notifiation_reception():
-        recv_data: dict = json.loads(await requester_ws.recv())
+        recv_data: dict = json.loads(await asyncio.wait_for(requester_ws.recv(),timeout=60))
         assert 'event' in recv_data
         assert 'data' in recv_data
         data = recv_data['data']
@@ -142,4 +157,34 @@ async def test_application( app_subprocess, client__fixture):
         async with asyncio.TaskGroup() as tg:
             tg.create_task(applicant_check())
             tg.create_task(requester_notifiation_reception())
+   
     await asyncio.wait_for(receipt_check_group(), timeout = 60)
+
+
+    #--* disconnect requester, send another request and assert a notification id exists in user pend_pool *--#
+    await requester_ws.close()
+    # give a lil time to disconnect
+    await asyncio.sleep(2)
+    
+    async def get_pending_notification():
+        pool_key = user_pend_pool_key(requester.id)
+        data = await redis_client.hget(pool_key, user_pend_pool_fields['notification'])
+        return (json.loads(data) if data else [])
+    assert not await get_pending_notification()
+    
+    # make another request
+    response = await httpx_client.get(
+        f'/roommate-finder/request-to-join/{roommate_finder_request_id}',
+        headers=applicant_headers
+    )    
+    assert response.status_code == 201
+    data = response.json()
+    assert isinstance(data,list)
+    assert roommate_finder_request_id in data
+
+    # check the pend pool again
+    pending_notifications = await get_pending_notification()
+    assert pending_notifications
+    notification = await test_db.get(Notification,pending_notifications[0])
+    assert notification.fmt_not['ref_id'] == roommate_finder_request_id
+    assert notification.fmt_not['ref_model'] == notification_ref['roommates_finder']

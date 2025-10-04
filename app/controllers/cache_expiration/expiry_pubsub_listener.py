@@ -33,9 +33,6 @@ async def run_cache_db_expiry_listener(
         
 
         while not stop_event.is_set():
-            # if DEBUG:
-            #     logger.info("**In Cache expiry notification loop!")
-            
             # set an indicator that the loop has been entered.
             await redis_client.set(expiry_pubsub_loop_entered, '', nx=True)
             

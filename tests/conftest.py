@@ -50,6 +50,7 @@ async def get_test_db__fixture(test_env_var):
 @pytest_asyncio.fixture(scope="function")
 async def redis_client__fixture(test_env_var):
     async with get_redis_instance() as redis_client:
+        await redis_client.flushdb()
         yield redis_client
 
 
