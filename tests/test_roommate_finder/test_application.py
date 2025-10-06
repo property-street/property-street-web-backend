@@ -6,8 +6,6 @@ import websockets
 from httpx import AsyncClient
 from sqlalchemy import select
 from redis.asyncio import Redis
-from sqlalchemy.orm import selectinload
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -17,16 +15,13 @@ from property_street_backend.app.models import (
     CloudImageDetail,
 )
 from property_street_backend.app.initiator import logger
-from property_street_backend.app.controllers.ws_init import (
-    notification_ref, 
-    user_pend_pool_key,
-    user_pend_pool_fields,
-)
+from property_street_backend.app.controllers.ws_init import notification_ref
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.app.controllers.notification.models import Notification
 from property_street_backend.app.controllers.auth.schemas import UserRegistrationSchema
 from property_street_backend.app.controllers.roommate_finder.models import RoomieApplication
+from property_street_backend.app.controllers.notification import get_pending_notification_ids
 from property_street_backend.tests.activity.test_controller.test_objects import cloud_image_template
 from property_street_backend.app.controllers.roommate_finder.schemas import RoommateFinderResponseSchema
 
@@ -166,11 +161,7 @@ async def test_application( app_subprocess, client__fixture):
     # give a lil time to disconnect
     await asyncio.sleep(2)
     
-    async def get_pending_notification():
-        pool_key = user_pend_pool_key(requester.id)
-        data = await redis_client.hget(pool_key, user_pend_pool_fields['notification'])
-        return (json.loads(data) if data else [])
-    assert not await get_pending_notification()
+    assert not await get_pending_notification_ids(requester.id, redis_client)
     
     # make another request
     response = await httpx_client.get(
@@ -183,7 +174,7 @@ async def test_application( app_subprocess, client__fixture):
     assert roommate_finder_request_id in data
 
     # check the pend pool again
-    pending_notifications = await get_pending_notification()
+    pending_notifications = await get_pending_notification_ids(requester.id, redis_client)
     assert pending_notifications
     notification = await test_db.get(Notification,pending_notifications[0])
     assert notification.fmt_not['ref_id'] == roommate_finder_request_id

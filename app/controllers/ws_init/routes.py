@@ -42,9 +42,8 @@ async def websocket_endpoint( websocket: WebSocket ):
             'is_agent': is_agent
         })
 
-
     try:
-        last_n_timestamp = int(last_n_timestamp)
+        last_n_timestamp = float(last_n_timestamp)
     except:
         last_n_timestamp = None
 

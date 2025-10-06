@@ -1,15 +1,9 @@
 import pytest
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .test_user_creation import user_data
-from property_street_backend.app.schemas.auth_schemas import (
-    UserRegistrationSchema,
-)
 from property_street_backend.app.models import User
 from property_street_backend.app.controllers.auth.services import (
-    create_user,
     create_agent,
     verify_password,
 )
@@ -31,7 +25,6 @@ async def test_create_agent(get_test_db__fixture):
         break
     try:
         created_agent: User = await create_test_agent(test_db)
-
         
         # assertions 
         assert created_agent.username == user_data.username

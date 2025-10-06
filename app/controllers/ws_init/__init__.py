@@ -1,6 +1,7 @@
 import time
 import json
 import logging
+from typing import List
 from redis.asyncio import Redis
 
 agent_pend_pool_key = "pend_pool_agent_notification"
@@ -17,12 +18,14 @@ generic_channels = {
     'roommates_finder': 'roommates-finder'
 }
 
-# references
+# channel categories or pong class
 channel_categories = {
     'asset_request':'asset_request',
     'roommates_finder':'roommates_finder',
     'notification': 'notification'
 }
+pong_class = channel_categories
+# references
 notification_ref = {
     'roommates_finder': 'roommates_finder'
 }
@@ -49,8 +52,8 @@ def user_pend_pool_key(user_id:int,/)->str:
 def get_client_channel_key(client_id):
     return f'channel_{client_id}'
 
-def get_timestamp_milliseconds():
-    return int(time.time() * 1000)
+def get_timestamp_milliseconds(timestamp:float)->float:
+    return (timestamp if timestamp else time.time()) * 1000.0
     # int(datetime.now(timezone.utc).timestamp())
 
 
@@ -69,10 +72,13 @@ async def is_online(redis_client: Redis, user_id: int) -> bool:
 
 async def add_pending_tokens_to_user_pool(
     user_id: int,
-    token: str|int,
+    tokens: str|int|List,
     pool_field: str,
     redis_client: Redis,
+    *,
+    replace: bool = False,
 ):
+    websocket_logger.info(f"**Replace: {replace}")
     """adds a given token i.e'chat_key:timestamp' to the messages field of 
     a user's pend-pool hset in the redis cache.
 
@@ -85,6 +91,10 @@ async def add_pending_tokens_to_user_pool(
     pend_pool_key = user_pend_pool_key(user_id)
     token_list = await redis_client.hget(pend_pool_key, pool_field)
     loaded_tokens:list = json.loads(token_list) if token_list else []
-    loaded_tokens.append(token)
+    token_is_list = isinstance(tokens,list)
+    if replace:
+        loaded_tokens = tokens if token_is_list else [tokens]
+    else:
+        loaded_tokens.extend(tokens) if token_is_list else loaded_tokens.append(tokens)
     token_set = set(loaded_tokens) # removes duplicates
     await redis_client.hset(pend_pool_key, pool_field, json.dumps(list(token_set)))

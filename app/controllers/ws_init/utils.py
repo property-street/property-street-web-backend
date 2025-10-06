@@ -25,7 +25,7 @@ async def handle_pending_trx(
     async with db_session_maker() as db:
         # dispatch pending notification
         await dispatch_pending_notification(
-            last_timestamp=last_n_timestamp,
+            last_timestamp_ms = last_n_timestamp,
             redis_client = redis_client,
             db = db,
             is_agent = is_agent,
