@@ -28,7 +28,6 @@ class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
         """Transform ORM object to response schema with all relationships resolved"""
         return cls(
             id=roommate_finder.id,
-            gender=roommate_finder.requester.gender if roommate_finder.requester else None,
             extra_conditions=roommate_finder.extra_conditions,
             area=roommate_finder.area,
             room_images=[img.secure_url for img in roommate_finder.room_images],
@@ -41,7 +40,8 @@ class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
                     roommate_finder.requester.profile_avatar.secure_url
                     if (roommate_finder.requester and roommate_finder.requester.profile_avatar)
                     else None
-                )
+                ),
+                "gender": roommate_finder.requester.gender if roommate_finder.requester else None,
             } if roommate_finder.requester
                 else None,
         )

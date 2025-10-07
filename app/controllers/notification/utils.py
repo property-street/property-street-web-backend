@@ -35,11 +35,32 @@ def organize_payload(o_list: List[Union[str, Notification]]) -> dict:
     ] if o_list else []
 
 
-def bump_decimal(value: float) -> float:
-    dec = Decimal(str(value))
-    precision = abs(dec.as_tuple().exponent)  # number of decimal places
-    increment = Decimal('1e-' + str(precision))
-    return float((dec + increment).quantize(increment, rounding=ROUND_HALF_UP))
+def bump_decimal(score) -> str:
+    """
+    score: str, bytes, float or Decimal
+    returns: bumped score as string (one least-decimal-place higher)
+    """
+    # get stable string representation
+    if isinstance(score, bytes):
+        s = score.decode()
+    elif isinstance(score, float):
+        s = format(score, ".17g")   # preserves full float digits reliably
+    else:
+        s = str(score)
+
+    dec = Decimal(s)                   # exact decimal from the textual representation
+    exp = dec.as_tuple().exponent      # negative if there are fractional digits
+    precision = -exp if exp < 0 else 0
+    increment = Decimal(1).scaleb(-precision)  # 1e-precision, or 1 if precision==0
+    bumped = (dec + increment).quantize(increment)  # keep same scale
+    return format(bumped)  # string, safe to pass to Redis
+
+def zrangemin(last_timestamp_ms):
+    # last_timestamp_ms may be float or str/bytes from Redis
+    return ( format(last_timestamp_ms, ".17g")   # stable text form of the float
+        if isinstance(last_timestamp_ms, float)
+        else last_timestamp_ms.decode() if isinstance(last_timestamp_ms, bytes) else str(last_timestamp_ms)
+    )
 
 async def dispatch_pending_notification(
     *,

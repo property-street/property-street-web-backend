@@ -21,6 +21,7 @@ from property_street_backend.app.database import (
 from property_street_backend.app.controllers.auth import routes as auth_routes
 from property_street_backend.app.controllers.chat import routes as chat_routes
 from property_street_backend.app.controllers.ws_init import routes as ws_routes
+from property_street_backend.app.controllers.search import routes as search_routes
 from property_street_backend.app.controllers.assets import routes as assets_routes
 from property_street_backend.app.controllers.settings import routes as settings_routes
 from property_street_backend.app.controllers.activity import routes as activity_routes
@@ -128,6 +129,7 @@ app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(chat_routes.router)
 app.include_router(google_oauth.router)
+app.include_router(search_routes.router)
 app.include_router(assets_routes.router)
 app.include_router(assets_routes.router)
 app.include_router(settings_routes.router)

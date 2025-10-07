@@ -69,7 +69,8 @@ asset_tag_association = Table(
             ondelete='RESTRICT'
         ), 
         primary_key=True
-    )
+    ),
+    extend_existing=True  # 👈 this allows redefinition without errors
 )
 
 # models

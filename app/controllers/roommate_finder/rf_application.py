@@ -1,4 +1,5 @@
 import json
+import time
 from sqlalchemy import select
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,6 +70,7 @@ async def roommates_finder_request_application(applicant: User, request_id: int,
         n_type = NotificationTypeChoice.roommate_finder.value
         notification_map = {
             'n_type': n_type,
+            'timestamp': time.time(),
             'fmt_not': {
                 'title': title,
                 'media_urls': media_urls,
@@ -94,10 +96,7 @@ async def roommates_finder_request_application(applicant: User, request_id: int,
         request_data = NotificationResponse.model_validate(notification).model_dump()
         data_to_publish = {
             'category': channel_categories['notification'],
-            'data': {
-                **request_data,
-                'created_at': request_data['created_at'].isoformat()
-            },
+            'data': request_data,
         }
         requester_channel = get_client_channel_key(requester_id)
         try:

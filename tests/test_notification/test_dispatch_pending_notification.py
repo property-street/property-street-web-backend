@@ -84,7 +84,7 @@ async def test_dispatch_pending_notification(app_subprocess, sessions_fixture):
         loaded_response = json.loads(await asyncio.wait_for(ws.recv(), timeout = 60))
         assert len(loaded_response['data'])# == (n-1)
     
-    #--- CASE 3: agent with no timestamp but has latest notification in DB ---
+    # === CASE 3: agent with no timestamp but has latest notification in DB ---
     # Add one notification to DB to act as the latest
     await test_db.rollback() # rollback initial flush
     notif = not_obj_list[0]

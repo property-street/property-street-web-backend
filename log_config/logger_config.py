@@ -33,6 +33,9 @@ def log_message(log_type, message):
     logger.info(message) if log_type != "error" else logger.error(message)
     truncate_log_file(logger.handlers[0].baseFilename)
 
+def log_error(message):
+    log_message('error',message)
+
 # Function to truncate log files to 100 lines
 def truncate_log_file(file_path, max_lines=100):
     try:

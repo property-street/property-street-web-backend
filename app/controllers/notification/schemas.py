@@ -1,12 +1,13 @@
 from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
+from .enums import NotificationTypeChoice, NotificationStateChoice
 
 class FMTNOT(BaseModel):
     title: str
     text_content: Optional[str] = None
     media_urls: Optional[list] = None
-    notification_avatar: Optional[str] = None
+    avatar: Optional[str] = None
     ref_model: Optional[str] = None
     ref_id: Optional[int] = None
 
@@ -16,9 +17,9 @@ class ModelFMTNOT(FMTNOT):
 
 class NotificationResponse(BaseModel):
     id: int
-    n_type: str
+    n_type: NotificationTypeChoice
     fmt_not: ModelFMTNOT
-    n_status: str
+    n_status: NotificationStateChoice
     timestamp: float
     user_id: int
 
