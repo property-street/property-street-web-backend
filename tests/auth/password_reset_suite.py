@@ -31,15 +31,15 @@ async def test_send_password_reset_mail(client__fixture):
     )
     assert response.status_code == 200
     data = response.json()
-    print(data)
     assert "detail" in data
     assert "expiry" in data
 
     hset_key = hset_password_reset_key(email)
-    assert redis_client.exists(hset_key)
+    assert await redis_client.exists(hset_key)
 
-    secret = redis_client.hget(hset_key, sec_field_name)
-    token=f'{test_user.id}_{secret}'
+    cached_secret = await redis_client.hget(hset_key, sec_field_name)
+    decoded_secret = cached_secret.decode() if isinstance(cached_secret, bytes) else cached_secret
+    token=f'{test_user.id}_{decoded_secret}'
 
     #-- check validity of the token --#
     response = await httpx_client.get(
@@ -50,12 +50,10 @@ async def test_send_password_reset_mail(client__fixture):
 
     #-- change password --#
     new_password = "new_secure_password123"
-    token = "valid_token_for_user"
-
     response = await httpx_client.post(
         "/auth/change-password",
         json={"token": token, "password": new_password},
     )
     assert response.status_code == 200
     await authenticate_user(test_db, email, new_password)
-    assert not await redis_client.exists(user_key)
+    assert not await redis_client.exists(hset_key)

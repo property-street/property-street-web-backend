@@ -284,8 +284,8 @@ async def send_email_verification_code(
             detail = {
                 "message" : "Please wait before requesting a new code.",
                 "expiry" : (expiry.decode() 
-                        if isinstance(expiry,bytes) 
-                        else expiry)
+                    if isinstance(expiry,bytes) 
+                    else expiry)
                 }
         )
     else: # When no result is found
@@ -550,10 +550,15 @@ async def send_password_reset_mail(
             email_template_content = read_email_from_html_template_name('password_reset_template')
             property_street_address = "Port Harcourt"
             
+            reset_link = (
+                f"http://localhost:3000/reset-password?token={user.id}_{secret}"
+                if DEBUG else
+                f"https://propertystreet.ng/reset-password?token={user.id}_{secret}"
+            )
             email_string = substituted_string(
                 email_template_content,
                 {
-                    "reset_link":f"https://propertystreet.ng/reset-password?token={user.id}_{secret}",
+                    "reset_link": reset_link,
                     "property_street_address": property_street_address
                 }
             )
@@ -620,9 +625,13 @@ async def check_password_reset_email_validity(
     # Check if the secret exists in the cache
     user_key = hset_password_reset_key(email)
     cached_secret = await redis_client.hget(user_key, sec_field_name)
-
+    if not cached_secret:
+        if DEBUG:
+            logger.info("Cached_secret non-existent.")
+        raise _exc
+    
     decoded_secret = cached_secret.decode() if isinstance(cached_secret, bytes) else cached_secret
-    if not cached_secret or (decoded_secret != secret): #When a result is found
+    if (decoded_secret != secret): #When a result is found
         if DEBUG:
             logger.info("Cached_secret malformed.")
         raise _exc
@@ -647,8 +656,13 @@ async def change_password(
     redis_client: Redis,
 ):
     split_token = token.split('_', maxsplit=1)
-    user_id = int(split_token[0])
-    secret = split_token[1]
+    user_id = None
+    secret = None
+    try:
+        user_id = int(split_token[0])
+        secret = split_token[1]
+    except:
+        raise _exc
 
     
     user = await session.get(User, user_id)

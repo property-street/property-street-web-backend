@@ -24,13 +24,23 @@ async def test_password_change_route(client__fixture):
     test_user = await create_test_user(test_db)
     email = test_user.email
 
+
     # Generate a new five-digit code
     secret = secrets.token_urlsafe()
     token=f'{test_user.id}_{secret}'
     user_key = hset_password_reset_key(email)
+    
+    # cache an instance of the user with the data
     await redis_client.hset(user_key, sec_field_name, secret)
 
+    #-- check validity of the token --#
+    response = await httpx_client.get(
+        f"/auth/check-email-reset-validity?token={token}",
+    )
+    assert response.status_code == 200
+
     #-- Send a request with old password --#
+    await redis_client.hset(user_key, sec_field_name, secret)
     response = await httpx_client.post(
         "/auth/change-password",
         json={"token": token, "password": user_data.password},
