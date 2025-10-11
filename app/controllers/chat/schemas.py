@@ -2,10 +2,11 @@ from pydantic import (
     BaseModel, 
     field_validator
 )
-from typing import Literal, Optional
-
+from typing import Literal, Optional, List, Any
+from .enums import MessageTypes, MessageStatus
 from property_street_backend.app.schemas import ConfigDictSetter
-from property_street_backend.app.models import User, CloudImageDetail
+from property_street_backend.app.models_helper import CloudImageDetail
+from property_street_backend.app.controllers.assets.schemas import CloudImageSchema
 
 class UserMiniSchema(ConfigDictSetter):
     id: int
@@ -19,13 +20,23 @@ class UserMiniSchema(ConfigDictSetter):
             return {'url': value.secure_url}
         return None
 
+class AdditionalMetadata(BaseModel):
+    edited: bool = False
+    pinned: bool = False
+
+class FMTMSG(BaseModel):
+    text_content: str = ''
+    media: CloudImageSchema = []
+    reactions: Optional[dict[str, int]] = None
+    additional_metadata: AdditionalMetadata
+
 
 class MessageSchema(ConfigDictSetter):
     id: int
-    fmt_msg: dict
-    server_timestamp_ms: int
-    status: str #Literal['unsent', 'sent', 'delivered', 'read']
-    msg_type: Optional[str]
+    fmt_msg: FMTMSG
+    server_timestamp_ms: float
+    status: MessageStatus
+    msg_type: MessageTypes
     thread_id: int
     sender_id: int
     sender: UserMiniSchema
@@ -33,17 +44,12 @@ class MessageSchema(ConfigDictSetter):
     recipient: UserMiniSchema
 
 
-class ChatObjectSchema(BaseModel):
-    pass
-
-
 class CachedMessageSchema(MessageSchema):
     id: Optional[int] = None
-    server_timestamp_ms: Optional[int] = None
+    server_timestamp_ms: Optional[float] = None
 
     category: Literal['chat'] = 'chat'
-    msg_type: Literal['outbound_message','incoming_message', 'delivered_message', 'read_message', 'completed']
     
     thread_id: Optional[int] = None
-    ui_inbound_timestamp_ms: Optional[int] = None
-    ui_outbound_timestamp_ms: Optional[int] = None
+    ui_inbound_timestamp_ms: Optional[float] = None
+    ui_outbound_timestamp_ms: Optional[float] = None

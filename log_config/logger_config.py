@@ -36,6 +36,9 @@ def log_message(log_type, message):
 def log_error(message):
     log_message('error',message)
 
+def log_success(message):
+    log_message('success',message)
+
 # Function to truncate log files to 100 lines
 def truncate_log_file(file_path, max_lines=100):
     try:

@@ -2,10 +2,13 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from . import message as message_template, fmt_msg
+from property_street_backend.app.controllers.chat.schemas import FMTMSG
 from property_street_backend.app.models import Thread, Message, CloudImageDetail
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.controllers.auth.services import fetched_access_token
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
+from property_street_backend.app.controllers.chat.enums import MessageStatus, MessageTypes
 from property_street_backend.app.controllers.chat.get_threads_schemas import (
     ThreadSummarySchema,
 )
@@ -14,11 +17,8 @@ from property_street_backend.tests.activity.test_controller.test_objects import 
 
 @pytest.mark.asyncio
 async def test_get_threads_with_latest_message(client__fixture):
-    async for fixture_obj in client__fixture:
-        test_db: AsyncSession = fixture_obj['db']
-        httpx_client: AsyncClient = fixture_obj['http_client']
-        break
-
+    test_db: AsyncSession = client__fixture['db']
+    httpx_client: AsyncClient = client__fixture['http_client']
 
     # Create test users
     user1 = await create_test_user(test_db)
@@ -44,9 +44,8 @@ async def test_get_threads_with_latest_message(client__fixture):
     for i in range(3):
         messages = [
             Message(
-                fmt_msg={'text_content': f"Thread {i} - Message {j}"},
+                fmt_msg=FMTMSG.model_validate(fmt_msg).model_dump(),
                 server_timestamp_ms=j,
-                status="sent",
                 sender_id=user1.id if j % 2 == 0 else user2.id,
                 recipient_id=user2.id if j % 2 == 0 else user1.id
             ) for j in range(5)  # 5 messages per thread

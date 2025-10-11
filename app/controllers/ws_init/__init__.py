@@ -22,7 +22,8 @@ generic_channels = {
 channel_categories = {
     'asset_request':'asset_request',
     'roommates_finder':'roommates_finder',
-    'notification': 'notification'
+    'notification': 'notification',
+    'chat': 'chat',
 }
 pong_class = channel_categories
 # references
@@ -33,7 +34,8 @@ notification_ref = {
 websocket_logger = logging.getLogger("websocket")
 
 user_pend_pool_fields = {
-    'notification': 'notifications'
+    'message': 'messages',
+    'notification': 'notifications',
 }
 
 def user_pend_pool_key(user_id:int,/)->str:
@@ -52,9 +54,8 @@ def user_pend_pool_key(user_id:int,/)->str:
 def get_client_channel_key(client_id):
     return f'channel_{client_id}'
 
-def get_timestamp_milliseconds(timestamp:float)->float:
-    return (timestamp if timestamp else time.time()) * 1000.0
-    # int(datetime.now(timezone.utc).timestamp())
+def get_timestamp_milliseconds()->float:
+    return time.time() * 1000
 
 
 async def is_online(redis_client: Redis, user_id: int) -> bool:

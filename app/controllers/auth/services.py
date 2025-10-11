@@ -12,9 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Response
 
-from property_street_backend.app.models import (
-    User,
-)
 from property_street_backend.app.schemas.auth_schemas import (
     TokenData, 
     UserRegistrationSchema, 
@@ -36,6 +33,7 @@ from property_street_backend.config.settings import (
 )
 from property_street_backend.config import env_is_test
 from property_street_backend.app.database import get_db
+from property_street_backend.app.controllers.actors.models import User
 
 # Constants for JWT
 SECRET_KEY = JWT_SECRET_KEY

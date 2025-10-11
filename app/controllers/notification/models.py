@@ -1,9 +1,7 @@
 from sqlalchemy import (
-    func,
     Float,
     Column,
     Integer,
-    DateTime,
     ForeignKey,
     Enum as SQLAlchemyEnum,
 )
@@ -18,7 +16,6 @@ class Notification(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    # created_at = Column(DateTime(timezone=True), server_default=func.now())
     timestamp = Column(Float, nullable=False)
     n_type = Column(
         SQLAlchemyEnum(NotificationTypeChoice, name='notification_type_choice'), 

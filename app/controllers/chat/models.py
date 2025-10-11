@@ -5,13 +5,15 @@ from sqlalchemy import (
     ForeignKey, 
     func,
     Table,
+    Float,
     DateTime,
     Enum as SQLAlchemyEnum,
-    BigInteger,
 )
-from sqlalchemy.orm import relationship
+from pydantic import ValidationError
+from sqlalchemy.orm import relationship, validates
 from sqlalchemy.dialects.postgresql import JSONB
 
+from .schemas import FMTMSG
 from .enums import MessageStatus, MessageTypes
 from property_street_backend.config.postgres_connection_manager import Base
 
@@ -146,8 +148,8 @@ class Message(Base):
         nullable=False,
         default=MessageStatus.unsent
     )
-    server_timestamp_ms = Column(BigInteger, nullable=False)
-    updated_timestamp_ms = Column(BigInteger, nullable=True)
+    server_timestamp_ms = Column(Float, nullable=False)
+    updated_timestamp_ms = Column(Float)
 
     # Foreign key relationship to Thread
     thread_id = Column(
@@ -195,3 +197,20 @@ class Message(Base):
         back_populates='received_messages',
         lazy='selectin'
     )
+
+    @validates("fmt_msg")
+    def validate_fmt_msg(self, key, value):
+        if value is None:
+            return None
+        
+        # Allow Pydantic model instance
+        if isinstance(value, FMTMSG):
+            return value.model_dump()
+        
+        # Validate dict input
+        try:
+            validated = FMTMSG(**value)
+        except ValidationError as e:
+            raise ValueError(f"Invalid fmt_msg format: {e}")
+        
+        return validated.model_dump()

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..utils import get_user_ws_endpoint
 from . import message as message_template
 from property_street_backend.app.initiator import get_redis
+from property_street_backend.app.controllers.chat.schemas import CachedMessageSchema as MessageSchema
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
@@ -16,14 +17,9 @@ from property_street_backend.app.controllers.chat import chat_dialogue_hset_key,
 
 
 @pytest.mark.asyncio
-async def test_dialogue( app_subprocess, sessions_fixture ):
-    test_db = None
-    redis_client = None
-
-    async for fixture_obj in sessions_fixture:
-        test_db: AsyncSession = fixture_obj['db']
-        redis_client: Redis = fixture_obj['redis_client']
-        break
+async def test_dialogue( app_subprocess, client__fixture ):
+    test_db: AsyncSession = client__fixture['db']
+    redis_client: Redis = client__fixture['redis_client']
 
     sender = await create_test_user(test_db)
     recipient = await create_test_user(test_db, UserRegistrationSchema(
@@ -52,11 +48,11 @@ async def test_dialogue( app_subprocess, sessions_fixture ):
     await asyncio.sleep(5)
 
     try:
-        message = {
+        message = MessageSchema.model_validate({
             "sender_id": sender_id,
             "recipient_id": recipient_id,
             **message_template,
-        }
+        }).model_dump()
 
         await sender_ws.send(json.dumps(message))
 
@@ -158,10 +154,6 @@ async def test_dialogue( app_subprocess, sessions_fixture ):
 
 
     finally:
-        if test_db:
-            await test_db.close()
-        if redis_client:
-            await redis_client.aclose()
         if sender_ws:
             await sender_ws.close()
         if recipient_ws:

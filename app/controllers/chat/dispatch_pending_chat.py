@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from typing import List
 from fastapi import WebSocket
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,10 +7,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .utils.offload_chat_data import offload_dialogue
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
-from property_street_backend.log_config.logger_config import log_message
-from property_street_backend.app.controllers.ws_init import user_pend_pool_key
+from property_street_backend.app.controllers.ws_init import (
+    user_pend_pool_key,
+    channel_categories,
+)
+from property_street_backend.log_config.logger_config import (
+    log_error,
+    log_success,
+)
 from property_street_backend.app.controllers.ws_init import get_timestamp_milliseconds
-from property_street_backend.app.controllers.chat.utils.store import get_chat_next_offload_schedule
+from property_street_backend.app.controllers.chat.utils.store import (
+    get_pending_message_tokens,
+    get_chat_next_offload_schedule,
+)
 
 async def dispatch_pending_chat(
     *,
@@ -31,38 +40,27 @@ async def dispatch_pending_chat(
     """
     if DEBUG:
         logger.info('*In dispatch_pending_chat function*')
+    
     try:
-        pend_pool_key = user_pend_pool_key(user_id)
-        message_tokens = await redis_client.hget(pend_pool_key, 'messages')
+        message_tokens: List[str] = await get_pending_message_tokens(user_id, redis_client)
         
         dialogue_keys = []
-
-        logger.info(f'**{message_tokens}')
-        if message_tokens:
-            msgs_to_dispatch = []
-            token_list = json.loads(message_tokens)
-            
-            for token in token_list: # token -> dialogue_key:timestamp
-                token: str
-                split_token = token.split(':')
-                dialogue_key = split_token[0]
-                dialogue_keys.append(dialogue_key)
-                lazy_timestamp = split_token[1]
-                messages: dict[str, dict] = json.loads(await redis_client.hget(dialogue_key, 'messages'))
-                if messages:
-                    chat_obj = messages.get(lazy_timestamp)
-                    if chat_obj:
-                        msgs_to_dispatch.append(chat_obj)
-            
-            if msgs_to_dispatch:
-                await websocket.send_json({
-                    'event': {
-                        'class': 'chat',
-                        'type': 'pending_messages'
-                    },
-                    'data': msgs_to_dispatch 
-                })
-
+        msgs_to_dispatch = []
+        for token in message_tokens: # token -> dialogue_key:timestamp
+            dialogue_key, timestamp = (split_token:=token.split(':'))[0],split_token[1]
+            dialogue_keys.append(dialogue_key)
+            messages: dict[str, dict] = json.loads(await redis_client.hget(dialogue_key, 'messages'))
+            if messages and (chat_obj:= messages.get(timestamp)):
+                msgs_to_dispatch.append(chat_obj)
+        
+        if msgs_to_dispatch:
+            await websocket.send_json({
+                'event': {
+                    'class': channel_categories['chat'],
+                    'type': 'pending_messages'
+                },
+                'data': msgs_to_dispatch 
+            })
 
             # lazy offload
             unique_dialogue_keys = set(dialogue_keys)
@@ -71,7 +69,7 @@ async def dispatch_pending_chat(
                 lazy_timestamp = await redis_client.hget(key, 'lazy_timestamp')
                 if lazy_timestamp: 
                     # offload if the current timestamp is greater than the lazy timestamp
-                    if get_timestamp_milliseconds() > int(lazy_timestamp): 
+                    if get_timestamp_milliseconds() > float(lazy_timestamp): 
                         await offload_dialogue(
                             redis_client = redis_client,
                             db = db,
@@ -81,13 +79,14 @@ async def dispatch_pending_chat(
                     lazy_timestamp_ms = get_chat_next_offload_schedule()
                     await redis_client.hset(key, 'lazy_timestamp', lazy_timestamp_ms)
             
-            if dialogue_keys:
-                log_message(
+            if unique_dialogue_keys and DEBUG:
+                log_success(
                     'success',
-                    f'User:{user_id} pending chats successfully offloaded!'
+                    f'{len(unique_dialogue_keys)} User:{user_id} pending threads successfully offloaded!'
                 )
     except Exception as e:
         e_msg = f'Error offloading User:{user_id} pending chats! Reason: {e}'
-        logger.error(e_msg)
-        log_message('error',e_msg)
+        if DEBUG:
+            logger.error(e_msg)
+        log_error('error',e_msg)
         raise e

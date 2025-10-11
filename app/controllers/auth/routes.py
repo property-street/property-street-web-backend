@@ -10,37 +10,32 @@ from .schemas import (
     ConfirmEmailVerificationCodeSchema,
     SendEmailVerificationResponseSchema,
 )
-from property_street_backend.app.models import User
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.schemas.auth_schemas import (
-    UserRegistrationSchema, 
-    UserSigninSchema, 
-    SigninResponse, 
     TokenData, 
-    ProbeUserExistenceSchema,
+    SigninResponse, 
+    UserSigninSchema, 
     SendEmailCodeSchema,
+    UserRegistrationSchema, 
+    ProbeUserExistenceSchema,
     SignupCodeVerificationSchema,
 )
-from property_street_backend.log_config.logger_config import log_message
-from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.utils.store import email_verification_code_ttl
 from .services import (
     create_user, 
     create_agent,
-    require_roles,
     change_password,
     authenticate_user, 
     fetched_access_token, 
     decode_user_from_token, 
     send_password_reset_mail,
     process_token_validate_user,
-    get_password_reset_link_ttl,
+    confirm_email_verification_code,
     check_username_email_availability,
     check_password_reset_email_validity,
     send_email_verification_code as controller_send_email_verification_code,
     confirm_email_verification_code_and_sign_user_up as controller_confirm_email_verification_code_and_sign_user_up,
-    confirm_email_verification_code,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
