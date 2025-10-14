@@ -4,6 +4,7 @@ from redis.asyncio import Redis
 from datetime import datetime, timezone, timedelta
 
 
+from ..schemas import CachedMessageSchema
 from property_street_backend.config import get_env
 from property_street_backend.config.settings import (
     DEBUG,
@@ -196,6 +197,10 @@ def get_chat_next_offload_schedule() -> int:
     lazy_timestamp = datetime.now(timezone.utc) + timedelta(seconds=chat_lazy_offload_schedule)
     return int(lazy_timestamp.timestamp())
 
+
+async def get_pending_messages(redis_client: Redis, dialogue_key: str)->dict[str, CachedMessageSchema]:
+    messages = await redis_client.hget(dialogue_key, 'messages')
+    return  json.loads(messages) if messages else {}
 
 
 def get_chat_ttl() -> int:

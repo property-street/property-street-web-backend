@@ -4,6 +4,7 @@ from fastapi import WebSocket
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .schemas import CachedMessageSchema
 from .utils.offload_chat_data import offload_dialogue
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
@@ -17,6 +18,7 @@ from property_street_backend.log_config.logger_config import (
 )
 from property_street_backend.app.controllers.ws_init import get_timestamp_milliseconds
 from property_street_backend.app.controllers.chat.utils.store import (
+    get_pending_messages,
     get_pending_message_tokens,
     get_chat_next_offload_schedule,
 )
@@ -49,7 +51,7 @@ async def dispatch_pending_chat(
         for token in message_tokens: # token -> dialogue_key:timestamp
             dialogue_key, timestamp = (split_token:=token.split(':'))[0],split_token[1]
             dialogue_keys.append(dialogue_key)
-            messages: dict[str, dict] = json.loads(await redis_client.hget(dialogue_key, 'messages'))
+            messages: dict[str, CachedMessageSchema] = await get_pending_messages(redis_client, dialogue_key)
             if messages and (chat_obj:= messages.get(timestamp)):
                 msgs_to_dispatch.append(chat_obj)
         
@@ -88,5 +90,5 @@ async def dispatch_pending_chat(
         e_msg = f'Error offloading User:{user_id} pending chats! Reason: {e}'
         if DEBUG:
             logger.error(e_msg)
-        log_error('error',e_msg)
+        log_error('error')
         raise e

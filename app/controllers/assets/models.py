@@ -141,10 +141,6 @@ class Asset(Base):
     def has_features(self):
         return bool(self.features)  # works in Python
 
-    # @has_features.expression
-    # def has_features(cls):
-    #     return func.count(AssetFeature.id) > 0  # for SQL use, if needed
-
 
 class AssetFeature(Base):
     __tablename__ = 'asset_features'

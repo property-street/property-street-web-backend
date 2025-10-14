@@ -1,3 +1,5 @@
+from property_street_backend.tests.activity.test_controller.test_objects import cloud_image_template
+
 sender = {
     "id": 1,
     "username": "john",
@@ -13,17 +15,17 @@ recipient = {
 
 fmt_msg = {
     "text_content": "Hello!",
-    "media_urls": ["https://cdn.domain.com/file1.jpg", "https://cdn.domain.com/file2.png"],
-    "sender": sender,
-    "recipient": recipient,
+    "media": [{**cloud_image_template}],
     "reactions": {
-        "👍": ["user1", "user2"],
-        "❤️": ["user3"]
+        "👍": [sender, recipient],
+        "❤️": [recipient]
     },
     "additional_metadata": {
         "edited": False,
         "pinned": False
-    }
+    },
+    "ui_inbound_timestamp_ms": 0,
+    "ui_outbound_timestamp_ms": 0
 }
 
 message = {

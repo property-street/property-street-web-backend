@@ -34,6 +34,7 @@ from property_street_backend.config.settings import (
 from property_street_backend.config import env_is_test
 from property_street_backend.app.database import get_db
 from property_street_backend.app.controllers.actors.models import User
+from property_street_backend.log_config.logger_config import log_error
 
 # Constants for JWT
 SECRET_KEY = JWT_SECRET_KEY
@@ -595,9 +596,14 @@ async def send_password_reset_mail(
                 "expiry": expiry_time
             }
         except Exception as e:
+            f_msg = "Something went wrong sending a password reset mail. Please try again later."
+            d_msg = f'{f_msg} Reason: {e}'
+            if DEBUG:
+                logger.error(d_msg)
+            log_error(d_msg)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong sending a password reset mail. Please try again later.",
+                detail=f_msg,
                 headers={"X-Error": "Server error"},
             )
 
@@ -639,11 +645,17 @@ async def check_password_reset_email_validity(
 
 async def process_token_validate_user(token:str, session: AsyncSession):
     split_token = token.split('_', maxsplit=1)
-    user_id = int(split_token[0])
-    secret = split_token[1]
+
+    try:
+        user_id = int(split_token[0])
+        secret = split_token[1]
+    except:
+        raise _exc
 
     user = await session.get(User, user_id)
     if not user:
+        if DEBUG:
+            logger.info(f'**User not found')
         raise _exc
     
     return user, secret

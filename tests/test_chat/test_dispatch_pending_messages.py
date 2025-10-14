@@ -8,9 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from . import message as message_template
 from ..utils import get_user_ws_endpoint
 from property_street_backend.app.controllers.ws_init import (
-    user_pend_pool_key,
     channel_categories,
-    get_timestamp_milliseconds,
 )
 from property_street_backend.app.controllers.chat import chat_dialogue_hset_key
 from property_street_backend.app.controllers.chat.schemas import CachedMessageSchema
@@ -19,7 +17,6 @@ from property_street_backend.app.controllers.chat import get_or_create_cached_ch
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
 from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.app.controllers.chat.utils.store import (
-    chat_exception_handler,
     get_pending_message_tokens,
 )
 

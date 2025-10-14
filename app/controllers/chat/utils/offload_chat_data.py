@@ -6,7 +6,11 @@ from sqlalchemy.sql import update, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Message, Thread
-from .store import get_chat_next_offload_schedule
+from .store import (
+    get_pending_messages,
+    get_chat_next_offload_schedule,
+)
+from ..schemas import CachedMessageSchema
 from property_street_backend.app.models import User
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
@@ -83,27 +87,21 @@ async def offload_dialogue(
         return
 
     try:
-        messages = await redis_client.hget(dialogue_key, "messages")
-        if not messages:
+        cached_messages: dict[str, CachedMessageSchema] = await get_pending_messages(redis_client,dialogue_key)
+        if not cached_messages:
             if DEBUG:
                 logger.info(f"[Offload] No messages to offload for {dialogue_key}")
             return
 
         # Optimistically remove messages from Redis to prevent race overwrite
         await redis_client.hdel(dialogue_key, "messages")
-        loaded_messages: dict = json.loads(messages)
-
-        if not loaded_messages:
-            if DEBUG:
-                logger.info(f"[Offload] Empty message object for {dialogue_key}")
-            return
 
         thread_id = await get_or_create_thread_id(db, min_id, max_id)
 
         new_messages: List[Message] = []
         updated_messages_count = 0
 
-        for timestamp, item in loaded_messages.items():
+        for timestamp, item in cached_messages.items():
             item: dict
             if not item.get("id"):
                 new_messages.append(
@@ -112,8 +110,9 @@ async def offload_dialogue(
                         recipient_id=item["recipient_id"],
                         fmt_msg=item["fmt_msg"],
                         status=item["status"],
+                        msg_type=item["msg_type"],
                         thread_id=thread_id,
-                        server_timestamp_ms=int(timestamp),
+                        server_timestamp_ms=float(timestamp),
                     )
                 )
             else:
@@ -123,7 +122,7 @@ async def offload_dialogue(
                     .values(
                         fmt_msg=item["fmt_msg"],
                         status=item["status"],
-                        server_timestamp_ms=int(timestamp),
+                        msg_type=item["msg_type"],
                     )
                 )
                 await db.execute(stmt)
@@ -141,7 +140,7 @@ async def offload_dialogue(
             )
 
         # Clean up Redis if no one has added anything since we offloaded
-        current_chat_obj = await redis_client.hget(dialogue_key, "messages")
+        current_chat_obj: dict[str, CachedMessageSchema] = await get_pending_messages(redis_client,dialogue_key)
         if not current_chat_obj:
             await redis_client.delete(dialogue_key)
             if DEBUG:
@@ -149,7 +148,7 @@ async def offload_dialogue(
 
     except Exception as e:
         # Restore chat object into Redis for retry
-        await redis_client.hset(dialogue_key, "messages", messages)
+        await redis_client.hset(dialogue_key, "messages", cached_messages)
         if DEBUG:
             logger.error(f"[Offload] Error while offloading {dialogue_key}: {e}", exc_info=True)
 

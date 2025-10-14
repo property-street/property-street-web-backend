@@ -3,10 +3,12 @@ import random
 from sqlalchemy.ext.asyncio import AsyncSession
 from httpx import AsyncClient
 
+from . import fmt_msg
 from property_street_backend.app.models import Message, Thread
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
 from property_street_backend.app.controllers.auth.services import fetch_access_token
+
 
 @pytest.mark.asyncio
 async def test_get_messages( client__fixture ):
@@ -30,9 +32,10 @@ async def test_get_messages( client__fixture ):
         random_id = random.choice([sender.id, recipient.id])
         messages.append(
             Message(
-                text_content = f'Content{i+1}',
+                fmt_msg=fmt_msg,
+                server_timestamp_ms=i*1000,
                 status="unsent",
-                timestamp=i*1000,
+                msg_type= "completed",
                 sender_id = random_id,
                 recipient_id = recipient.id if random_id is not recipient.id else sender.id 
             )
@@ -58,8 +61,8 @@ async def test_get_messages( client__fixture ):
         }
     )
     page1_response = response1.json()
-    assert page1_response[0]['text_content'] == messages[-1].text_content
-    assert page1_response[-1]['timestamp'] == messages[100-page1_size].timestamp
+    assert page1_response[0]['fmt_msg']['text_content'] == messages[-1].fmt_msg['text_content']
+    assert page1_response[-1]['server_timestamp_ms'] == messages[100-page1_size].server_timestamp_ms
 
     # get second page of messages
     page2 = 2
@@ -73,5 +76,5 @@ async def test_get_messages( client__fixture ):
         }
     )
     page2_messages = response2.json()
-    assert page2_messages[0]['text_content'] == messages[((page2-1) * page2_size)-1].text_content
-    assert page2_messages[-1]['timestamp'] == messages[0].timestamp
+    assert page2_messages[0]['fmt_msg']['text_content'] == messages[((page2-1) * page2_size)-1].fmt_msg['text_content']
+    assert page2_messages[-1]['server_timestamp_ms'] == messages[0].server_timestamp_ms

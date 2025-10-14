@@ -8,7 +8,13 @@ from property_street_backend.app.schemas import ConfigDictSetter
 from property_street_backend.app.models_helper import CloudImageDetail
 from property_street_backend.app.controllers.assets.schemas import CloudImageSchema
 
-class UserMiniSchema(ConfigDictSetter):
+class UserMiniBase(BaseModel):
+    id: int
+    username: str
+    user_role: str
+    profile_avatar: Optional[dict] = None
+
+class UserMiniSchema(UserMiniBase, ConfigDictSetter):
     id: int
     username: str
     user_role: str
@@ -26,9 +32,11 @@ class AdditionalMetadata(BaseModel):
 
 class FMTMSG(BaseModel):
     text_content: str = ''
-    media: CloudImageSchema = []
-    reactions: Optional[dict[str, int]] = None
+    media: List[CloudImageSchema] = []
+    reactions: Optional[dict[str, List[UserMiniBase]]] = None
     additional_metadata: AdditionalMetadata
+    ui_inbound_timestamp_ms: int
+    ui_outbound_timestamp_ms: int
 
 
 class MessageSchema(ConfigDictSetter):
@@ -45,11 +53,33 @@ class MessageSchema(ConfigDictSetter):
 
 
 class CachedMessageSchema(MessageSchema):
-    id: Optional[int] = None
-    server_timestamp_ms: Optional[float] = None
+    """always use ...model_dump(exclude_unset=True)
 
-    category: Literal['chat'] = 'chat'
-    
+    Args:
+        MessageSchema (_type_): _description_
+    """
+    id: Optional[int] = None
     thread_id: Optional[int] = None
-    ui_inbound_timestamp_ms: Optional[float] = None
-    ui_outbound_timestamp_ms: Optional[float] = None
+    thread_name: Optional[str] = None
+    server_timestamp_ms: Optional[float] = None
+    ui_order_index: Optional[float] = None     
+    ui_timestamp_ms: Optional[float] = None
+    # redundant
+    category: Literal['chat'] = 'chat'
+    thread_thumbnail: Optional[str] = None
+
+
+# 🧠 However, if you want to mimic TS behavior exactly — i.e.
+# 
+# “may be omitted entirely” and “must be a string if present”,
+# use this:
+# from pydantic import BaseModel, Field
+# 
+# class Thread(BaseModel):
+#     thread_name: str | None = Field(default=None)
+# 
+# And when parsing:
+#
+# Thread()  # OK → thread_name missing
+# Thread(thread_name="Discussion")  # OK
+# Thread(thread_name=None)  # Also OK (explicitly set None)
