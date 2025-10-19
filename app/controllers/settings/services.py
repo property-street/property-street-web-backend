@@ -116,3 +116,16 @@ async def user_record_update(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f_message
         )
+
+
+async def email_uniqueness_check(db: AsyncSession, email: str):
+    query = await db.execute(
+        select(User)
+        .where(User.email == email)
+    )
+    user = query.scalars().first()
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already taken."
+        )

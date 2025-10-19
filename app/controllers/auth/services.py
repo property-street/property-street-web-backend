@@ -78,7 +78,7 @@ def fetch_access_token(user: User):
     return {"access_token": access_token, "token_type": "bearer"}
 
 # signin
-async def authenticate_user(db: AsyncSession, login: str, password: str):
+async def authenticate_user(db: AsyncSession, login: str, password: str) -> User|None:
     # Check if the login is either a username or an email
     user_query = select(User).filter((User.username == login) | (User.email == login))
     
@@ -340,9 +340,14 @@ async def send_email_verification_code(
                 "expiry": expiry_time
             }
         except Exception as e:
+            f_msg = "An errror occured sending code to email"
+            d_msg = f"{f_msg}. Reason: {e}"
+            if DEBUG:
+                logger.error(d_msg)
+            logger.error(d_msg)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong. Please try again later.",
+                detail=f_msg,
                 headers={"X-Error": "Server error"},
             )
 
@@ -352,9 +357,7 @@ async def confirm_email_verification_code(
     redis_client: redis.Redis,
 ):
     email_address = requester_data['email']
-    input_code = requester_data['code']
-    if DEBUG:
-        logger.info(f"**Requesting code: {input_code}")
+    request_code = requester_data['code']
     reason = "email_verification"
 
     # `email:reason` is the HSET's key
@@ -377,7 +380,7 @@ async def confirm_email_verification_code(
         )
 
     # Confirm the input code matches the one in the cache
-    if input_code != emailed_code:
+    if request_code != emailed_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid verification code."

@@ -5,23 +5,41 @@ from fastapi import (
 )
 from typing import Dict
 from sqlalchemy import select
+from redis.asyncio import Redis
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
 
-from .schemas import UserSettingResponseSchema
+from .utils import (
+    get_password_update_ttl,
+    password_update_set_token,
+)
+from .schemas import (
+    EmailUpdateVerification,
+    UserSettingResponseSchema,
+    PasswordVerificationForUpdate,
+)
 from property_street_backend.app.database import get_db
 from property_street_backend.config.settings import DEBUG
+from property_street_backend.app.initiator import get_redis, logger
 from property_street_backend.app.controllers.auth.services import (
-    decode_user_from_token,
     get_password_hash,
     verify_password,
+    authenticate_user,
+    decode_user_from_token,
+    confirm_email_verification_code
 )
 from property_street_backend.app.models import User, UserSetting
 from property_street_backend.app.schemas.auth_schemas import TokenData 
 from property_street_backend.log_config.logger_config import log_message
-from property_street_backend.app.controllers.settings.services import user_record_update
+from property_street_backend.log_config.logger_config import log_error 
+from property_street_backend.app.controllers.settings.services import (
+    user_record_update,
+    email_uniqueness_check,
+)
+from property_street_backend.app.controllers.auth.services import confirm_email_verification_code 
+from property_street_backend.app.controllers.auth.schemas import ConfirmEmailVerificationCodeSchema
 
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -70,20 +88,38 @@ async def delete_account(
     await db.commit()
 
 
+@router.post("/confirm-password-for-update", status_code=status.HTTP_200_OK)
+async def confirm_password_for_update(
+    data: PasswordVerificationForUpdate = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(decode_user_from_token),
+    redis_client: Redis = Depends(get_redis)
+):
+    email = current_user.email
+    if not await authenticate_user(db,email,data.password):
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail="Password is wrong!"
+        )
+    key = password_update_set_token(email)
+    await redis_client.set(key, 1, ex=get_password_update_ttl())
+
+
 @router.post("/update-password", status_code=status.HTTP_200_OK)
 async def update_password(
-    data: Dict = Body(...),  # Ensures the request body is required
+    data: PasswordVerificationForUpdate = Body(...),  # Ensures the request body is required
     db: AsyncSession = Depends(get_db),
-    current_user: TokenData = Depends(decode_user_from_token)
+    redis_client: Redis = Depends(get_redis),
+    current_user: User = Depends(decode_user_from_token),
 ):
-    # ✅ Ensure 'password' is provided in the request body
-    if "password" not in data or not data["password"]:
+    password_update_token = password_update_set_token(current_user.email)
+    if not await redis_client.get(password_update_token):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Password field is required and cannot be empty"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Window for password update close. Try again"
         )
-
-    new_password = data["password"]
+    
+    new_password = data.password
 
     # ✅ Prevent updating to the same password
     if verify_password(new_password, current_user.password_hash):
@@ -117,5 +153,41 @@ async def update_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while updating password"
         )
+    finally:
+        await redis_client.delete(password_update_token)
 
 
+@router.post("/email-update-validation", status_code=status.HTTP_200_OK)
+async def check_email_update_validity(
+    data: EmailUpdateVerification = Body(...),  # Ensures the request body is required
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(decode_user_from_token),
+):
+    return await email_uniqueness_check(db,data.email)
+
+
+@router.post("/confirm-email-update", status_code=status.HTTP_200_OK)
+async def email_update_confirmation(
+    data: ConfirmEmailVerificationCodeSchema = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(decode_user_from_token),
+    redis_client: Redis = Depends(get_redis),
+):
+    await confirm_email_verification_code(data.model_dump(),redis_client)
+    email = data.email
+    await email_uniqueness_check(db, email)
+    try:
+        current_user.email = email
+        db.add(current_user)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        f_message = "An error occurred while updating email address."
+        d_message = f"{f_message} Reason: {e}"
+        if DEBUG:
+            logger.info(d_message)
+        log_error(d_message)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f_message
+        )

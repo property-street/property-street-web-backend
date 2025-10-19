@@ -26,6 +26,19 @@ class SettingsUserResponseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
 
+class PasswordVerificationForUpdate(BaseModel):
+    password: str
+
+class EmailUpdateBase(BaseModel):
+    email: str
+
+class EmailUpdateVerification(EmailUpdateBase):
+    pass
+
+class EmailUpdateConfirmation(EmailUpdateBase):
+    pass
+
+
 class UserSettingResponseSchema(BaseModel):
     id: Optional[int] = Field(None, description="Instance's id")
     user: SettingsUserResponseSchema
@@ -50,17 +63,17 @@ class UserSettingResponseSchema(BaseModel):
         
         return cls(
             id=settings.id if settings else None,
-            email=user.email,
             user = {
                 'id': user.id,
                 'email': user.email,
                 'first_name' : user.first_name,
-                'last_name' : user.last_name,
+                'last_name' : user.last_name or '',
                 'profile_avatar_url' : (
                     user.profile_avatar.secure_url 
                     if hasattr(user, 'profile_avatar') and user.profile_avatar 
-                    else None
-                )
+                    else ''
+                ),
+                'user_role': user.user_role
             },
             area=areas[0] if (areas and isinstance(areas,list)) else None,
             has_settings=True if settings else False,

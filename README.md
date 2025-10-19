@@ -85,6 +85,11 @@ TEST_ENV=True celery -A property_street_backend.app.celery_config beat --logleve
 pip install --upgrade $(pip freeze | awk -F'[=]' '{print $1}')
 ```
 
+## manual deloyment
+```bash
+chmod +x deploy.sh && ./deploy.sh```
+
+
 <!--
 ## Set Usage & Parameters
 ```
