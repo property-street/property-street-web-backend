@@ -8,6 +8,8 @@ class AgentResponseSchema(ConfigDictSetter):
     id: int
     username: str
     profile_avatar_url: Optional[str] = Field(None, description="Agent's avatar URL from the related user")
+    phone_no: Optional[str]
+    dial_code: Optional[str]
 
     @model_validator(mode='before')
     @classmethod
@@ -20,6 +22,8 @@ class AgentResponseSchema(ConfigDictSetter):
                     data.profile_avatar.secure_url 
                     if data and data.profile_avatar 
                     else ""
-                )
+                ),
+                'dial_code': data.settings.dial_code if data.settings else "",
+                'phone_no': data.settings.phone_number if data.settings else "",
             }
         return data  # Fallback for dict input
