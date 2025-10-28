@@ -4,13 +4,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from .models import Asset
+from .schemas import (
+    AssetResponseSchema,
+    PropertySearchResponse,
+)
 from property_street_backend.app.models import (
     Tag,
     Area, 
 )
 
 
-async def search_assets(query_data: Dict[str, Any], db: AsyncSession):
+async def search_assets(query_data: Dict[str, Any], db: AsyncSession) -> List[PropertySearchResponse]:
     keywords: List[str] = query_data.get('keywords', [])
     numbers: List[int] = query_data.get('numbers', [])
 
@@ -72,4 +76,4 @@ async def search_assets(query_data: Dict[str, Any], db: AsyncSession):
     # -----------------------------
     # Return structured output
     # -----------------------------
-    return [{"type": "asset", "data": asset} for asset in results]
+    return [{"type": "property", "data": AssetResponseSchema.model_validate(asset).model_dump()} for asset in results]

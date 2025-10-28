@@ -1,5 +1,4 @@
 import pytest
-from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.controllers.assets.models import (
@@ -20,7 +19,6 @@ async def test_search_assets_basic(client__fixture):
     """
     # fetch the async db session from fixture
     test_db: AsyncSession = client__fixture['db']
-    httpx_client: AsyncClient = client__fixture['http_client']
 
     test_agent = await create_test_agent(test_db)
 
@@ -104,19 +102,32 @@ async def test_search_assets_basic(client__fixture):
     await test_db.commit()
 
     # -----------------------------
-    # 2. request search result
-    # 3. Validate results
+    # 2. Define queries to test
     # -----------------------------
-    response = await httpx_client.get('/search/mini flat in ikeja at $800000/')
-    assert response.status_code == 200
-    results = response.json()
-    print(results)
+    # match by location
+    query1 = {"keywords": ["ikeja"], "numbers": []}
+    # match by category/description
+    query2 = {"keywords": ["mini", "flat"], "numbers": []}
+    # match by numeric price proximity
+    query3 = {"keywords": [], "numbers": [800000]}
 
+    # -----------------------------
+    # 3. Run the search
+    # -----------------------------
+    results_ikeja = await search_assets(query1, test_db)
+    results_mini_flat = await search_assets(query2, test_db)
+    results_price = await search_assets(query3, test_db)
+
+    # -----------------------------
+    # 4. Validate results
+    # -----------------------------
     # Test Ikeja search
-    assert any("Ikeja" in r["data"]['title'] for r in results)
-    assert any(r["type"] == "property" for r in results)
+    assert any("Ikeja" in r["data"]['title'] for r in results_ikeja)
+    assert all(r["type"] == "property" for r in results_ikeja)
+
     # Test mini flat search
-    assert any("Mini" in r["data"]['title'] for r in results)
-    assert any("Flat" in r["data"]['title'] for r in results)
+    assert any("Mini" in r["data"]['title'] for r in results_mini_flat)
+    assert any("Flat" in r["data"]['title'] for r in results_mini_flat)
+
     # Test price search (~800k range)
-    assert any(abs(float(r["data"]['price']) - 800000) < 200000 for r in results)
+    assert any(abs(float(r["data"]['price']) - 800000) < 200000 for r in results_price)

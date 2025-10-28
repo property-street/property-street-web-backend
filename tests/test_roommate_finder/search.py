@@ -81,11 +81,7 @@ async def test_search_roommates(client__fixture):
     # Step 4: Assertions
     assert isinstance(results, list)
     assert len(results) >= 1
-    assert any("quiet" in r["data"].extra_conditions for r in results)
-    assert all(r["type"] == "roommate" for r in results)
-
-    # Step 5: Validate with schema
-    for result in results:
-        RoommateFinderResponseSchema.from_orm_with_relations(result["data"])
+    assert any("quiet" in r["data"]['extra_conditions'] for r in results)
+    assert all(r["type"] == "roommates-finder" for r in results)
 
     # print(f"✅ Found {len(results)} roommate(s) matching keywords: {[r['data'].title for r in results]}")

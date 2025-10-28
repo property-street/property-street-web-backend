@@ -3,12 +3,13 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, status, Depends, Query
 
-
+from .search import search_asset_requests
 from .schemas import AssetRequestResponseSchema
 from .services import fetch_recent_asset_request
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.schemas.auth_schemas import TokenData
+from property_street_backend.app.controllers.search.tools import normalize_query
 from property_street_backend.app.controllers.auth.services import decode_user_from_token
 from property_street_backend.app.controllers.asset_request.schemas import AssetRequestSchema
 from property_street_backend.app.controllers.asset_request.handle_asset_request import handle_asset_request
@@ -50,3 +51,11 @@ async def recent_assets(
         size = size,
         session = session,
     )
+
+@router.get("/search/{query}")
+async def search_property_request_endpoint(
+    query: str,
+    session: AsyncSession = Depends(get_db),
+):      
+    normalized_query = normalize_query(query)
+    return await search_asset_requests(normalized_query,session)

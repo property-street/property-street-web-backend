@@ -1,10 +1,12 @@
+from typing import List
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import AssetRequest
+from .schemas import PropertyRequestSchema, PropertyRequestSearchResponse
 from property_street_backend.app.models import Area
 
-async def search_asset_requests(query_data: dict, db: AsyncSession):
+async def search_asset_requests(query_data: dict, db: AsyncSession) -> List[PropertyRequestSearchResponse]:
     keywords = query_data['keywords']
     if not keywords:
         return []
@@ -22,4 +24,4 @@ async def search_asset_requests(query_data: dict, db: AsyncSession):
         .limit(20)
     )
     results = (await db.execute(stmt)).scalars().all()
-    return [{"type": "asset_request", "data": r} for r in results]
+    return [{"type": "property-request", "data": PropertyRequestSchema.from_orm_with_relations(r).model_dump()} for r in results]

@@ -19,7 +19,7 @@ class RoommateFinderRequestSchema(BaseModel):
 
 class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
     id: int
-    room_images: List[str]  # Flattened
+    room_images: List[str] = []# Flattened
     requester: dict
     gender: Optional[str] = None
 
@@ -34,6 +34,7 @@ class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
             max_roomies=roommate_finder.max_roomies,
             category=roommate_finder.category,
             requester={
+                "username": roommate_finder.requester.username,
                 "first_name": roommate_finder.requester.first_name,
                 "last_name": roommate_finder.requester.last_name,
                 "avatar_url": (
@@ -50,37 +51,41 @@ class RFRSListWithCachedIds(BaseModel):
     requests: list[RoommateFinderResponseSchema] = []
     cached_roomies_application_ids: Optional[list[int]] = []
 
-    #--* Previously used validators *--#
-    #@field_validator('room_images', mode='before')
-    #def transform_room_images(cls, value):
-    #    if value and isinstance(value, list) and hasattr(value[0], 'secure_url'):
-    #        return [img.secure_url for img in value]
-    #    return value
+class RoommateRequestSearchResponse(BaseModel):
+    type: str = 'roommates-finder'
+    data: RoommateFinderResponseSchema
+
+#--* Previously used validators *--#
+#@field_validator('room_images', mode='before')
+#def transform_room_images(cls, value):
+#    if value and isinstance(value, list) and hasattr(value[0], 'secure_url'):
+#        return [img.secure_url for img in value]
+#    return value
 #
-    #@field_validator('requester', mode='before')
-    #def serialize_requester(cls, value):
-    #    if value and isinstance(value, dict):
-    #        return f"{value.first_name} {value.last_name}"
-    #    return ""
+#@field_validator('requester', mode='before')
+#def serialize_requester(cls, value):
+#    if value and isinstance(value, dict):
+#        return f"{value.first_name} {value.last_name}"
+#    return ""
 #
-    #
-    #@field_validator('gender', mode='before')
-    #def get_gender_from_requester(cls, value, info):
-    #    # 'value' here is the RoommateFinder instance
-    #    if isinstance(value, RoommateFinder):
-    #        return value.requester.gender if value.requester else ""
-    #    return ""
-    
-    # @field_validator('requester_avatar_url', mode='before')
-    # def transform_requester_avatar_url(cls, value, info):
-    #     # 'value' here is the RoommateFinder instance
-    #     if isinstance(value, RoommateFinder):
-    #         return (
-    #             value.requester.profile_avatar.secure_url 
-    #             if (value.requester and value.requester.profile_avatar) 
-    #             else ""
-    #         )
-    #     return ""
-    
-    #Assuming you have a RoommateFinder ORM instance called 'finder_instance'
-    # response_data = RoommateFinderResponseSchema.from_orm_with_relations(finder_instance)
+#
+#@field_validator('gender', mode='before')
+#def get_gender_from_requester(cls, value, info):
+#    # 'value' here is the RoommateFinder instance
+#    if isinstance(value, RoommateFinder):
+#        return value.requester.gender if value.requester else ""
+#    return ""
+
+# @field_validator('requester_avatar_url', mode='before')
+# def transform_requester_avatar_url(cls, value, info):
+#     # 'value' here is the RoommateFinder instance
+#     if isinstance(value, RoommateFinder):
+#         return (
+#             value.requester.profile_avatar.secure_url 
+#             if (value.requester and value.requester.profile_avatar) 
+#             else ""
+#         )
+#     return ""
+
+#Assuming you have a RoommateFinder ORM instance called 'finder_instance'
+# response_data = RoommateFinderResponseSchema.from_orm_with_relations(finder_instance)

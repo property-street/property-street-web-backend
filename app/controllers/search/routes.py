@@ -12,7 +12,6 @@ router = APIRouter(prefix='/search', tags=['search'])
 
 @router.get('/{query}/', response_model=List[SearchResultSchema])
 async def get_results(
-    query: str,
-    db: AsyncSession = Depends(get_db),
+    query: str
 ):
-    return await global_search(query,db)
+    return await global_search(query)

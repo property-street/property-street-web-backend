@@ -55,10 +55,6 @@ async def test_search_asset_requests(client__fixture):
     # Step 4: Assertions
     assert isinstance(results, list)
     assert len(results) > 0
-    assert any("family" in r["data"].description for r in results)
-    assert all("Garki" in r["data"].area.city_or_town for r in results)
-    assert all(r["type"] == "asset_request" for r in results)
-
-    # Step 5: Validate schema
-    for result in results:
-        AssetRequestResponseSchema.from_orm_with_relations(result["data"])
+    assert any("family" in r["data"]['description'] for r in results)
+    assert all("Garki" in r["data"]['area']['city_or_town'] for r in results)
+    assert all(r["type"] == "property-request" for r in results)

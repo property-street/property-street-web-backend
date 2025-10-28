@@ -98,3 +98,9 @@ class ProcessAssetSchema(ConfigDictSetter):
 
 class AssetFetchResponseSchema():
     pass
+
+class PropertySearchResponse(BaseModel):
+    type: str = 'property'
+    data: AssetResponseSchema
+
+SearchList = List[PropertySearchResponse]

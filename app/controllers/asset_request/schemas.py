@@ -26,6 +26,9 @@ class AssetRequestResponseSchema(BaseSchema):
             return cls(
                 id = data.id,
                 requester = ({
+                    'first_name': data.requester.first_name,
+                    'last_name': data.requester.last_name,
+                    'username': data.requester.username,
                     'name': f"{data.requester.first_name} {data.requester.last_name}",
                     'avatar_url': (
                         data.requester.profile_avatar.secure_url
@@ -47,3 +50,10 @@ class AssetRequestResponseSchema(BaseSchema):
                     } for resolution in data.assets
                 ] if data.assets else None),
             )
+    
+class PropertyRequestSchema(AssetRequestResponseSchema):
+    pass
+    
+class PropertyRequestSearchResponse(BaseModel):
+    type: str = 'property-request'
+    data: PropertyRequestSchema

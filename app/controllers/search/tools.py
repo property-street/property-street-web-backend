@@ -30,7 +30,7 @@ def rank_results(results, query):
     for r in results:
         text_fields = []
         data = r["data"]
-        if hasattr(data, "title"): text_fields.append(data.title)
-        if hasattr(data, "description"): text_fields.append(data.description)
+        if "title" in data: text_fields.append(data['title'])
+        if "description" in data: text_fields.append(data['description'])
         r["score"] = max([text_similarity(query, t) for t in text_fields if t], default=0)
     return sorted(results, key=lambda x: x["score"], reverse=True)

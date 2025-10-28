@@ -1,9 +1,14 @@
+from typing import List
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .schemas import (
+    RoommateFinderResponseSchema,
+    RoommateRequestSearchResponse,
+)
 from property_street_backend.app.models import Area, RoommateFinder
 
-async def search_roommates(query_data: dict, db: AsyncSession):
+async def search_roommates(query_data: dict, db: AsyncSession) -> List[RoommateRequestSearchResponse]:
     keywords = query_data['keywords']
     stmt = (
         select(RoommateFinder)
@@ -20,4 +25,4 @@ async def search_roommates(query_data: dict, db: AsyncSession):
         .limit(20)
     )
     results = (await db.execute(stmt)).scalars().all()
-    return [{"type": "roommates_finder", "data": r} for r in results]
+    return [{"type": "roommates-finder", "data": RoommateFinderResponseSchema.from_orm_with_relations(r).model_dump()} for r in results]
