@@ -43,12 +43,12 @@ class UserSettingResponseSchema(BaseModel):
     id: Optional[int] = Field(None, description="Instance's id")
     user: SettingsUserResponseSchema
     area: Optional[AreaResponseSchema] = Field(None, description="User address")
-    has_settings: bool = Field(None, description="Indicates if the user has settings associated with them")
-    phone_number: Optional[str] = Field(None, description="User's phone number")
-    date_of_birth: Optional[date] = Field(None, description="User's date of birth")
+    has_settings: bool = Field(..., description="Indicates if the user has settings associated with them")
+    phone_number: Optional[str] = Field('', description="User's phone number")
+    date_of_birth: Optional[date] = Field('', description="User's date of birth")
     email_notification: bool = Field(..., description="Email notification status")
     push_notification: bool = Field(..., description="Push notification status")
-    dial_code: Optional[str] = Field(None, description="User's dial code")
+    dial_code: Optional[str] = Field('', description="User's dial code")
 
     model_config = ConfigDict(from_attributes=True)
     
@@ -80,17 +80,17 @@ class UserSettingResponseSchema(BaseModel):
             dial_code = (
                 settings.dial_code 
                 if settings and hasattr(settings, 'dial_code') 
-                else None
+                else ''
             ),
             date_of_birth=(
                 settings.date_of_birth 
                 if settings and hasattr(settings, 'date_of_birth') 
-                else None
+                else ''
             ),
             phone_number=(
                 settings.phone_number 
                 if settings and hasattr(settings, 'phone_number')
-                else None
+                else ''
             ),
             email_notification=settings.email_notification,
             push_notification=settings.push_notification 
