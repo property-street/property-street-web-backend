@@ -17,10 +17,8 @@ from property_street_backend.tests.activity.test_controller.test_objects import 
 @pytest.mark.asyncio
 async def test_fetch_user_settings(client__fixture):
     # Extract the fixture object
-    async for fixture_obj in client__fixture:
-        test_db: AsyncSession = fixture_obj["db"]
-        client: AsyncClient = fixture_obj["http_client"]
-        break  # Stop iteration after first fixture retrieval
+    test_db: AsyncSession = client__fixture["db"]
+    client: AsyncClient = client__fixture["http_client"]
 
     # Create a test user
     created_user = await create_test_user(test_db)

@@ -9,7 +9,7 @@ from property_street_backend.config.settings import (
 )
 from property_street_backend.config import get_env
 
-resend.api_key = "re_ZiJG94e2_3Y8QW4MuBrpGbHyDdQcdYWVX"
+resend.api_key = "re_cnExyX9b_HphE7pg6AttJ55M4x9ES78EN"
 
 
 def send_email(from_email, from_name, subject, to_email,  html_email, to_name=None, reply_to_email=None, text_email=None, cc=None, bcc=None, attachments=None):

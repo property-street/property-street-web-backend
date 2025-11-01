@@ -44,11 +44,11 @@ class UserSettingResponseSchema(BaseModel):
     user: SettingsUserResponseSchema
     area: Optional[AreaResponseSchema] = Field(None, description="User address")
     has_settings: bool = Field(..., description="Indicates if the user has settings associated with them")
-    phone_number: Optional[str] = Field('', description="User's phone number")
-    date_of_birth: Optional[date] = Field('', description="User's date of birth")
-    email_notification: bool = Field(..., description="Email notification status")
-    push_notification: bool = Field(..., description="Push notification status")
-    dial_code: Optional[str] = Field('', description="User's dial code")
+    phone_number: str = Field(..., description="User's phone number")
+    date_of_birth: Optional[date] = Field(None, description="User's date of birth")
+    email_notification: Optional[bool] = Field(None, description="Email notification status")
+    push_notification: Optional[bool] = Field(None, description="Push notification status")
+    dial_code: str = Field(..., description="User's dial code")
 
     model_config = ConfigDict(from_attributes=True)
     
@@ -78,20 +78,20 @@ class UserSettingResponseSchema(BaseModel):
             area=areas[0] if (areas and isinstance(areas,list)) else None,
             has_settings=True if settings else False,
             dial_code = (
-                settings.dial_code 
+                (settings.dial_code or '') 
                 if settings and hasattr(settings, 'dial_code') 
                 else ''
             ),
             date_of_birth=(
                 settings.date_of_birth 
                 if settings and hasattr(settings, 'date_of_birth') 
-                else ''
+                else None
             ),
             phone_number=(
-                settings.phone_number 
+                (settings.phone_number or '') 
                 if settings and hasattr(settings, 'phone_number')
                 else ''
             ),
-            email_notification=settings.email_notification,
-            push_notification=settings.push_notification 
+            email_notification=settings.email_notification if settings else None,
+            push_notification=settings.push_notification  if settings else None
         )

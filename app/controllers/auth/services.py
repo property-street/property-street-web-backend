@@ -307,7 +307,7 @@ async def send_email_verification_code(
                     "property_street_address": property_street_address
                 }
             )
-            from_address="team@stackfinancialsolutions.com"
+            from_address="team@propertystreet.ng"
             subject="Property street Verification Code"
             from_name="Property street"
             #to_name="Customer"
@@ -566,7 +566,7 @@ async def send_password_reset_mail(
                     "property_street_address": property_street_address
                 }
             )
-            from_address="team@stackfinancialsolutions.com"
+            from_address="support@propertystreet.ng"
             subject="Password Reset Request"
             from_name="Property street"
             #to_name="Customer"
