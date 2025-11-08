@@ -6,7 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
 
-from .services import fetch_agent_assets, eager_asset_load
+from .services import (
+    eager_asset_load,
+    fetch_agent_assets,
+    get_unverified_properties,
+)
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import (
     logger,
@@ -176,3 +180,13 @@ async def fetch_asset_by_id(
         )
     
     return asset
+
+
+router.get('/unverified-properties/', resposne_model=List[AssetResponseSchema])
+async def unverified_properties(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    _: User = require_roles('admin','staff'),
+):
+    return await get_unverified_properties(db,page,size)

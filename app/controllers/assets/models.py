@@ -8,7 +8,8 @@ from sqlalchemy import (
     DateTime,
     func,
     event,
-    Enum as SqlalchemyEnum
+    Enum as SqlalchemyEnum,
+    Boolean,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -51,6 +52,11 @@ class Asset(Base):
         default = 'available',
         nullable = False
     )
+
+    # verification
+    verified = Column(Boolean, default=False)
+    datetime_declined = Column(DateTime(timezone=True))
+    datetime_verified = Column(DateTime(timezone=True))
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

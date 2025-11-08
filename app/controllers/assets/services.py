@@ -1,9 +1,11 @@
 import json
+from typing import List
 from fastapi import status
-from sqlalchemy import select
+from sqlalchemy import and_
 from redis.asyncio import Redis
 from fastapi import HTTPException
 from pydantic import ValidationError
+from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -178,3 +180,32 @@ async def fetch_agent_assets(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail = f_message
         )
+    
+
+async def get_unverified_properties(
+    db: AsyncSession,
+    page: int,
+    size: int
+) -> List[AssetResponseSchema]:
+    """Returns unverified properties
+
+    Args:
+        db (AsyncSession): Postgress session
+        page (int): pagination track
+        size (int): pagination size
+
+    Returns:
+        _type_: a list of properties type
+    """
+    offset = (page-1) * size
+    return await db.execute(
+        eager_asset_load()
+        .where(
+            and_(
+                Asset.verified == False,
+                Asset.datetime_declined.is_(None)   # exclude where datetime_declined is not null
+            )
+        )
+        .offset(offset)
+        .limit(size)
+    )

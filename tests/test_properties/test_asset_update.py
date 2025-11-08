@@ -9,7 +9,7 @@ from property_street_backend.tests.activity.test_controller.test_objects import 
 )
 from property_street_backend.tests.auth.test_create_agent import create_test_agent
 from property_street_backend.app.controllers.auth.services import fetch_access_token
-from property_street_backend.tests.test_assets.test_create_asset import create_test_asset
+from property_street_backend.tests.test_properties.test_create_asset import create_test_asset
 
 
 

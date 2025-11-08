@@ -81,6 +81,7 @@ class AssetSchema(ConfigDictSetter):
 
 
 class AssetResponseSchema(AssetSchema):
+    verified: bool
     cover_image: CloudImageResponseSchema
     features: Optional[List[AssetFeatureResponseSchema]]
     cloud_images: Optional[Optional[List[CloudImageResponseSchema]]]

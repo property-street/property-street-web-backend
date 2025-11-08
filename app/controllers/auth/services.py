@@ -5,13 +5,13 @@ from redis.asyncio import Redis
 from jose import jwt, JWTError
 from typing import List, Callable
 from sqlalchemy.future import select
-from passlib.context import CryptContext
 from sqlalchemy.exc import IntegrityError
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Response
 
+from . import verify_password, pwd_context
 from property_street_backend.app.schemas.auth_schemas import (
     TokenData, 
     UserRegistrationSchema, 
@@ -41,14 +41,10 @@ SECRET_KEY = JWT_SECRET_KEY
 ALGORITHM = JWT_ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = JWT_EXPIRATION_DELTA
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 app = FastAPI()
 router = APIRouter()
-
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password):

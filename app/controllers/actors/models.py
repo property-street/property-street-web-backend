@@ -10,6 +10,7 @@ from sqlalchemy import (
     DateTime,
     event,
 )
+from sqlalchemy.future import select
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -19,9 +20,14 @@ from .enums import (
     ClientGenderChoice,
 )
 from .mixin import UniqueIDArrayMixin
+from property_street_backend.config.settings import (
+    ADMIN_EMAIL,
+    ADMIN_USERNAME,
+    ADMIN_PASSWORD,
+)
+from property_street_backend.app.controllers.auth import verify_password
 from property_street_backend.config.postgres_connection_manager import Base
 from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
-
 
 class User(AggregateRatingAClass, UniqueIDArrayMixin):
     __tablename__ = 'users'
@@ -163,6 +169,15 @@ class User(AggregateRatingAClass, UniqueIDArrayMixin):
             self.user_role = UserRoleChoice.agent
             session.add(self)
             await session.commit()
+    
+@event.listens_for(User, "before_insert")
+def prevent_multiple_admins(mapper, connection, target):
+    if not target.is_admin:
+        return
+    
+    if (target.email != ADMIN_EMAIL) and verify_password(ADMIN_PASSWORD, target.hashed_password):
+        raise
+
 
 
 class SocialLog(Base):
