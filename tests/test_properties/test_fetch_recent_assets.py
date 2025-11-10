@@ -71,11 +71,9 @@ def pre_commit_test_asset_collection(agent_id: int ,size: int = 10) -> List[Asse
 async def test_latest_collection(client__fixture):
 
     # Unpack the client and test database from the fixture
-    async for fixture_obj in client__fixture:
-        httpx_client: AsyncClient = fixture_obj['http_client'] 
-        test_db: AsyncSession = fixture_obj['db']
-        redis_client: Redis = fixture_obj['redis_client']
-        break
+    httpx_client: AsyncClient = client__fixture['http_client'] 
+    test_db: AsyncSession = client__fixture['db']
+    redis_client: Redis = client__fixture['redis_client']
 
     # Create a test agent/user
     created_agent: User = await create_test_agent(test_db)

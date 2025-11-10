@@ -22,7 +22,6 @@ from .enums import (
 from .mixin import UniqueIDArrayMixin
 from property_street_backend.config.settings import (
     ADMIN_EMAIL,
-    ADMIN_USERNAME,
     ADMIN_PASSWORD,
 )
 from property_street_backend.app.controllers.auth import verify_password
@@ -175,9 +174,20 @@ def prevent_multiple_admins(mapper, connection, target):
     if not target.is_admin:
         return
     
-    if (target.email != ADMIN_EMAIL) and verify_password(ADMIN_PASSWORD, target.hashed_password):
-        raise
+    if (target.email != ADMIN_EMAIL) or not verify_password(ADMIN_PASSWORD, target.password_hash):
+        raise ValueError("Unauthorized admin creation attempt detected.")
+    
+    # Ensure no existing admin
+    existing_admin = connection.execute(
+        select(User).where(User.is_admin == True)
+    ).scalar_one_or_none()
+    if existing_admin:
+        raise ValueError("An admin user already exists. Only one admin is allowed.")
 
+@event.listens_for(User, 'before_insert')
+# Listen for the 'before_insert' event to set updated_at
+def set_updated_at_before_insert(mapper, connection, target):
+    target.updated_at = func.now()
 
 
 class SocialLog(Base):
@@ -206,8 +216,3 @@ class SocialLog(Base):
         uselist=False
     )
     
-
-@event.listens_for(User, 'before_insert')
-# Listen for the 'before_insert' event to set updated_at
-def set_updated_at_before_insert(mapper, connection, target):
-    target.updated_at = func.now()

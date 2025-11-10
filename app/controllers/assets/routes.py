@@ -10,6 +10,7 @@ from .services import (
     eager_asset_load,
     fetch_agent_assets,
     get_unverified_properties,
+    update_verification_state,
 )
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import (
@@ -142,9 +143,9 @@ async def retrieve_agent_assets(
 
 @router.get("/my-properties", response_model=List[AssetResponseSchema])
 async def retrieve_agent_assets(
-    session: AsyncSession = Depends(get_db),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles("agent", "staff", "admin")),
 ):
     return await fetch_agent_assets(
@@ -182,11 +183,31 @@ async def fetch_asset_by_id(
     return asset
 
 
-router.get('/unverified-properties/', resposne_model=List[AssetResponseSchema])
+@router.get("/unverified-properties/", response_model=List[AssetResponseSchema])
 async def unverified_properties(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _: User = require_roles('admin','staff'),
+    _: User = Depends(require_roles('admin','staff')),
 ):
     return await get_unverified_properties(db,page,size)
+
+
+@router.post("/confirm-verification/{asset_id}/", response_model=AssetResponseSchema)
+async def confirm_verification(
+    asset_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_roles('admin','staff')),
+):
+    """Mark the property as verified (admin only)."""
+    return await update_verification_state(asset_id, db, 'verify')
+
+
+@router.post("/cancel-verification/{asset_id}/", response_model=AssetResponseSchema)
+async def cancel_verification_route(
+    asset_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_roles('admin')),
+):
+    """Cancel a property's verification (admin only)."""
+    return await update_verification_state(asset_id, db, 'cancel')

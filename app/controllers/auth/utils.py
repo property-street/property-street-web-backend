@@ -24,18 +24,18 @@ async def ensure_admin_user():
 
         if not admin:
             # Create the admin for the first time
-            new_admin = User(
+            admin = User(
                 email=ADMIN_EMAIL,
                 username=ADMIN_USERNAME,
-                password=ADMIN_PASSWORD,
+                password_hash=get_password_hash(ADMIN_PASSWORD),
                 is_admin=True,
                 user_role='admin'
             )
-            session.add(new_admin)
+            session.add(admin)
             await session.commit()
             if DEBUG:
                 logger.info("✅ Admin user created.")
-            return
+            return admin
 
         # Update existing admin if credentials differ
         updated = False
@@ -56,3 +56,5 @@ async def ensure_admin_user():
         else:
             if DEBUG:
                 logger.info("✅ Admin already up-to-date.")
+        
+        return admin

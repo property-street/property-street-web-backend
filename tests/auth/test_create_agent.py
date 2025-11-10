@@ -18,11 +18,9 @@ async def create_test_agent(db:AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_create_agent(get_test_db__fixture):
+async def test_create_agent(get_test_db__fixture: AsyncSession):
     # fetch the testdb
-    async for test_db in get_test_db__fixture:
-        test_db: AsyncSession
-        break
+    test_db = get_test_db__fixture
     try:
         created_agent: User = await create_test_agent(test_db)
         

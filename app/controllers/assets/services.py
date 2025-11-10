@@ -1,13 +1,14 @@
 import json
-from typing import List
 from fastapi import status
 from sqlalchemy import and_
 from redis.asyncio import Redis
+from typing import List, Literal
 from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timezone
 
 from .schemas import AssetResponseSchema
 from property_street_backend.app.models import (
@@ -197,15 +198,84 @@ async def get_unverified_properties(
     Returns:
         _type_: a list of properties type
     """
-    offset = (page-1) * size
-    return await db.execute(
-        eager_asset_load()
-        .where(
-            and_(
-                Asset.verified == False,
-                Asset.datetime_declined.is_(None)   # exclude where datetime_declined is not null
+    try:
+        offset = (page-1) * size
+        return (await db.execute(
+            eager_asset_load()
+            .where(
+                and_(
+                    Asset.verified == False,
+                    Asset.datetime_declined.is_(None)   # exclude where datetime_declined is not null
+                )
             )
+            .offset(offset)
+            .limit(size)
+        )).scalars().all()
+    except Exception as e:
+        f_msg = "An error occured while retrieving your unverified properties."
+        d_msg = f"{f_msg} Reason {e}" 
+        if DEBUG:
+            logger.error(d_msg)
+        log_message('error', d_msg)
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = f_msg
         )
-        .offset(offset)
-        .limit(size)
-    )
+    
+
+async def update_verification_state(
+    asset_id: int,
+    db: AsyncSession,
+    action: Literal['verify','cancel'],
+):
+    """Mark an Asset as verified (verified=True).
+
+    Args:
+        asset_id: id of the Asset to verify
+        db: AsyncSession
+        action: verify or cancel
+
+    Returns:
+        The updated Asset instance
+    """
+    asset = await db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found.",
+        )
+
+    if action == 'verify':
+        if asset.verified:
+            # already verified — return as-is
+            return asset
+
+        asset.verified = True
+    elif action == 'cancel':
+        asset.verified = False
+        asset.datetime_declined = datetime.now(timezone.utc)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Action can be verify or cancel."
+        )
+    
+    try:
+        db.add(asset)
+        await db.commit()
+        await db.refresh(asset)
+        if DEBUG:
+            log_message('info', f"Asset {asset_id} marked as verified")
+        return asset
+
+    except Exception as e:
+        await db.rollback()
+        f_msg = f"Failed to {action} property."
+        d_msg = f"{f_msg} Reason: {e}"
+        if DEBUG:
+            logger.error(d_msg)
+        log_message('error', d_msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f_msg,
+        )

@@ -21,7 +21,9 @@ from property_street_backend.app.database import (
 from property_street_backend.app.controllers.auth import routes as auth_routes
 from property_street_backend.app.controllers.chat import routes as chat_routes
 from property_street_backend.app.controllers.ws_init import routes as ws_routes
+from property_street_backend.app.controllers.auth.utils import ensure_admin_user
 from property_street_backend.app.controllers.search import routes as search_routes
+from property_street_backend.app.controllers.actors import routes as actors_routes
 from property_street_backend.app.controllers.assets import routes as assets_routes
 from property_street_backend.app.controllers.settings import routes as settings_routes
 from property_street_backend.app.controllers.activity import routes as activity_routes
@@ -30,7 +32,6 @@ from property_street_backend.app.controllers.notification import routes as notif
 from property_street_backend.app.controllers.asset_request import routes as asset_request_routes
 from property_street_backend.app.controllers.roommate_finder import routes as roommates_finder_routes
 from property_street_backend.app.routers import (
-    search,
     google_oauth,
 )
 from property_street_backend.app.initiator import (
@@ -47,6 +48,7 @@ from property_street_backend.app.controllers.cache_expiration import cache_expir
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
+    await ensure_admin_user()
     async for redis_client in get_redis():
         (
             listener_task, 
@@ -125,11 +127,11 @@ async def test_database(
 
 # Include routers
 app.include_router(home_router)
-app.include_router(search.router)
 app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(chat_routes.router)
 app.include_router(google_oauth.router)
+app.include_router(actors_routes.router)
 app.include_router(search_routes.router)
 app.include_router(assets_routes.router)
 app.include_router(assets_routes.router)

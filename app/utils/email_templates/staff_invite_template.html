@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>You're invited to join Property street</title>
+	<link href="https://fonts.cdnfonts.com/css/arial-mt" rel="stylesheet">
+	<style>
+		html{ background-color: #fafbfb; }
+		.button { display:inline-block; background:#0dd138ff; color:#fff; padding:12px 18px; text-decoration:none; border-radius:6px; font-weight:600 }
+	</style>
+</head>
+<body style="height: 100vh; min-height: 100vh; width: 100%; max-width: 610px; margin: auto" bgcolor="#FFF">
+	<table cellspacing="0" cellpadding="0" width="100%" height="100%" style="min-width:100%">
+		<tbody>
+			<tr>
+				<td width="100%" align="center" style="vertical-align:top">
+					<table cellspacing="0" width="100%" style="padding:16px">
+						<tbody>
+							<tr>
+								<td bgcolor="#ffffff" height="32"></td>
+							</tr>
+							<tr>
+								<td align="left">
+									<a href="" title="Property street" style="text-decoration:none; font-weight:normal; color:#0dd138ff; font-size: 20px; font-family: 'Arial Rounded MT Bold', sans-serif;" target="_blank">Property street</a>
+								</td>
+							</tr>
+							<tr>
+								<td bgcolor="#ffffff" height="16" style="font-family:Helvetica,Arial,sans-serif; font-size:13px; color:#343a40; line-height:1.4">
+									<p>Hi ${recipient_name},</p>
+									<p>${inviter_name} has invited you to join Property street as a staff member.</p>
+									<p>To accept the invitation and create your staff account, please click the button below. The invite will expire in ${expiry_minutes} minutes.</p>
+									<p style="text-align:center; margin:18px 0">
+										<a class="button" href="${invite_link}" target="_blank">Accept Invitation</a>
+									</p>
+									<p>If the button above does not work, paste this link into your browser:</p>
+									<p style="word-break:break-all"><a href="${invite_link}" style="color:#0dd138ff">${invite_link}</a></p>
+									<p>If you did not expect this invitation, you can safely ignore this email.</p>
+									<p>Best regards,<br/>Property street</p>
+								</td>
+							</tr>
+							<tr>
+								<td height="16"></td>
+							</tr>
+							<tr>
+								<td height="0.01" style="border-top: 1px solid #eaecf0;"></td>
+							</tr>
+							<tr>
+								<td height="16"></td>
+							</tr>
+							<tr>
+								<td align="center" style="line-height:1.6">
+									<font style="font-family:Helvetica,Arial,sans-serif; font-size:14px; color:#666666; line-height:1.6">© 2024 Property street<br/>${property_street_address}</font>
+								</td>
+							</tr>
+							<tr>
+								<td height="16"></td>
+							</tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</body>
+</html>

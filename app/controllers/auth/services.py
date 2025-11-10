@@ -542,7 +542,7 @@ async def send_password_reset_mail(
         )
     else: # When no result is found
         try:
-            # Generate a new five-digit code
+            # Generate a url-safe token
             secret = secrets.token_urlsafe()
 
             # call the email function and send the email

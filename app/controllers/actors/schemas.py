@@ -7,9 +7,9 @@ from .models import User
 class AgentResponseSchema(ConfigDictSetter):
     id: int
     username: str
-    profile_avatar_url: Optional[str] = Field(None, description="Agent's avatar URL from the related user")
-    phone_no: Optional[str]
-    dial_code: Optional[str]
+    profile_avatar_url: str = Field("", description="Agent's avatar URL from the related user")
+    phone_no: str = ""
+    dial_code: str = ""
 
     @model_validator(mode='before')
     @classmethod
