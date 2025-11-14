@@ -14,6 +14,7 @@ from .schemas import AssetResponseSchema
 from property_street_backend.app.models import (
     User,
     Asset, 
+    Area
 )
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
@@ -21,6 +22,11 @@ from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.activity import (
     auto_category_hset_key,
     newly_created_asset_set_key, 
+)
+from property_street_backend.app.utils.store import (
+    send_email,
+    read_email_from_html_template_name,
+    substituted_string,
 )
 
 def eager_asset_load():
@@ -224,39 +230,135 @@ async def get_unverified_properties(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail = f_msg
         )
-    
 
+
+async def send_verification_state_email(
+    property: Asset,
+    action: Literal['verify','cancel'],
+    **kwargs
+):
+    """Send email notification when property is verified.
+    
+    Args:
+        asset: The verified Asset object with agent relationship loaded
+    """
+    if action not in ['verify','cancel']:
+        detail=f"Verification state email got a wrong action: {action}"
+        if DEBUG:
+            logger.error(detail)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=detail
+        )
+    
+    agent: User = property.agent
+    action_is_verify = action == 'verify'
+    cancellation_reason = kwargs.get('cancellation_reason',None)
+
+    try:
+        if not agent or not agent.email:
+            log_message('warning', f"Agent email not found for asset {property.id}")
+            return
+        
+        # Load the email template
+        template = "property_verification_template" if action_is_verify else "property_cancellation_template"
+        template_content = read_email_from_html_template_name(template)
+        if not template_content:
+            log_message('error', f"Could not load {action} template for asset {property.id}")
+            return
+        
+        # Build the variable map
+        area: Area = property.area
+        property_location = f"{area.city_or_town}, {area.state_or_province}" if area else "Unknown Location"
+        property_price = f"{property.currency} {property.price}" if property.price else "Contact for Price"
+        verification_date = property.datetime_verified.strftime("%B %d, %Y") if property.datetime_verified else datetime.now(timezone.utc).strftime("%B %d, %Y")
+        property_view_link = f"https://app.propertystreet.com/property/{property.id}"
+        property_street_address = "Port Harcourt, Nigeria"
+        
+                
+        if action == 'verify':
+            substitution_map = {
+                "agent_name": agent.username,
+                "property_title": property.title,
+                "property_location": property_location,
+                "property_price": property_price,
+                "verification_date": verification_date,
+                "property_view_link": property_view_link,
+                "property_street_address": property_street_address
+            }
+        elif action == 'cancel':
+            cancellation_date = property.datetime_declined.strftime("%B %d, %Y") if property.datetime_declined else datetime.now(timezone.utc).strftime("%B %d, %Y")
+            host = "http://localhost:3000" if DEBUG else "https://www.propertystreet.ng"
+            property_edit_link = f"{host}/update-property/{property.id}"
+            substitution_map = {
+                "agent_name": agent.username,
+                "property_title": property.title,
+                "cancellation_reason": cancellation_reason or 'Property violates eligibiltity criteria. Contact support for more clarity.',
+                "cancellation_date": cancellation_date,
+                "property_edit_link": property_edit_link,
+                "property_street_address": property_street_address
+            }
+        
+        # Substitute variables in template
+        html_email = substituted_string(template_content, substitution_map)
+        
+        subject="Your Property Has Been Verified! 🎉" if action_is_verify else "Property Verification Status Update"
+        # Send email
+        send_email(
+            from_email="team@propertystreet.ng",
+            from_name="Property street",
+            subject=subject,
+            to_email=agent.email,
+            html_email=html_email
+        )
+        
+        if DEBUG:
+            log_message('info', f"{action} email sent to {agent.email} for asset {property.id}")
+        
+    except Exception as e:
+        # Log error but don't fail the verification process
+        d_msg = f"Failed to send {action} email for asset {property.id}. Reason: {e}"
+        if DEBUG:
+            logger.error(d_msg)
+        log_message('error', d_msg)
+
+    
 async def update_verification_state(
     asset_id: int,
     db: AsyncSession,
     action: Literal['verify','cancel'],
+    cancellation_reason: str = None,
 ):
-    """Mark an Asset as verified (verified=True).
+    """Mark an Asset as verified (verified=True) or cancelled (verified=False).
 
     Args:
         asset_id: id of the Asset to verify
         db: AsyncSession
         action: verify or cancel
+        cancellation_reason: reason for cancellation (only used when action is 'cancel')
 
     Returns:
         The updated Asset instance
     """
-    asset = await db.get(Asset, asset_id)
+    # Fetch asset with agent relationship loaded
+    stmt = eager_asset_load().where(Asset.id == asset_id)
+    result = await db.execute(stmt)
+    asset = result.scalars().first()
+    
     if not asset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Property not found.",
         )
 
+    now = datetime.now(timezone.utc)
     if action == 'verify':
-        if asset.verified:
-            # already verified — return as-is
-            return asset
-
         asset.verified = True
+        asset.datetime_declined = None
+        asset.datetime_verified = now
     elif action == 'cancel':
         asset.verified = False
-        asset.datetime_declined = datetime.now(timezone.utc)
+        asset.datetime_declined = now
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -268,7 +370,11 @@ async def update_verification_state(
         await db.commit()
         await db.refresh(asset)
         if DEBUG:
-            log_message('info', f"Asset {asset_id} marked as verified")
+            log_message('info', f"Asset {asset_id} marked as {action}")
+        
+        # Send appropriate email notification
+        await send_verification_state_email(asset, action, cancellation_reason=cancellation_reason)
+        
         return asset
 
     except Exception as e:

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Property Verification Cancelled - Property street</title>
+	<link href="https://fonts.cdnfonts.com/css/arial-mt" rel="stylesheet">
+	<style>
+		html{ background-color: #fafbfb; }
+		.button { display:inline-block; background:#0dd138ff; color:#fff; padding:12px 18px; text-decoration:none; border-radius:6px; font-weight:600 }
+		.cancelled-badge { display:inline-block; background:#dc3545; color:#fff; padding:4px 8px; border-radius:4px; font-weight:600; font-size:12px; }
+	</style>
+</head>
+<body style="height: 100vh; min-height: 100vh; width: 100%; max-width: 610px; margin: auto" bgcolor="#FFF">
+	<table cellspacing="0" cellpadding="0" width="100%" height="100%" style="min-width:100%">
+		<tbody>
+			<tr>
+				<td width="100%" align="center" style="vertical-align:top">
+					<table cellspacing="0" width="100%" style="padding:16px">
+						<tbody>
+							<tr>
+								<td bgcolor="#ffffff" height="32"></td>
+							</tr>
+							<tr>
+								<td align="left">
+									<a href="" title="Property street" style="text-decoration:none; font-weight:normal; color:#0dd138ff; font-size: 20px; font-family: 'Arial Rounded MT Bold', sans-serif;" target="_blank">Property street</a>
+								</td>
+							</tr>
+							<tr>
+								<td bgcolor="#ffffff" height="16" style="font-family:Helvetica,Arial,sans-serif; font-size:13px; color:#343a40; line-height:1.4">
+									<p>Hi ${agent_name},</p>
+									<p>We are writing to inform you that the verification of your property <strong>"${property_title}"</strong> has been <span class="cancelled-badge">CANCELLED</span>.</p>
+									<p>Your property is now <strong>no longer visible</strong> to users on Property street and will not receive new inquiries or bookings until it is re-verified.</p>
+									<div style="background-color:#fff3cd; padding:12px; border-radius:6px; margin:16px 0; border-left:4px solid #ffc107">
+										<p style="margin:4px 0"><strong>Reason for Cancellation:</strong></p>
+										<p style="margin:4px 0">${cancellation_reason}</p>
+										<p style="margin:8px 0 0 0"><strong>Cancelled on:</strong> ${cancellation_date}</p>
+									</div>
+									<p><strong>What happens next?</strong></p>
+									<ul style="margin:8px 0">
+										<li>Your property has been moved back to pending verification status</li>
+										<li>You can review the cancellation details and make any necessary updates</li>
+										<li>Once ready, you can resubmit your property for verification</li>
+									</ul>
+									<p style="text-align:center; margin:18px 0">
+										<a class="button" href="${property_edit_link}" target="_blank">Review Your Property</a>
+									</p>
+									<p>If you believe this decision was made in error or have questions about the cancellation, please contact our support team for assistance.</p>
+									<p>Best regards,<br/>Property street Team</p>
+								</td>
+							</tr>
+							<tr>
+								<td height="16"></td>
+							</tr>
+							<tr>
+								<td height="0.01" style="border-top: 1px solid #eaecf0;"></td>
+							</tr>
+							<tr>
+								<td height="16"></td>
+							</tr>
+							<tr>
+								<td align="center" style="line-height:1.6">
+									<font style="font-family:Helvetica,Arial,sans-serif; font-size:14px; color:#666666; line-height:1.6">© 2024 Property street<br/>${property_street_address}</font>
+								</td>
+							</tr>
+							<tr>
+								<td height="16"></td>
+							</tr>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</body>
+</html>

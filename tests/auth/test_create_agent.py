@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .test_user_creation import user_data
 from property_street_backend.app.models import User
+from .test_user_creation import user_data, UserRegistrationSchema
 from property_street_backend.app.controllers.auth.services import (
     create_agent,
     verify_password,
@@ -10,7 +10,7 @@ from property_street_backend.app.controllers.auth.services import (
 from property_street_backend.app.controllers.actors.schemas import AgentResponseSchema
 
 
-async def create_test_agent(db:AsyncSession):
+async def create_test_agent(db:AsyncSession, user_data: UserRegistrationSchema = user_data):
     return await create_agent(
         db = db, 
         user_data = user_data
