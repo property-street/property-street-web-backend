@@ -54,7 +54,7 @@ class Asset(Base):
     )
 
     # verification
-    verified = Column(Boolean, default=False)
+    verified = Column(Boolean, nullable=False, default=False)
     datetime_declined = Column(DateTime(timezone=True))
     datetime_verified = Column(DateTime(timezone=True))
 

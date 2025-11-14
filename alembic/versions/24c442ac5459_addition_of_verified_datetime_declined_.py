@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.sql import text
 
 
 # revision identifiers, used by Alembic.
@@ -31,6 +32,15 @@ def upgrade() -> None:
                existing_type=sa.BIGINT(),
                type_=sa.Float(),
                existing_nullable=True)
+
+    op.execute(text("UPDATE assets SET verified = FALSE WHERE verified IS NULL"))
+    op.alter_column(
+        'assets',
+        'verified',
+        existing_type=sa.Boolean(),
+        nullable=False,
+        server_default=sa.text('FALSE')  # optional: sets a DB-level default for future inserts
+    )
     # ### end Alembic commands ###
 
 

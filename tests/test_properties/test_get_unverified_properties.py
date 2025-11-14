@@ -1,19 +1,12 @@
-import json
 import pytest
-from typing import List
 from httpx import AsyncClient
-from redis.asyncio import Redis
 from sqlalchemy.future import select
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import (
-    Tag,
-    Area,
     User,
     Asset, 
-    AssetCloudImage,
-    CloudImageDetail,
 )
 from property_street_backend.app.initiator import logger
 from .test_fetch_recent_assets import pre_commit_test_asset_collection

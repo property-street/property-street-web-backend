@@ -207,7 +207,7 @@ async def confirm_verification(
 async def cancel_verification_route(
     asset_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles('admin')),
+    _: User = Depends(require_roles('admin','staff')),
 ):
     """Cancel a property's verification (admin only)."""
     return await update_verification_state(asset_id, db, 'cancel')

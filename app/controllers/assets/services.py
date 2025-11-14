@@ -200,17 +200,20 @@ async def get_unverified_properties(
     """
     try:
         offset = (page-1) * size
-        return (await db.execute(
+        properties = (await db.execute(
             eager_asset_load()
             .where(
                 and_(
-                    Asset.verified == False,
+                    Asset.verified.isnot(True),
                     Asset.datetime_declined.is_(None)   # exclude where datetime_declined is not null
                 )
             )
             .offset(offset)
             .limit(size)
         )).scalars().all()
+    
+        v_assets, _ = await validate_assets(db, properties)
+        return v_assets
     except Exception as e:
         f_msg = "An error occured while retrieving your unverified properties."
         d_msg = f"{f_msg} Reason {e}" 

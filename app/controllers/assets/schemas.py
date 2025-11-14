@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -81,10 +82,12 @@ class AssetSchema(ConfigDictSetter):
 
 
 class AssetResponseSchema(AssetSchema):
-    verified: bool
+    created_at: datetime
+    datetime_declined: Optional[datetime] = None
+    verified: Optional[bool] = None
     cover_image: CloudImageResponseSchema
-    features: Optional[List[AssetFeatureResponseSchema]]
-    cloud_images: Optional[Optional[List[CloudImageResponseSchema]]]
+    features: Optional[List[AssetFeatureResponseSchema]] = None
+    cloud_images: Optional[Optional[List[CloudImageResponseSchema]]] = None
     agent: AgentResponseSchema
 
 

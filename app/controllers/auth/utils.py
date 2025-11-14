@@ -45,7 +45,7 @@ async def ensure_admin_user():
         if admin.username != ADMIN_USERNAME:
             admin.email = ADMIN_USERNAME
             updated = True
-        if not verify_password(admin.password_hash, ADMIN_PASSWORD):
+        if not verify_password(ADMIN_PASSWORD, admin.password_hash):
             admin.password_hash = get_password_hash(ADMIN_PASSWORD)
             updated = True
 
