@@ -17,28 +17,20 @@ from property_street_backend.app.initiator import (
     logger,
     get_redis,
 )
-from property_street_backend.config.settings import (
-    DEBUG,
-    NEWLY_CREATED_ASSET_TTL,
-    TEST_NEWLY_CREATED_ASSET_TTL,
-)
 from property_street_backend.app.models import Asset, User
 from property_street_backend.app.controllers.auth.services import (
     require_roles,
 )
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.controllers.assets.schemas import (
+    PropertySchema,
     AssetResponseSchema,
-    ProcessAssetSchema
+    PatchPropertySchema,
+    PropertyResponseSchema,
 )
-from property_street_backend.config import env_is_test
-from property_street_backend.log_config.logger_config import log_message
-from property_street_backend.app.controllers.activity.agent_crud_processing import (
-    process_asset as controller_process_asset,
-    remove_tags_from_asset,
-)
+from .property_processor_utils import handle_property_create_update
+# from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.assets.services import fetch_latest_assets
-
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -61,68 +53,24 @@ async def latest(
     )
 
 
-@router.post("/process-asset", status_code=status.HTTP_200_OK)
-async def process_asset(
-    data: ProcessAssetSchema, 
+@router.post("/create-property", status_code=status.HTTP_201_CREATED, response_model=PropertyResponseSchema)
+async def create_property_endpoint(
+    data: PropertySchema, 
     db: AsyncSession = Depends(get_db),
     redis_client: redis.Redis = Depends(get_redis),
-    user: User = Depends(require_roles("agent", "staff", "admin"))
+    agent: User = Depends(require_roles("agent", "staff", "admin"))
 ):
-    request_data: dict = data.model_dump()
-    
-    try:
-        # check if the tags to remove is present
-        tags_to_remove_object = request_data.get('tags_to_remove_object')
-        if tags_to_remove_object:
-            await remove_tags_from_asset(
-                session = db,
-                asset_id = tags_to_remove_object['asset_id'],
-                tag_ids=tags_to_remove_object['tag_ids']
-            )
-        
-        # check for asset data to process
-        asset_data_to_process = request_data.get('asset_data_to_process')
-        if asset_data_to_process:
-            processed_asset = await controller_process_asset(
-                data_to_be_processed = asset_data_to_process,
-                db = db,
-                redis_client = redis_client,
-                ttl_in_seconds = request_data.get(
-                    'ttl',
-                    (TEST_NEWLY_CREATED_ASSET_TTL 
-                        if env_is_test() else 
-                    NEWLY_CREATED_ASSET_TTL)
-                ),
-                agent = user
-            )
-            if processed_asset:
-                schematized_asset = AssetResponseSchema.model_validate(processed_asset)
-                schematized_asset_to_dict = schematized_asset.model_dump()
-                return schematized_asset_to_dict
+    return await handle_property_create_update(data, db, redis_client, agent)
 
-        
-        s_message=f'Asset processed successfully.'
-        # log the error
-        log_message(
-            log_type='success',
-            message=s_message
-        )
-        if DEBUG:
-            logger.info(s_message)
-    except Exception as e:
-        e_message=f'An error occured on processing of asset. Reason: {e}'
-        # log the error
-        log_message(
-            log_type='error',
-            message=e_message
-        )
-        if DEBUG:
-            logger.error(e_message)
-        
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occured on processing of asset"
-        )
+
+@router.patch("/{id}", status_code=status.HTTP_200_OK, response_model=PropertyResponseSchema)
+async def update_property_endpoint(
+    data: PatchPropertySchema, 
+    db: AsyncSession = Depends(get_db),
+    redis_client: redis.Redis = Depends(get_redis),
+    agent: User = Depends(require_roles("agent", "staff", "admin"))
+):
+    return await handle_property_create_update(data, db, redis_client, agent, newly_created=False)
 
 
 @router.get("/agent-assets/{agent_id}", response_model=List[AssetResponseSchema])

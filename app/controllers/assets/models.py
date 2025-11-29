@@ -1,20 +1,23 @@
 from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    ForeignKey,
-    Numeric,
     Text,
-    DateTime,
     func,
     event,
-    Enum as SqlalchemyEnum,
+    event,
+    String,
+    Column,
+    Integer,
+    Numeric,
     Boolean,
+    DateTime,
+    ForeignKey,
+    Enum as SqlalchemyEnum,
 )
+from sqlalchemy.future import select
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from .enums import AvailabilityStatus
+from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.app.models_helper import AbstractCloudImage
 from property_street_backend.config.postgres_connection_manager import Base
 
@@ -73,7 +76,8 @@ class Asset(Base):
             'users.id', 
             name='fk_assets_agent_id_users', 
             ondelete='CASCADE'
-        )
+        ),
+        nullable=False
     )
     agent = relationship(
         'User', 
@@ -89,17 +93,19 @@ class Asset(Base):
             'cloud_image_details.id', 
             name='fk_assets_cover_image_id', 
             use_alter=True, 
-            ondelete='SET NULL'
+            ondelete='CASCADE'
         ), 
         nullable=True
     )
     cover_image = relationship(
-        'CloudImageDetail', 
+        'CloudImageDetail',
         back_populates='asset',
-        uselist=False, # explicitly tell SQLAlchemy it's a one-to-one
-        foreign_keys=[cover_image_id], 
+        uselist=False,
+        foreign_keys=[cover_image_id],
         post_update=True,
-        lazy="selectin",  # Ensures relationship loads in async contexts
+        lazy="selectin",
+        cascade="all, delete-orphan", # Ensures that if the parent disappears, the child is deleted.
+        single_parent=True # Required for delete-orphan behavior in one-to-one relationships.
     )
     
     # Many-to-many relationship with Tag
@@ -108,6 +114,7 @@ class Asset(Base):
         secondary='asset_tag_association', 
         back_populates='assets',
         lazy="selectin",  # Ensures relationship loads in async contexts
+        uselist=True,
     )
 
     # Reverse relationship to asset feature
@@ -116,7 +123,7 @@ class Asset(Base):
         back_populates='asset',
         cascade="all, delete-orphan", # cascade from Asset to AssetFeature
         lazy="selectin",  # Ensures relationship loads in async contexts
-
+        uselist = True,
     )
 
     # Reverse relationship to the AssetCloudImage
@@ -146,6 +153,19 @@ class Asset(Base):
     @hybrid_property
     def has_features(self):
         return bool(self.features)  # works in Python
+
+# @event.listens_for(Asset, "before_insert")
+# def prevent_unauthorized_agency(mapper, connection, target):
+#     agent_id: int = target.agent_id
+#     expected_agent: User = target.agent or connection.execute(
+#         select(User).where(User.id == agent_id)
+#     ).scalar_one_or_none()
+# 
+#     if not isinstance(expected_agent, User):
+#         raise ValueError("No agent detected on property creation.")
+#     
+#     if not (expected_agent.user_role in ['staff','agent','admin']):
+#         raise ValueError("Unauthorized property creation by a non agent, admin or staff.")  
 
 
 class AssetFeature(Base):
@@ -178,6 +198,7 @@ class AssetFeature(Base):
         back_populates='asset_feature',
         cascade="all, delete-orphan", # cascade from AssetFeature to AssetCloudImage
         lazy="selectin",  # Ensures relationship loads in async contexts
+        post_update=True,
     )
 
 
@@ -201,7 +222,6 @@ class AssetCloudImage(AbstractCloudImage):
         back_populates='cloud_images',
         foreign_keys=[asset_id],
         lazy="selectin",  # Ensures relationship loads in async contexts
-
     )
 
     # Foreign key relationship to asset_features (no cascade)

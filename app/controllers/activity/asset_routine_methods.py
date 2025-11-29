@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from redis.asyncio import Redis
 
 from property_street_backend.app.initiator import logger
@@ -23,6 +24,13 @@ async def create_or_update_newly_created_asset_cache(
     """
     hash_key = "newly_created_asset"
     hset_key = "auto_category"
+
+    # serialize datetime values
+    date_fields = ['created_at', 'datetime_declined']
+    for field in date_fields:
+        value = asset_data[field]
+        if isinstance(value, datetime):
+            asset_data[field] = value.isoformat()
 
     asset_data_to_str = json.dumps(asset_data)
 

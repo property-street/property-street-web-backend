@@ -2,9 +2,9 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from property_street_backend.app.schemas import ConfigDictSetter 
-from property_street_backend.app.schemas.area_schema import AreaSchema
 from property_street_backend.app.controllers.actors.schemas import AgentResponseSchema
+from property_street_backend.app.schemas.area_schema import AreaSchema, AreaResponseSchema, AreaPatchSchema
+from property_street_backend.app.schemas import ConfigDictSetter, make_optional, UtilitySchemaMixin
     
 
 class AssetFeatureCreateSchema(ConfigDictSetter):
@@ -12,12 +12,8 @@ class AssetFeatureCreateSchema(ConfigDictSetter):
     asset_id: Optional[int] = Field(None, description="The ID of the asset to which this feature belongs")
 
 
-class RemoveTagFromAssetSchema(ConfigDictSetter):
-    asset_id: int = Field(..., description="The id of the asset whose tags is to be removed")
-    tag_ids: List[int] = Field(..., description="Ids of tags to be removed from the asset")
-
-
-class CloudImageSchema(ConfigDictSetter):
+class CloudImageSchema(BaseModel,UtilitySchemaMixin):
+    id: Optional[int] = None
     cloud_asset_id: str = Field(..., description="asset_id from the cloud")
     format: str = Field(..., description="The format of the image (e.g. jpg, png)")
     bytes: int = Field(..., description="The size of the image in bytes")
@@ -26,17 +22,27 @@ class CloudImageSchema(ConfigDictSetter):
     public_id: str = Field(..., description="The public ID of the image in the cloud storage")
     secure_url: str = Field(..., description="The secure URL of the image in the cloud storage")
 
+CloudImagePatch = make_optional(CloudImageSchema)
+class CloudImagePatchSchema(CloudImagePatch):
+    pass
+
 
 # Asset return schema
-class CloudImageResponseSchema(ConfigDictSetter):
+class CloudImageResponseSchema(ConfigDictSetter,UtilitySchemaMixin):
     id: int
     public_id: str
     secure_url: str = Field(..., description="The secure URL of the image in the cloud storage")
 
 
-class AssetFeatureSchema(ConfigDictSetter):
+class AssetFeatureSchema(ConfigDictSetter,UtilitySchemaMixin):
+    id: Optional[int] = None
     title: str = Field(..., description="The title of the feature")
     cloud_images: List[CloudImageSchema] = Field(..., description="The cloud images of each asset feature")
+
+class AssetFeaturePatchSchema(BaseModel,UtilitySchemaMixin):
+    id: Optional[int] = None
+    title: Optional[str] = None
+    cloud_images: Optional[List[CloudImagePatchSchema]] = None
 
 
 class AssetFeatureResponseSchema(AssetFeatureSchema):
@@ -47,16 +53,24 @@ class AssetFeatureResponseSchema(AssetFeatureSchema):
 class NoFeatureSchema(ConfigDictSetter):
     cloud_images: List[CloudImageSchema] = Field(..., description="The cloud images of each asset feature")
 
+class NoFeaturePatchSchema(BaseModel):
+    cloud_images: Optional[List[CloudImagePatchSchema]] = None
 
-class TagSchema(BaseModel):
-    id: int
+
+class TagSchema(BaseModel,UtilitySchemaMixin):
+    id: Optional[int] = None
     name: str = Field(..., description="Tag associated with the asset")
 
+TagPatch = make_optional(TagSchema)
+class TagPatchSchema(TagPatch):
+    pass
+
+class TagSchemaResponse(TagSchema):
+    id: int
     model_config = ConfigDict(from_attributes=True)
 
-
-class AssetSchema(ConfigDictSetter):
-    id: int = Field(..., description="The id of the asset")
+class FlatPropertyFields(BaseModel):
+    id: Optional[int] = None
     title: str = Field(..., description="The title of the asset")
     currency: str = Field(..., description="The currency used for the asset's price (e.g., USD, EUR)")
     price: float = Field(..., description="The monetary value of the asset")
@@ -64,11 +78,15 @@ class AssetSchema(ConfigDictSetter):
     description: str = Field(..., description="A detailed description of the asset, possibly in HTML")
     category: str = Field(..., description="The category of the asset (e.g., House, Hotel)")
     status: str = Field(..., description="The status of the asset (e.g., Available, Sold)")
-    availability: str = Field(..., description="availability status")
-    has_features: Optional[bool] = Field(None, description="Boolean indicating if the asset has features or not")
-    area: AreaSchema
+    availability: str = Field('available', description="availability status")
+    agent_id: int
 
-    # Updated fields to allow for multiple entries
+FlatPropertyFieldsPatch = make_optional(FlatPropertyFields)
+class FlatFieldsPatchSchema(FlatPropertyFieldsPatch):
+    pass
+
+class AssetSchema(FlatPropertyFields):
+    area: AreaSchema
     tags: List[TagSchema] = Field(..., description="Tags associated with the asset")
     cover_image: CloudImageSchema = Field(..., description="The main image of the asset")
     features: Optional[List[AssetFeatureSchema]] = Field(None, description="A list of features of the asset")
@@ -80,28 +98,36 @@ class AssetSchema(ConfigDictSetter):
             raise ValueError("Only one of 'features' or 'cloud_images' can be included in the response at a time.")
         return values
 
+class PropertySchema(AssetSchema):
+    pass
 
-class AssetResponseSchema(AssetSchema):
+
+class AssetResponseSchema(ConfigDictSetter, AssetSchema):
+    id: int = Field(..., description="The id of the asset")
+    has_features: Optional[bool] = Field(None, description="Boolean indicating if the asset has features or not")
+    verified: bool
     created_at: datetime
-    datetime_declined: Optional[datetime] = None
-    verified: Optional[bool] = None
+    area: AreaResponseSchema
+    tags: List[TagSchemaResponse]
     cover_image: CloudImageResponseSchema
+    datetime_declined: Optional[datetime] = None
     features: Optional[List[AssetFeatureResponseSchema]] = None
     cloud_images: Optional[Optional[List[CloudImageResponseSchema]]] = None
     agent: AgentResponseSchema
 
+class PropertyResponseSchema(AssetResponseSchema):
+    pass
+
+class PatchPropertySchema(FlatFieldsPatchSchema,UtilitySchemaMixin):
+    area: Optional[AreaPatchSchema] = None
+    tags: Optional[List[TagPatchSchema]] = None
+    cover_image: Optional[CloudImagePatchSchema] = None
+    features: Optional[List[AssetFeaturePatchSchema]] = None
+    cloud_images: Optional[List[CloudImagePatchSchema]] = None
+
 
 class LatestAssetsFetchResponseSchema(ConfigDictSetter):
-    assets: List[AssetResponseSchema]
-
-
-class ProcessAssetSchema(ConfigDictSetter):
-    tags_to_remove_object: Optional[dict] = None
-    asset_data_to_process: Optional[dict] = None
-
-
-class AssetFetchResponseSchema():
-    pass
+    assets: List[PropertyResponseSchema]
 
 class PropertySearchResponse(BaseModel):
     type: str = 'property'

@@ -1,12 +1,11 @@
 import pytest
-
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import Asset
+from .test_processing.test_create_with_apply_model import create_test_asset
 from property_street_backend.app.controllers.auth.utils import ensure_admin_user
 from property_street_backend.app.controllers.auth.services import fetch_access_token
-from property_street_backend.tests.test_properties.test_create_asset import create_test_asset
 from property_street_backend.tests.auth.test_create_agent import create_test_agent, UserRegistrationSchema
 
 
@@ -30,8 +29,7 @@ async def test_confirm_verification_endpoint(client__fixture):
 
     # ensure admin exists and get token
     admin = await ensure_admin_user()
-    token_obj = fetch_access_token(user=admin)
-    admin_token = token_obj['access_token']
+    admin_token = fetch_access_token(user=admin)['access_token']
     headers = {"Authorization": f"Bearer {admin_token}"}
 
     # call the confirm verification endpoint

@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .test_process_asset.test_create_with_apply_model import create_test_asset
 from property_street_backend.app.models import Asset
 from property_street_backend.app.controllers.auth.utils import ensure_admin_user
 from property_street_backend.app.controllers.auth.services import fetch_access_token
-from property_street_backend.tests.test_properties.test_create_asset import create_test_asset
 from property_street_backend.tests.auth.test_create_agent import create_test_agent, UserRegistrationSchema
 
 
