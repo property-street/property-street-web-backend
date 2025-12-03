@@ -112,7 +112,6 @@ async def fetch_asset_by_id(
     """
     Fetches a single asset by its ID.
     """
-    # Explicitly handle the 404 logic outside the try block
     result = await session.execute(
         eager_asset_load()
         .where(Asset.id == asset_id)

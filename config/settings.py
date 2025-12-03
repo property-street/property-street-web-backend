@@ -93,4 +93,11 @@ ADMIN_PASSWORD=os.getenv("ADMIN_PASSWORD")
 
 # staff link validity
 STAFF_LINK_VALIDITY=86400  # in seconds (1 day) 
-TEST_STAFF_LINK_VALIDITY=2  # in seconds (2 seconds)) 
+TEST_STAFF_LINK_VALIDITY=2  # in seconds (2 seconds))
+
+# staff link validity
+BETA_LINK_VALIDITY=86400  # in seconds (1 day) 
+TEST_BETA_LINK_VALIDITY=2  # in seconds (2 seconds))
+
+# Beta launching
+BETA_LAUNCHING = True 

@@ -23,10 +23,12 @@ class UserSigninSchema(BaseModel):
 class ProbeUserExistenceSchema(BaseModel):
     username: str
     email: str
+    beta_token: Optional[str] = None
 
 class SendEmailCodeSchema(BaseModel):
     email: str
     username: str
+    beta_token: Optional[str] = None
 
 class UserRegistrationSchema(BaseModel):
     email: str
@@ -78,3 +80,9 @@ class SendPasswordResetMail(BaseModel):
 class PasswordResetSchema(BaseModel):
     password: str
     token: str
+
+class GenerateBetaLinkResponse(BaseModel):
+    url: str
+    token: str
+    expiry: str
+    ttl_seconds: int

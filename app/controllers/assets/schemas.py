@@ -31,24 +31,24 @@ class CloudImagePatchSchema(CloudImagePatch):
 class CloudImageResponseSchema(ConfigDictSetter,UtilitySchemaMixin):
     id: int
     public_id: str
+    format: str
     secure_url: str = Field(..., description="The secure URL of the image in the cloud storage")
 
 
 class AssetFeatureSchema(ConfigDictSetter,UtilitySchemaMixin):
     id: Optional[int] = None
     title: str = Field(..., description="The title of the feature")
-    cloud_images: List[CloudImageSchema] = Field(..., description="The cloud images of each asset feature")
+    cloud_images: Optional[List[CloudImageSchema]] = None
 
 class AssetFeaturePatchSchema(BaseModel,UtilitySchemaMixin):
     id: Optional[int] = None
-    title: Optional[str] = None
-    cloud_images: Optional[List[CloudImagePatchSchema]] = None
+    title: str = None
+    cloud_images: List[CloudImagePatchSchema] = []
 
 
 class AssetFeatureResponseSchema(AssetFeatureSchema):
     id: int
     cloud_images: List[CloudImageResponseSchema] = Field(..., description="The cloud images of each asset feature")
-
 
 class NoFeatureSchema(ConfigDictSetter):
     cloud_images: List[CloudImageSchema] = Field(..., description="The cloud images of each asset feature")
@@ -90,11 +90,11 @@ class AssetSchema(FlatPropertyFields):
     tags: List[TagSchema] = Field(..., description="Tags associated with the asset")
     cover_image: CloudImageSchema = Field(..., description="The main image of the asset")
     features: Optional[List[AssetFeatureSchema]] = Field(None, description="A list of features of the asset")
-    cloud_images: Optional[List[CloudImageSchema]] = Field(None, description="Fallback images for assets without features")
+    unfeatured_images: Optional[List[CloudImageSchema]] = Field(None, description="Fallback images for assets without features")
 
     @model_validator(mode="after")
     def validate_features_or_no_feature(cls, values):
-        if values.features and values.cloud_images:
+        if values.features and values.unfeatured_images:
             raise ValueError("Only one of 'features' or 'cloud_images' can be included in the response at a time.")
         return values
 
@@ -112,7 +112,7 @@ class AssetResponseSchema(ConfigDictSetter, AssetSchema):
     cover_image: CloudImageResponseSchema
     datetime_declined: Optional[datetime] = None
     features: Optional[List[AssetFeatureResponseSchema]] = None
-    cloud_images: Optional[Optional[List[CloudImageResponseSchema]]] = None
+    unfeatured_images: Optional[Optional[List[CloudImageResponseSchema]]] = None
     agent: AgentResponseSchema
 
 class PropertyResponseSchema(AssetResponseSchema):
@@ -123,7 +123,7 @@ class PatchPropertySchema(FlatFieldsPatchSchema,UtilitySchemaMixin):
     tags: Optional[List[TagPatchSchema]] = None
     cover_image: Optional[CloudImagePatchSchema] = None
     features: Optional[List[AssetFeaturePatchSchema]] = None
-    cloud_images: Optional[List[CloudImagePatchSchema]] = None
+    unfeatured_images: Optional[List[CloudImagePatchSchema]] = None
 
 
 class LatestAssetsFetchResponseSchema(ConfigDictSetter):

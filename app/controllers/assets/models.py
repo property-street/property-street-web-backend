@@ -127,7 +127,7 @@ class Asset(Base):
     )
 
     # Reverse relationship to the AssetCloudImage
-    cloud_images = relationship(
+    unfeatured_images = relationship(
         'AssetCloudImage', 
         back_populates='asset',
         cascade="all, delete-orphan", # cascade from Asset to AssetCloudImage
@@ -219,7 +219,7 @@ class AssetCloudImage(AbstractCloudImage):
     )
     asset = relationship(
         'Asset', 
-        back_populates='cloud_images',
+        back_populates='unfeatured_images',
         foreign_keys=[asset_id],
         lazy="selectin",  # Ensures relationship loads in async contexts
     )

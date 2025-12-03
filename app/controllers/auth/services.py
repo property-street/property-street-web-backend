@@ -30,6 +30,9 @@ from property_street_backend.config.settings import (
     JWT_ALGORITHM,
     PASSWORD_LINK_TTL,
     TEST_PASSWORD_LINK_TTL,
+    BETA_LINK_VALIDITY,
+    TEST_BETA_LINK_VALIDITY,
+    BETA_LAUNCHING,
 )
 from property_street_backend.config import env_is_test
 from property_street_backend.app.database import get_db
@@ -91,9 +94,19 @@ async def authenticate_user(db: AsyncSession, login: str, password: str) -> User
 
     return user
 
-
+async def check_beta(redis_client: Redis, token: str) -> None:
+    if BETA_LAUNCHING:
+        if not token or not await validate_beta_signup_token(token, redis_client):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Beta token required."
+            )
+        
 # user existence
-async def check_username_email_availability(db: AsyncSession, data: dict):
+async def check_username_email_availability(db: AsyncSession, redis_client: Redis, data: dict):
+    # Check beta
+    await check_beta(redis_client,data.get("beta_token",None))
+    
     username = data['username']
     email = data['email']
     
@@ -259,6 +272,10 @@ async def send_email_verification_code(
     redis_client: redis.Redis,
     ttl_in_secs: int,
 ):
+    # Check beta
+    beta_token = requester_data.get("beta_token",None)
+    await check_beta(redis_client,beta_token)
+    
     email_address = requester_data['email']
     user_name = requester_data['username']
     reason = "email_verification"
@@ -285,67 +302,70 @@ async def send_email_verification_code(
                     else expiry)
                 }
         )
-    else: # When no result is found
-        try:
-            # Generate a new five-digit code
-            new_code = '{:04d}'.format(random.randint(0, 9999))
+    
+    try:
+        # Generate a new five-digit code
+        new_code = '{:04d}'.format(random.randint(0, 9999))
 
-            # call the email function and send the email
-            # extract the email content from the template
-            email_template_content = read_email_from_html_template_name('email_verification_code_template')
-            property_street_address = "Port Harcourt"
-            
-            email_string = substituted_string(
-                email_template_content,
-                {
-                    "user_name":user_name,
-                    "verification_code":new_code,
-                    "property_street_address": property_street_address
-                }
-            )
-            from_address="team@propertystreet.ng"
-            subject="Property street Verification Code"
-            from_name="Property street"
-            #to_name="Customer"
-
-            send_email(
-                from_email=from_address,
-                to_email=email_address,
-                from_name=from_name,
-                subject=subject,
-                html_email=email_string
-            )
-
-            # create another instance of the user with the new code
-            await redis_client.hset(user_key, reason, str(new_code))
-
-            # get the current time and add the ttl
-            current_time = datetime.now(timezone.utc)
-            expiry_time = (current_time + timedelta(seconds=ttl_in_secs)).isoformat()
-
-            # save the ttl_time in the ttl field of the user's key
-            await redis_client.hset(user_key, "ttl", expiry_time)
-
-            # set an expiry for the user key
-            # explicitly convert the expiry_time_in_secs to int
-            # to avoid `value is not an integer or out of range` error
-            await redis_client.expire(user_key, int(ttl_in_secs)) 
-
-            return {
-                "message":"A new verification code has been sent to your email.",
-                "expiry": expiry_time
+        # call the email function and send the email
+        # extract the email content from the template
+        email_template_content = read_email_from_html_template_name('email_verification_code_template')
+        property_street_address = "Port Harcourt"
+        
+        email_string = substituted_string(
+            email_template_content,
+            {
+                "user_name":user_name,
+                "verification_code":new_code,
+                "property_street_address": property_street_address
             }
-        except Exception as e:
-            f_msg = "An errror occured sending code to email"
-            d_msg = f"{f_msg}. Reason: {e}"
-            if DEBUG:
-                logger.error(d_msg)
+        )
+        from_address="team@propertystreet.ng"
+        subject="Property street Verification Code"
+        from_name="Property street"
+        #to_name="Customer"
+
+        send_email(
+            from_email=from_address,
+            to_email=email_address,
+            from_name=from_name,
+            subject=subject,
+            html_email=email_string
+        )
+
+        # create another instance of the user with the new code
+        await redis_client.hset(user_key, reason, str(new_code))
+
+        # get the current time and add the ttl
+        current_time = datetime.now(timezone.utc)
+        expiry_time = (current_time + timedelta(seconds=ttl_in_secs)).isoformat()
+
+        # save the ttl_time in the ttl field of the user's key
+        await redis_client.hset(user_key, "ttl", expiry_time)
+
+        # set an expiry for the user key
+        # explicitly convert the expiry_time_in_secs to int
+        # to avoid `value is not an integer or out of range` error
+        await redis_client.expire(user_key, int(ttl_in_secs)) 
+
+        # delete beta key if beta mode
+        await redis_client.delete(beta_token)
+
+        return {
+            "message":"A new verification code has been sent to your email.",
+            "expiry": expiry_time
+        }
+    except Exception as e:
+        f_msg = "An errror occured sending code to email"
+        d_msg = f"{f_msg}. Reason: {e}"
+        if DEBUG:
             logger.error(d_msg)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f_msg,
-                headers={"X-Error": "Server error"},
-            )
+        logger.error(d_msg)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f_msg,
+            headers={"X-Error": "Server error"},
+        )
 
 
 async def confirm_email_verification_code(
@@ -702,4 +722,70 @@ async def change_password(
         # delete the key
         key = hset_password_reset_key(email)
         await redis_client.delete(key)
+
+
+def hset_beta_signup_key(token: str):
+    """Generate Redis key for beta signup token storage"""
+    return f'beta:signup:{token}'
+
+def beta_link_validity() -> int:
+    """Generate beta link validity
+
+    Returns:
+        int: ttl in seconds
+    """
+    return TEST_BETA_LINK_VALIDITY if DEBUG else BETA_LINK_VALIDITY
+
+async def generate_beta_signup_link(
+    redis_client: Redis,
+    ttl_in_secs: int = beta_link_validity(),  # 24 hours default
+) -> dict:
+    """
+    Generate a time-based beta signup link token.
+    
+    Args:
+        redis_client: Redis client instance
+        ttl_in_secs: Time-to-live for the token in seconds
+    
+    Returns:
+        Dictionary containing the generated token and expiry time
+    """
+    # Generate a secure random token
+    token = secrets.token_urlsafe(32)
+    host = "http://localhost:3000" if DEBUG else "https://propertystreet.ng"
+    url = f"{host}/signup/{token}"
+    
+    # Store the token in Redis with TTL
+    key = hset_beta_signup_key(token)
+    await redis_client.setex(key, ttl_in_secs, "active")
+    
+    # Calculate expiry datetime
+    expiry_datetime = datetime.now(timezone.utc) + timedelta(seconds=ttl_in_secs)
+    expiry_str = expiry_datetime.isoformat()
+    
+    return {
+        "url": url,
+        "token": token,
+        "expiry": expiry_str,
+        "ttl_seconds": ttl_in_secs
+    }
+
+
+async def validate_beta_signup_token(
+    token: str,
+    redis_client: Redis,
+) -> bool:
+    """
+    Validate if a beta signup token is valid and still active.
+    
+    Args:
+        token: The beta signup token to validate
+        redis_client: Redis client instance
+    
+    Returns:
+        True if token is valid, False otherwise
+    """
+    key = hset_beta_signup_key(token)
+    result = await redis_client.get(key)
+    return result is not None
     

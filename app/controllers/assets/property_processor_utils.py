@@ -58,7 +58,7 @@ async def handle_property_create_update(
     # Handle creation
     # ===============
     try:
-        payload = data.model_dump(exclude_unset=True)
+        payload = data.model_dump(exclude_none=True)
         # logger.info(f"**Payload: {payload}")
         result = await apply_model(Asset, db, payload, instance=property)
         property = (await db.execute(

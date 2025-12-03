@@ -7,6 +7,7 @@ from .schemas import (
     Email,
     PasswordResetSchema,
     SendPasswordResetMail,
+    GenerateBetaLinkResponse,
     ConfirmEmailVerificationCodeSchema,
     SendEmailVerificationResponseSchema,
 )
@@ -21,7 +22,9 @@ from property_street_backend.app.schemas.auth_schemas import (
     ProbeUserExistenceSchema,
     SignupCodeVerificationSchema,
 )
+from property_street_backend.app.models import User
 from property_street_backend.app.utils.store import email_verification_code_ttl
+from property_street_backend.config.settings import BETA_LAUNCHING
 from .services import (
     create_user, 
     create_agent,
@@ -29,11 +32,14 @@ from .services import (
     authenticate_user, 
     fetched_access_token, 
     decode_user_from_token, 
+    require_roles,
     send_password_reset_mail,
     process_token_validate_user,
     confirm_email_verification_code,
     check_username_email_availability,
     check_password_reset_email_validity,
+    generate_beta_signup_link,
+    validate_beta_signup_token,
     send_email_verification_code as controller_send_email_verification_code,
     confirm_email_verification_code_and_sign_user_up as controller_confirm_email_verification_code_and_sign_user_up,
 )
@@ -56,10 +62,11 @@ async def register_user(data: UserRegistrationSchema, db: AsyncSession = Depends
 # probe user existence endpoint
 @router.post("/probe-user-existence", status_code=status.HTTP_200_OK)
 async def probe_user_existence(
-    data: ProbeUserExistenceSchema,    
+    data: ProbeUserExistenceSchema,  
+    redis_client: Redis = Depends(get_redis),  
     db: AsyncSession = Depends(get_db)
 ):
-    return await check_username_email_availability(db, data.model_dump())
+    return await check_username_email_availability(db, redis_client, data.model_dump())
 
 
 # send email verification for signup endpoint
@@ -169,3 +176,28 @@ async def change_password_endpoint(
         session=session,
         **data.model_dump()
     )
+
+
+# Beta signup link generation endpoint
+@router.get("/generate-beta-signup-link", status_code=status.HTTP_201_CREATED, response_model=GenerateBetaLinkResponse)
+async def generate_beta_signup_link_endpoint(
+    _: User = Depends(require_roles("admin", "staff")),
+    redis_client: Redis = Depends(get_redis),
+):
+    """
+    Generate a time-based beta signup link token.
+    Only admin and staff users can generate these links.
+    
+    Args:
+        ttl_in_secs: Time-to-live for the token in seconds (default: 24 hours)
+    
+    Returns:
+        Dictionary containing the generated token and expiry time
+    """
+    if not BETA_LAUNCHING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Beta launching is not currently enabled"
+        )
+    
+    return await generate_beta_signup_link(redis_client)

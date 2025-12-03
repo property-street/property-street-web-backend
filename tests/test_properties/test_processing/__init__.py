@@ -15,7 +15,9 @@ def property_payload(agent_id, with_feature: bool = True):
             **cloud_image_template,
             'public_id':  'covr_img_pub_id'
         },
-        "tags": [*tags_template]
+        "tags": [*tags_template],
+        "features": None,
+        "unfeatured_images": None,
     }
 
     if with_feature:
@@ -29,7 +31,7 @@ def property_payload(agent_id, with_feature: bool = True):
             ]
         } for i in range(2)]
     else:
-        payload["cloud_images"] = [
+        payload["unfeatured_images"] = [
             {**cloud_image_template,
              'public_id':  'unfeat_public_id'}
         ]

@@ -3,7 +3,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import Asset
-from .test_processing.test_create_with_apply_model import create_test_asset
+from .test_processing.test_apply_model import create_test_asset
 from property_street_backend.app.controllers.auth.utils import ensure_admin_user
 from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.tests.auth.test_create_agent import create_test_agent, UserRegistrationSchema

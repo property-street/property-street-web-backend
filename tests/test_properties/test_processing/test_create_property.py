@@ -25,8 +25,11 @@ async def test_create_property(client__fixture: dict):
     agent = await create_test_agent(test_db)
     token = fetch_access_token(user=agent)['access_token']
     headers = {"Authorization": f"Bearer {token}"}
-    payload = property_payload(agent.id)
 
+    #==========================
+    # Featured request
+    #==========================
+    payload = property_payload(agent.id)
     response = await http_client.post(
         "/assets/create-property",
         json=payload,
@@ -34,7 +37,6 @@ async def test_create_property(client__fixture: dict):
     )
     assert response.status_code == 201
     property = response.json()
-    # print(property)
     assert 'id' in property
     # cache assertions
     # await assertions_after_caching(
@@ -43,4 +45,22 @@ async def test_create_property(client__fixture: dict):
     #     asset_data=property,
     #     expiry_seconds = property_create_persistence_ttl()
     # )
+    property = await test_db.get(Asset, property['id'])
+    await test_db.delete(property)
+    await test_db.commit()
 
+    #==========================
+    # Second unfeatured request
+    #==========================
+    payload = property_payload(agent.id, with_feature=False)
+    response = await http_client.post(
+        "/assets/create-property",
+        json=payload,
+        headers=headers,
+    )
+    assert response.status_code == 201
+    property = response.json()
+    assert 'id' in property
+    assert not property['has_features']
+    assert not property['features']
+    assert property['unfeatured_images']

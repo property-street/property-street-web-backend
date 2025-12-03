@@ -36,7 +36,7 @@ def eager_asset_load():
             selectinload(Asset.features),
             selectinload(Asset.tags),
             selectinload(Asset.area),
-            selectinload(Asset.cloud_images),
+            selectinload(Asset.unfeatured_images),
             selectinload(Asset.cover_image),
             selectinload(Asset.agent)
             .selectinload(User.profile_avatar)

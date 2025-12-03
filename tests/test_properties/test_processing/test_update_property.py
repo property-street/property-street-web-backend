@@ -57,7 +57,7 @@ async def test_update_property(client__fixture: dict):
     feat_1_id = feat_1.id
     feat_1_cld_img1_id = feat_1.cloud_images[0].id
     new_feat_1_cld_img1_pub_id = "new_feat_1_cld_img1_pub_id"
-    new_feat_2_cld_img_pub_id = "new_feat_2_cld_img_pub_id"
+    new_feat_3_cld_img_pub_id = "new_feat_2_cld_img_pub_id"
 
     flat_fields = {
         "status": "Lease",
@@ -95,7 +95,7 @@ async def test_update_property(client__fixture: dict):
             "title": "Feature3",
             "cloud_images": [{
                 **cloud_image_template,
-                "public_id": new_feat_2_cld_img_pub_id
+                "public_id": new_feat_3_cld_img_pub_id
             }]
         }]
     }
@@ -143,6 +143,27 @@ async def test_update_property(client__fixture: dict):
     assert any(ci['public_id'] == new_feat_1_cld_img1_pub_id for ci in feat1.get('cloud_images', []))
 
     # New Feature2 should be present with its cloud image
-    feat2 = next((f for f in features if f.get('title') == 'Feature2'), None)
-    assert feat2 is not None
-    assert any(ci['public_id'] == new_feat_2_cld_img_pub_id for ci in feat2.get('cloud_images', []))
+    feat3 = next((f for f in features if f.get('title') == 'Feature3'), None)
+    assert feat3 is not None
+    assert any(ci['public_id'] == new_feat_3_cld_img_pub_id for ci in feat3.get('cloud_images', []))
+
+    # Now, change the property from featured -> unfeatured by providing cloud_images only
+    new_unfeat_pub_id = 'new_unfeat_img_pub_id'
+    payload_unfeatured = {
+        "id": prop_id,
+        "features": [
+            {"id": obj['id'], "action":"delete"}
+            for obj in property['features']
+        ],
+        "cloud_images": [{**cloud_image_template, "public_id": new_unfeat_pub_id}]
+    }
+    response = await client.patch(
+        f"/assets/{prop_id}",
+        json=payload_unfeatured,
+        headers=headers
+    )
+    assert response.status_code == 200
+    property_unfeat = response.json()
+    assert not property_unfeat.get('has_features')
+    assert not property_unfeat.get('features')
+    assert any(ci['public_id'] == new_unfeat_pub_id for ci in property_unfeat.get('cloud_images', []))

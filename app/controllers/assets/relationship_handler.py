@@ -99,7 +99,6 @@ class RelationshipExecutor:
     async def apply(self, instance, normalized_data: dict):
         transformer = ORMTransformer(instance.__class__, self.db)
 
-        # logger.info(f"**Normalized data: {normalized_data}")
         for field, value in normalized_data.items():
 
             # 1️⃣ Plain column
@@ -202,6 +201,9 @@ class RelationshipExecutor:
 
         setattr(instance, field, merged_list)
 
+        # Replace semantics (diff mode)
+        # existing_list.clear()
+        # existing_list.extend(new_list)
 
     
     async def _find_existing_match(self, related_cls, payload: dict):
@@ -234,7 +236,6 @@ class RelationshipExecutor:
 
 async def apply_model(model_cls, db: AsyncSession, data: dict, instance=None):
     normalized = normalize_payload(data)
-    # logger.info(f"**Normalized: {normalized}")
 
     if instance is None:
         instance = model_cls()
