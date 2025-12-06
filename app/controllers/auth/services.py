@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Response
 
 from . import verify_password, pwd_context
+from property_street_backend.config import env_is_test
 from property_street_backend.app.schemas.auth_schemas import (
     TokenData, 
     UserRegistrationSchema, 
@@ -96,10 +97,15 @@ async def authenticate_user(db: AsyncSession, login: str, password: str) -> User
 
 async def check_beta(redis_client: Redis, token: str) -> None:
     if BETA_LAUNCHING:
-        if not token or not await validate_beta_signup_token(token, redis_client):
+        if not token: 
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Beta token required."
+            )
+        if not await validate_beta_signup_token(token, redis_client):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Beta token malformed or expired."
             )
         
 # user existence
@@ -734,7 +740,7 @@ def beta_link_validity() -> int:
     Returns:
         int: ttl in seconds
     """
-    return TEST_BETA_LINK_VALIDITY if DEBUG else BETA_LINK_VALIDITY
+    return TEST_BETA_LINK_VALIDITY if env_is_test() else BETA_LINK_VALIDITY
 
 async def generate_beta_signup_link(
     redis_client: Redis,

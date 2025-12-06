@@ -1,18 +1,21 @@
 import json
 from sqlalchemy import select
 from redis.asyncio import Redis
-from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.orm import selectinload
+from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-from .models import AssetRequest 
+from .models import AssetRequest
 from .schemas import AssetRequestResponseSchema
-from property_street_backend.app.models import User
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
+from property_street_backend.app.controllers.actors.models import User
+from property_street_backend.app.controllers.assets.models import Asset
 from property_street_backend.log_config.logger_config import log_message
+from property_street_backend.app.controllers.assets.schemas import PropertySchema
+from property_street_backend.app.controllers.assets.property_processor_utils import handle_property_create_update
 
 
 
@@ -67,3 +70,64 @@ async def fetch_recent_asset_request(
     )
 
     return valid_requests
+
+async def handle_resolve_property_request(
+    id: int,
+    agent: User,
+    redis_client: Redis,
+    session: AsyncSession,
+    property_id: int = None,
+    data: PropertySchema = None,
+):
+    #=====================================================
+    # Check that either of data or property_id is provided
+    #=====================================================
+    if not (data or property_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            details="Property data or property id must be provided."
+        )
+    
+    property = None
+    #=======================
+    # Get property request
+    #=======================
+    property_request = await session.get(AssetRequest,id)
+    if not property_request:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            details="Property request not found."
+        )
+    
+    #==========================
+    # Get property if existent
+    #==========================
+    if property_id: 
+        property = await session.get(Asset, property_id)
+        if not property:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                details="Property referenced not found."
+            )
+        if property.agent_id == agent.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                details="Unauthorized to reference proeprty."
+            )
+
+    #==========================
+    # Create property
+    #==========================
+    if data: 
+        property = await handle_property_create_update(data,session,redis_client,agent)
+    
+    if not property:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            details="An error occured creating resolution."
+        )
+        
+    property_request.assets.append(property)
+    await session.commit()
+    await session.refresh(property_request)
+    return AssetRequestResponseSchema.from_orm_with_relations(property_request)

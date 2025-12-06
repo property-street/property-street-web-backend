@@ -49,14 +49,24 @@ async def handle_property_create_update(
     ttl_in_seconds: int = property_create_persistence_ttl(),
     newly_created: bool = True
 ):
-    """
-    Creates a property.
+    """Handles creation or update of properties
+
+    Args:
+        data (PropertySchema | PatchPropertySchema): Property schema
+        db (AsyncSession): Database session
+        redis_client (Redis): Cache session
+        agent (User): Agent user
+        ttl_in_seconds (int, optional): amount in time for the property to be cached as newly_created. Defaults to property_create_persistence_ttl().
+        newly_created (bool, optional): Boolean to indicate creation status. Defaults to True.
+
+    Raises:
+        HTTPException: _description_
+
+    Returns:
+        _type_: _description_
     """
     property = await db.get(Asset,data.id) if data.id else None
 
-    # ===============
-    # Handle creation
-    # ===============
     try:
         payload = data.model_dump(exclude_none=True)
         # logger.info(f"**Payload: {payload}")
@@ -67,8 +77,8 @@ async def handle_property_create_update(
         )).scalars().first()
     except Exception as e:
         await db.rollback()  # Rollback if there's an error to ensure atomicity
-        f_message=f'An error occured on processing of asset. Reason: {e}'
-        d_message=f'An error occured on processing of asset. Reason: {traceback.format_exc()}'
+        f_message=f'An error occured on processing of property. Reason: {e}'
+        d_message=f'An error occured on processing of property. Reason: {traceback.format_exc()}'
         if DEBUG:
             logger.error(d_message)
         log_message(
@@ -77,7 +87,7 @@ async def handle_property_create_update(
         )
         raise HTTPException(    
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail = "An error occurred while creating the asset."
+            detail = "An error occurred while creating the property."
         )
     # logger.info(f"**Validated Features: {[AssetFeatureResponseSchema.model_validate(feature) for feature in property.features]}")
     # ===============

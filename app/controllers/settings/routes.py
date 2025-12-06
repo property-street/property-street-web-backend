@@ -79,7 +79,7 @@ async def update_user_and_settings(
     )
 
 
-@router.post("/delete-account", status_code=status.HTTP_200_OK)
+@router.delete("/delete-account", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account(
     db: AsyncSession = Depends(get_db),
     user: TokenData = Depends(decode_user_from_token)

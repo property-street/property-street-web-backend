@@ -1,9 +1,10 @@
 from typing import Optional, List
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from property_street_backend.app.schemas import ConfigDictSetter
-from property_street_backend.app.schemas.area_schema import AreaSchema
 from .models import AssetRequest
+from property_street_backend.app.schemas import ConfigDictSetter
+from property_street_backend.app.controllers.assets.schemas import PropertySchema
+from property_street_backend.app.schemas.area_schema import AreaResponseSchema, AreaSchema
 
 class BaseSchema(ConfigDictSetter):
     description: str
@@ -19,7 +20,8 @@ class AssetRequestResponseSchema(BaseSchema):
     id: Optional[int] = None
     requester: dict
     time_requested: str
-    resolutions: Optional[list[dict]] = None
+    resolutions: Optional[list[dict]] = []
+    area: AreaResponseSchema
     
     @classmethod
     def from_orm_with_relations(cls, data: AssetRequest):
@@ -48,7 +50,7 @@ class AssetRequestResponseSchema(BaseSchema):
                             else ""
                         ),
                     } for resolution in data.assets
-                ] if data.assets else None),
+                ] if data.assets else []),
             )
     
 class PropertyRequestSchema(AssetRequestResponseSchema):
@@ -57,3 +59,13 @@ class PropertyRequestSchema(AssetRequestResponseSchema):
 class PropertyRequestSearchResponse(BaseModel):
     type: str = 'property-request'
     data: PropertyRequestSchema
+
+class RequestResolution(BaseModel):
+    property_id: Optional[int] = None
+    property: Optional[PropertySchema] = None
+    
+    @model_validator(mode="after")
+    def validate_property_id_or_property(cls, values):
+        if not (values.property_id or values.property):
+            raise ValueError("Either of 'property_id' or 'property' must be included in the payload. Both can't be non-empty.")
+        return values

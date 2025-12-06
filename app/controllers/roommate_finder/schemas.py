@@ -2,8 +2,8 @@ from typing import Optional, List, Literal
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from .models import RoommateFinder
-from property_street_backend.app.schemas.area_schema import AreaSchema
 from property_street_backend.app.schemas.cloud_image_schema import CloudImageSchema
+from property_street_backend.app.schemas.area_schema import AreaSchema, AreaResponseSchema
 
 class RoommateFinderRequestSchema(BaseModel):
     gender: Literal['male', 'female']
@@ -19,6 +19,7 @@ class RoommateFinderRequestSchema(BaseModel):
 
 class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
     id: int
+    area: AreaResponseSchema
     room_images: List[str] = []# Flattened
     requester: dict
     gender: Optional[str] = None

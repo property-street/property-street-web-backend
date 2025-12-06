@@ -54,7 +54,8 @@ async def validate_assets(
     for asset in assets:
         try:
             validated_asset = AssetResponseSchema.model_validate(asset)
-            valid_assets.append(validated_asset)
+            if validated_asset.verified:
+                valid_assets.append(validated_asset)
         except ValidationError as ve:
             asset_id = getattr(asset, 'id', asset.get('id') if isinstance(asset, dict) else None)
 
@@ -388,3 +389,14 @@ async def update_verification_state(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f_msg,
         )
+
+
+async def handle_delete_property(db: AsyncSession, id: int, agent: User):
+    property = await db.get(Asset, id)
+    if agent.user_role == 'agent' and property.agent_id != agent.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Not authorized to carry this operation"
+        )
+    await db.delete(property)
+    await db.commit()

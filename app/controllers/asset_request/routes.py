@@ -4,11 +4,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, status, Depends, Query
 
 from .search import search_asset_requests
-from .schemas import AssetRequestResponseSchema
-from .services import fetch_recent_asset_request
+from .schemas import (
+    AssetRequestResponseSchema,
+    RequestResolution,
+)
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
+from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.app.schemas.auth_schemas import TokenData
+from .services import fetch_recent_asset_request, handle_resolve_property_request
 from property_street_backend.app.controllers.search.tools import normalize_query
 from property_street_backend.app.controllers.auth.services import decode_user_from_token
 from property_street_backend.app.controllers.asset_request.schemas import AssetRequestSchema
@@ -59,3 +63,13 @@ async def search_property_request_endpoint(
 ):      
     normalized_query = normalize_query(query)
     return await search_asset_requests(normalized_query,session)
+
+@router.post("/resolve/{id}/", response_model=AssetRequestResponseSchema)
+async def resolve_property_request(
+    id: int,
+    data: RequestResolution,
+    session: AsyncSession = Depends(get_db),
+    redis_client: Redis = Depends(get_redis),
+    agent: User = Depends(decode_user_from_token),
+):      
+    return await handle_resolve_property_request(id, agent, redis_client, session, data.property_id, data.property)

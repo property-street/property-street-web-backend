@@ -12,7 +12,7 @@ class AssetFeatureCreateSchema(ConfigDictSetter):
     asset_id: Optional[int] = Field(None, description="The ID of the asset to which this feature belongs")
 
 
-class CloudImageSchema(BaseModel,UtilitySchemaMixin):
+class CloudImageSchema(BaseModel):
     id: Optional[int] = None
     cloud_asset_id: str = Field(..., description="asset_id from the cloud")
     format: str = Field(..., description="The format of the image (e.g. jpg, png)")
@@ -23,7 +23,7 @@ class CloudImageSchema(BaseModel,UtilitySchemaMixin):
     secure_url: str = Field(..., description="The secure URL of the image in the cloud storage")
 
 CloudImagePatch = make_optional(CloudImageSchema)
-class CloudImagePatchSchema(CloudImagePatch):
+class CloudImagePatchSchema(CloudImagePatch,UtilitySchemaMixin):
     pass
 
 
@@ -57,12 +57,12 @@ class NoFeaturePatchSchema(BaseModel):
     cloud_images: Optional[List[CloudImagePatchSchema]] = None
 
 
-class TagSchema(BaseModel,UtilitySchemaMixin):
+class TagSchema(BaseModel):
     id: Optional[int] = None
     name: str = Field(..., description="Tag associated with the asset")
 
 TagPatch = make_optional(TagSchema)
-class TagPatchSchema(TagPatch):
+class TagPatchSchema(TagPatch,UtilitySchemaMixin):
     pass
 
 class TagSchemaResponse(TagSchema):

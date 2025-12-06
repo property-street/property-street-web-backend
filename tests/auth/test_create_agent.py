@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from . import user_data, UserRegistrationSchema
 from property_street_backend.app.models import User
-from .test_user_creation import user_data, UserRegistrationSchema
 from property_street_backend.app.controllers.auth.services import (
     create_agent,
     verify_password,

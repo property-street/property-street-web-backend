@@ -11,6 +11,7 @@ from .services import (
     fetch_agent_assets,
     get_unverified_properties,
     update_verification_state,
+    handle_delete_property,
 )
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import (
@@ -158,3 +159,13 @@ async def cancel_verification_route(
 ):
     """Cancel a property's verification (admin only)."""
     return await update_verification_state(asset_id, db, 'cancel')
+
+
+@router.delete("/delete/{property_id}/", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_property(
+    property_id: int,
+    db: AsyncSession = Depends(get_db),
+    agent: User = Depends(require_roles('admin','staff','agent')),
+):
+    """Delete property."""
+    return await handle_delete_property(db, property_id, agent)

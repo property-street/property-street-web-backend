@@ -5,6 +5,8 @@ import websockets
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
+from . import payload
 from ..utils import get_user_ws_endpoint
 from property_street_backend.app.initiator import logger
 from property_street_backend.app.controllers.auth.services import fetch_access_token
@@ -17,10 +19,8 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
     ws = None
     test_db = None
     try:
-        async for fixture_obj in client__fixture:
-            test_db: AsyncSession = fixture_obj['db'] 
-            httpx_client = fixture_obj['http_client']
-            break; 
+        test_db: AsyncSession = client__fixture['db'] 
+        httpx_client = client__fixture['http_client']
 
         cloud_image_detail = {
             "cloud_asset_id":"dkajdlkajdlkajsdkfjasldkfj",
@@ -46,16 +46,6 @@ async def test_asset_request_creation(app_subprocess, client__fixture):
         auth_header = {
             'Authorization': f'Bearer {token}',
             "Content-Type": "application/json"
-        }
-        # construct payload
-        payload = {
-            'description': 'I need a 1 bedroom flat in the maldives!',
-            'area': {
-                'country':'Sri-lanka',
-                'state_or_province': 'Mogadishu',
-                'city_or_town': 'Pisque Central', 
-                'street': 'No 11 Jokey street',
-            }
         }
 
         # connect ws client

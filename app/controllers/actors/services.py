@@ -14,6 +14,7 @@ from property_street_backend.app.utils.store import (
 )
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
+from property_street_backend.app.models import CloudImageDetail
 from property_street_backend.log_config.logger_config import log_error
 
 
@@ -174,3 +175,12 @@ async def accept_staff_invite(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f_msg,
         )
+    
+async def handle_update_profile_avatar(db: AsyncSession, user: User, data: dict):
+    user.profile_avatar = CloudImageDetail(
+        **data
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user.profile_avatar

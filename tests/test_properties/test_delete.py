@@ -3,23 +3,21 @@ from httpx import AsyncClient
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .test_processing import property_payload
 from property_street_backend.app.models import (
     User,
     Asset, 
-    AssetRequest,
 )
 from tests.auth.test_create_agent import create_test_agent
 from app.controllers.auth.services import fetch_access_token
-from property_street_backend.tests.test_properties.test_processing import property_payload
 from app.controllers.assets.property_processor_utils import property_create_persistence_ttl
-from property_street_backend.tests.test_asset_request import payload as property_request_payload
 from property_street_backend.tests.activity.test_controller.test_newly_created_asset_cache_management import (
     assertions_after_caching,
 )
 
 
 @pytest.mark.asyncio
-async def test_resolve_request(client__fixture: dict):
+async def test_delete(client__fixture: dict):
     test_db: AsyncSession = client__fixture["db"]
     redis_client: Redis = client__fixture["redis_client"]
     http_client: AsyncClient = client__fixture["http_client"]
@@ -28,29 +26,31 @@ async def test_resolve_request(client__fixture: dict):
     token = fetch_access_token(user=agent)['access_token']
     headers = {"Authorization": f"Bearer {token}"}
 
-    #=============================
-    # Make property request
-    #=============================
-    response = await http_client.post(
-        "/asset-requests",
-        json=property_request_payload,
-        headers=headers 
-    )
-    assert response.status_code == 201
-    request_id = response.json()['id']
-    assert request_id
-
-    #==========================================
-    # request resolution
-    #==========================================
+    #==========================
+    # Featured request
+    #==========================
     payload = property_payload(agent.id)
     response = await http_client.post(
-        f"/asset-requests/resolve/{request_id}/",
-        json={"property": payload},
+        "/assets/create-property",
+        json=payload,
         headers=headers,
     )
-    assert response.status_code == 200
-    updated_request = response.json()
-    resolutions = updated_request['resolutions']
-    assert resolutions
-    assert len(resolutions) == 1
+    assert response.status_code == 201
+    property = response.json()
+    id = property.get('id',None)
+    assert id
+    # cache assertions
+    # await assertions_after_caching(
+    #     redis_client=redis_client,
+    #     asset_id=property["id"],
+    #     asset_data=property,
+    #     expiry_seconds = property_create_persistence_ttl()
+    # )
+    property = await test_db.get(Asset, id)
+    assert property
+    response = await http_client.delete(
+        f'/assets/delete/{id}/',
+        headers = headers
+    )
+    assert response.status_code == 204
+    assert not await test_db.get(Asset, id)

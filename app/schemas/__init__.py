@@ -9,10 +9,13 @@ class UtilitySchemaMixin:
 
 UtilitySchema = UtilitySchemaMixin
 
-def make_optional(model: type[BaseModel]) -> type[BaseModel]:
+def make_optional(model: type[BaseModel], FIELDS_TO_SKIP: set = None) -> type[BaseModel]:
     optional_fields = {}
 
     for name, field in model.model_fields.items():
+        if FIELDS_TO_SKIP and name in FIELDS_TO_SKIP:
+            continue   # <-- prevent shadowing
+        
         annotation = field.annotation
 
         # Skip nested models & collections

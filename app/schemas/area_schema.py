@@ -4,7 +4,7 @@ from pydantic import Field, BaseModel
 
 from . import UtilitySchemaMixin, make_optional
 
-class AreaSchema(BaseModel,UtilitySchemaMixin):
+class AreaSchema(BaseModel):
     id: Optional[int] = None
     country: str
     state_or_province: str
@@ -19,5 +19,5 @@ class AreaResponseSchema(ConfigDictSetter,AreaSchema):
     id: int
 
 AreaPatch = make_optional(AreaSchema)
-class AreaPatchSchema(AreaPatch):
+class AreaPatchSchema(AreaPatch,UtilitySchemaMixin):
     pass
