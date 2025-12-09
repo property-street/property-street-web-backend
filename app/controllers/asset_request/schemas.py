@@ -49,6 +49,7 @@ class AssetRequestResponseSchema(BaseSchema):
                             if getattr(resolution, 'cover_image', None) and getattr(resolution.cover_image, 'secure_url', None)
                             else ""
                         ),
+                        'title': resolution.title
                     } for resolution in data.assets
                 ] if data.assets else []),
             )

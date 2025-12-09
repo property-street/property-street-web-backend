@@ -30,6 +30,7 @@ def property_payload(agent_id, with_feature: bool = True):
                 } for j in range(2)
             ]
         } for i in range(2)]
+        payload['features'].append({"title": "Car park"})
     else:
         payload["unfeatured_images"] = [
             {**cloud_image_template,

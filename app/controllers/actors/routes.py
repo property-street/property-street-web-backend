@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .models import User
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
-from app.controllers.assets.schemas import (
+from property_street_backend.app.controllers.assets.schemas import (
     CloudImageSchema, 
     CloudImageResponseSchema,
 )

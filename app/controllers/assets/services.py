@@ -47,6 +47,7 @@ def eager_asset_load():
 async def validate_assets(
     session: AsyncSession, 
     assets: list[Asset],
+    verified_only: bool = True
 ):
     valid_assets = []
     skipped_assets = []
@@ -54,8 +55,9 @@ async def validate_assets(
     for asset in assets:
         try:
             validated_asset = AssetResponseSchema.model_validate(asset)
-            if validated_asset.verified:
-                valid_assets.append(validated_asset)
+            if verified_only and not validated_asset.verified:
+                continue
+            valid_assets.append(validated_asset)
         except ValidationError as ve:
             asset_id = getattr(asset, 'id', asset.get('id') if isinstance(asset, dict) else None)
 
@@ -175,7 +177,7 @@ async def fetch_agent_assets(
             detail="Assets not found"
         )
     
-    v_assets, _ = await validate_assets(session, assets)
+    v_assets, _ = await validate_assets(session, assets, verified_only=False)
 
     try:
         return v_assets
@@ -219,7 +221,7 @@ async def get_unverified_properties(
             .limit(size)
         )).scalars().all()
     
-        v_assets, _ = await validate_assets(db, properties)
+        v_assets, _ = await validate_assets(db, properties, verified_only=False)
         return v_assets
     except Exception as e:
         f_msg = "An error occured while retrieving your unverified properties."
