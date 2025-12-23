@@ -47,7 +47,7 @@ async def test_create_with_apply_model(get_test_db__fixture):
         assert prpty_with_feat_imgs.has_features
         assert all((db_tag.name in plod_tag['name'] for plod_tag in tags_template) for db_tag in prpty_with_feat_imgs.tags)
         assert prpty_with_feat_imgs.area.country == area_template['country']
-        assert prpty_with_feat_imgs.features[0].title == "Feature"
+        assert prpty_with_feat_imgs.features[0].title == "Feature0"
         AssetResponseSchema.model_validate(prpty_with_feat_imgs)
         await test_db.delete(prpty_with_feat_imgs)
         await test_db.commit()
@@ -56,7 +56,8 @@ async def test_create_with_apply_model(get_test_db__fixture):
         # Property with unfeatured images
         prpty_no_feat_imgs: Asset = await create_test_asset(test_db, agent_id, with_feature=False)
         assert prpty_no_feat_imgs
-        assert len(prpty_no_feat_imgs.cloud_images) == 1
+        assert len(prpty_no_feat_imgs.unfeatured_images) == 1
         # AssetResponseSchema.model_validate(prpty_no_feat_imgs)
     finally: 
         await test_db.close()
+

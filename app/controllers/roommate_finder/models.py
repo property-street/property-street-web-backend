@@ -127,6 +127,7 @@ class RoommateFinder(Base):
     max_roomies = Column(Integer, default=1, nullable=False)
     extra_conditions = Column(Text)
     category = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # one-to-many relationship to cloud_image_details
     room_images = relationship(

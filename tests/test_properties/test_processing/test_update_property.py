@@ -3,17 +3,15 @@ from httpx import AsyncClient
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.initiator import logger
 from property_street_backend.app.models import (
-    User,
     Asset,
     AssetFeature,
 )
+from .test_apply_model import create_test_asset
 from tests.auth.test_create_agent import create_test_agent
 from tests.activity.test_controller.test_objects import (
     cloud_image_template,
 )
-from .test_apply_model import create_test_asset
 from property_street_backend.tests.auth.test_create_agent import create_test_agent
 from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.app.controllers.assets.schemas import PatchPropertySchema

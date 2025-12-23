@@ -35,13 +35,14 @@ class RoommateFinderResponseSchema(RoommateFinderRequestSchema):
             max_roomies=roommate_finder.max_roomies,
             category=roommate_finder.category,
             requester={
+                "id": roommate_finder.requester.id,
                 "username": roommate_finder.requester.username,
                 "first_name": roommate_finder.requester.first_name,
                 "last_name": roommate_finder.requester.last_name,
                 "avatar_url": (
                     roommate_finder.requester.profile_avatar.secure_url
                     if (roommate_finder.requester and roommate_finder.requester.profile_avatar)
-                    else None
+                    else ""
                 ),
                 "gender": roommate_finder.requester.gender if roommate_finder.requester else None,
             } if roommate_finder.requester

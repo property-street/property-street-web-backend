@@ -20,6 +20,7 @@ from .enums import AvailabilityStatus
 from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.app.models_helper import AbstractCloudImage
 from property_street_backend.config.postgres_connection_manager import Base
+from property_street_backend.config.settings import BETA_LAUNCHING, BETA_LAUNCH_PROPERTY_LIMIT
 
 
 class Asset(Base):
@@ -154,18 +155,56 @@ class Asset(Base):
     def has_features(self):
         return bool(self.features)  # works in Python
 
-# @event.listens_for(Asset, "before_insert")
-# def prevent_unauthorized_agency(mapper, connection, target):
-#     agent_id: int = target.agent_id
-#     expected_agent: User = target.agent or connection.execute(
-#         select(User).where(User.id == agent_id)
-#     ).scalar_one_or_none()
-# 
-#     if not isinstance(expected_agent, User):
-#         raise ValueError("No agent detected on property creation.")
-#     
-#     if not (expected_agent.user_role in ['staff','agent','admin']):
-#         raise ValueError("Unauthorized property creation by a non agent, admin or staff.")  
+
+@event.listens_for(Asset, 'before_insert')
+def validate_agent_and_check_beta_limit(mapper, connection, target):
+    """
+    Listener to validate agent and enforce beta mode asset limits.
+    
+    Validates:
+        1. Agent exists and has proper authorization
+        2. Beta mode agents don't exceed 5 assets
+    
+    Raises:
+        ValueError: If agent is invalid or beta user exceeds 5 assets
+    """
+    # Timestamp
+    target.updated_at = func.now()
+
+    # --- Validate agent_id exists ---
+    if not target.agent_id:
+        raise ValueError("Asset must be assigned to an agent.")
+
+    # --- Fetch agent data (SCALAR, SAFE) ---
+    agent_row = connection.execute(
+        select(
+            User.id,
+            User.username,
+            User.user_role,
+        ).where(User.id == target.agent_id)
+    ).one_or_none()
+
+    if not agent_row:
+        raise ValueError(f"No agent found with ID {target.agent_id}.")
+
+    agent_id, username, role = agent_row
+
+    # --- Validate role ---
+    if role not in ("staff", "agent", "admin"):
+        raise ValueError(
+            f"Unauthorized asset creation: user '{username}' has role '{role}'."
+        )
+
+    # --- Beta mode enforcement ---
+    if BETA_LAUNCHING:
+        asset_count = connection.execute(
+            select(func.count(Asset.id)).where(Asset.agent_id == agent_id)
+        ).scalar_one()
+
+        if asset_count >= BETA_LAUNCH_PROPERTY_LIMIT:
+            raise ValueError(
+                f"Beta mode agent '{username}' has reached the 5-asset limit."
+            )
 
 
 class AssetFeature(Base):

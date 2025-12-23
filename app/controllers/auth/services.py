@@ -524,8 +524,10 @@ sec_field_name = 'secret'
 exp_field_name = 'expiry'
 password_reset_reason = "password_reset"
 
+
 def get_password_reset_link_ttl():
     return TEST_PASSWORD_LINK_TTL if env_is_test() else PASSWORD_LINK_TTL
+
 
 async def send_password_reset_mail(
     email: str, 
@@ -638,6 +640,7 @@ _exc = HTTPException(
     detail = "Malformed request or link expired."
 )
 
+
 def hset_password_reset_key(email):
     return f'{email}:{password_reset_reason}'
 
@@ -734,6 +737,7 @@ def hset_beta_signup_key(token: str):
     """Generate Redis key for beta signup token storage"""
     return f'beta:signup:{token}'
 
+
 def beta_link_validity() -> int:
     """Generate beta link validity
 
@@ -741,6 +745,7 @@ def beta_link_validity() -> int:
         int: ttl in seconds
     """
     return TEST_BETA_LINK_VALIDITY if env_is_test() else BETA_LINK_VALIDITY
+
 
 async def generate_beta_signup_link(
     redis_client: Redis,

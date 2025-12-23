@@ -13,6 +13,7 @@ from property_street_backend.app.controllers.auth.services import (
 )
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.log_config.logger_config import log_message
+from property_street_backend.app.controllers.auth.utils import user_ui_metadata
 from property_street_backend.app.schemas.auth_schemas import UserUIMetaDataSchema
 from property_street_backend.app.controllers.settings.services import user_record_update
 from property_street_backend.app.controllers.activity.schemas import LatestCollectionSchema
@@ -25,6 +26,7 @@ router = APIRouter(prefix="/activity", tags=["activity"])
 
 @router.get("/user-ui-metadata",response_model=UserUIMetaDataSchema)
 async def fetch_user_ui_metadata(
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(decode_user_from_token_optional)
 ):
     """
@@ -34,21 +36,12 @@ async def fetch_user_ui_metadata(
         # Determine user status
         is_authenticated = user is not None
         user_details = (
-            {
-                "username": user.username,
-                "client_is_agent": True if (user.user_role.value == "agent") else False,
-                "id": user.id,
-                "profile_avatar_url": user.profile_avatar.secure_url if user.profile_avatar else None,
-                "user_role": user.user_role,
-            }
-            if is_authenticated else {}
+            (await user_ui_metadata(db, user, is_authenticated))
+            if user else {}
         )
 
         # Return assets and user authentication status
-        return {
-            "is_authenticated": is_authenticated,
-            **user_details,
-        }
+        return user_details
 
     except Exception as e:
         log_message(

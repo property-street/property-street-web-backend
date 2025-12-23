@@ -172,10 +172,7 @@ async def fetch_agent_assets(
     assets = query.scalars().all()
 
     if not assets:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assets not found"
-        )
+        return []
     
     v_assets, _ = await validate_assets(session, assets, verified_only=False)
 

@@ -1,3 +1,4 @@
+import time
 from tests.activity.test_controller.test_objects import (
     area_template,
     tags_template,
@@ -13,11 +14,9 @@ def property_payload(agent_id, with_feature: bool = True):
         "area" : {**area_template},
         "cover_image": {
             **cloud_image_template,
-            'public_id':  'covr_img_pub_id'
+            'public_id':  f'covr_img_pub_id_{time.time()}'
         },
         "tags": [*tags_template],
-        "features": None,
-        "unfeatured_images": None,
     }
 
     if with_feature:
@@ -26,7 +25,7 @@ def property_payload(agent_id, with_feature: bool = True):
             "cloud_images": [
                 {
                     **cloud_image_template,
-                    'public_id':  f'feat_img_{i}{j}'
+                    'public_id':  f'feat_img_{i}{j}_{time.time()}'
                 } for j in range(2)
             ]
         } for i in range(2)]
@@ -34,6 +33,6 @@ def property_payload(agent_id, with_feature: bool = True):
     else:
         payload["unfeatured_images"] = [
             {**cloud_image_template,
-             'public_id':  'unfeat_public_id'}
+             'public_id':  f'unfeat_public_id_{time.time()}'}
         ]
     return payload

@@ -1,8 +1,11 @@
 import traceback
+from sqlalchemy import func
+from datetime import datetime
 from redis.asyncio import Redis
-from typing import Literal, Union, List
+from sqlalchemy.future import select
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
 
 
 from .schemas import (
@@ -19,8 +22,17 @@ from property_street_backend.app.models import (
 )
 from property_street_backend.config.settings import (
     DEBUG,
+    ADMIN_EMAIL,
+    BETA_LAUNCHING,
+    REAL_TEST_EMAIL,
     NEWLY_CREATED_ASSET_TTL,
+    BETA_LAUNCH_PROPERTY_LIMIT,
     TEST_NEWLY_CREATED_ASSET_TTL,
+)
+from property_street_backend.app.utils.store import (
+    read_email_from_html_template_name,
+    substituted_string,
+    send_email,
 )
 from property_street_backend.config import env_is_test
 from property_street_backend.app.initiator import logger
@@ -40,6 +52,53 @@ def property_create_persistence_ttl() -> int:
     (TEST_NEWLY_CREATED_ASSET_TTL 
         if env_is_test() else 
     NEWLY_CREATED_ASSET_TTL)
+
+async def notify_admin_on_new_property(property: Asset):
+    try:
+        admin_email = REAL_TEST_EMAIL if DEBUG else ADMIN_EMAIL 
+
+        if admin_email:
+            template = read_email_from_html_template_name('new_property_notification_template')
+            host = 'http://localhost:3000' if DEBUG else 'https://propertystreet.ng'
+            property_view_link = f"{host}/properties/{property.title}/{property.id}"
+            property_location = f"{property.area.street}, {property.area.city_or_town}" if property.area else ""
+            html = substituted_string(
+                template or "New property ${property_title}",
+                {
+                    'agent_name': 'Unknown',
+                    'property_title': property.title,
+                    'property_location': property_location,
+                    'property_price': str(property.price),
+                    'creation_date': datetime.now().isoformat(),
+                    'property_view_link': property_view_link,
+                    'property_street_address': 'Property street'
+                }
+            )
+            # send email (do not block creation if this fails)
+            send_email(
+                from_email='team@propertystreet.com',
+                from_name='Property street',
+                subject='New property created',
+                to_email=admin_email,
+                html_email=html,
+            )
+    except Exception as e:
+        logger.error(f"Failed to send new property notification: {e}")
+
+
+async def check_limit_exceeded(
+    agent: User,
+    db: AsyncSession,
+):
+    property_count = (await db.execute(
+        select(func.count(Asset.id)).where(Asset.agent_id == agent.id)
+    )).scalar_one()
+    if property_count >= BETA_LAUNCH_PROPERTY_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail = f"Property limit has reached the 5 limit."
+            )
+
 
 async def handle_property_create_update(
     data: PropertySchema|PatchPropertySchema, 
@@ -65,7 +124,10 @@ async def handle_property_create_update(
     Returns:
         _type_: _description_
     """
-    property = await db.get(Asset,data.id) if data.id else None
+    if newly_created and BETA_LAUNCHING:
+        await check_limit_exceeded(agent, db)
+        
+    property = await db.get(Asset,data.id) if getattr(data,'id') else None
 
     try:
         payload = data.model_dump(exclude_none=True)
@@ -103,6 +165,8 @@ async def handle_property_create_update(
             newly_created = True,
             expiry_seconds = ttl_in_seconds,
         )
+        if newly_created:
+            notify_admin_on_new_property(property)
     except Exception as e:
         logger.warning(f"Cache update failed: {e}")
         raise

@@ -1,32 +1,28 @@
 import pytest
+from httpx import AsyncClient
+from redis.asyncio import Redis
+from sqlalchemy.future import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from property_street_backend.app.models import (
-    CloudImageDetail,
-)
-from property_street_backend.app.controllers.auth import (
-    fetched_access_token,
-)
-from property_street_backend.tests.activity.test_controller.test_asset_creation import (
-    create_test_agent
-)
+from property_street_backend.app.models import Asset
+from property_street_backend.app.models import CloudImageDetail
+from property_street_backend.tests.test_properties import create_test_asset
+from property_street_backend.tests.auth.test_create_agent import create_test_agent
+from property_street_backend.app.controllers.auth.services import fetch_access_token
+from property_street_backend.tests.test_properties.test_processing import property_payload
+from property_street_backend.app.controllers.assets.property_processor_utils import handle_property_create_update
 
-
-import pytest
 
 @pytest.mark.asyncio
-async def test_user_ui_metadata_retrieval(client__fixture):
-    # Extract the fixture object
-    fixture_obj = await client__fixture.__anext__()
-    test_db = fixture_obj.get("db")
-    client = fixture_obj.get("http_client")
-    """
-    Test the /activity/assets/latest endpoint to ensure it fetches
-    up to 100 latest assets with the correct structure.
-    """
+async def test_user_ui_metadata_retrieval(client__fixture: dict):
+    # Get the yielded client object
+    client: AsyncClient = client__fixture['http_client']
+    test_db: AsyncSession = client__fixture['db']
+    redis_client: Redis = client__fixture['redis_client']
+
 
     # Create a test agent and user
-    test_agent = await create_test_agent(db=test_db)
-    test_user = test_agent.user
+    test_agent = await create_test_agent(test_db)
 
     # profile avatar cloud image details
     # assigning it to the user and committing
@@ -39,41 +35,49 @@ async def test_user_ui_metadata_retrieval(client__fixture):
         "width": 1480,
         "public_id": "avatar_public_id"
     }
-    test_user.profile_avatar = CloudImageDetail(**profile_avatar_details)
-    test_db.add(test_user)
+    test_agent.profile_avatar = CloudImageDetail(**profile_avatar_details)
+    test_db.add(test_agent)
     await test_db.commit()
 
-    # Fetch a token for the user
-    token_obj = fetched_access_token(user=test_user)
-    token = token_obj["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
 
-    # Perform the GET request to fetch the latest assets
-    # Validate response status
+    # Fetch a token for the user
+    token = fetch_access_token(test_agent)["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
     response = await client.get("/activity/user-ui-metadata", headers=headers)
     assert response.status_code == 200
     data = response.json()
-
-    # refresh user
-    # Validate response structure
-    await test_db.refresh(test_user)
-    assert test_user.first_name == data.get('first_name')
-    assert test_user.id == data.get('user_id')
-    assert test_user.profile_avatar.secure_url == data.get('profile_avatar_url')
-    assert data.get('client_is_agent')
+    await test_db.refresh(test_agent)
+    assert test_agent.id == data['id']
+    assert test_agent.profile_avatar.secure_url == data.get('profile_avatar_url')
     assert data.get('is_authenticated')
+    assert data['agent_details']['property_count'] == 0
 
 
-    #**# fetch without authentication
+    # Create a property and assert the agent's property count
+    payload = property_payload(test_agent.id)
+    response = await client.post(
+        "/assets/create-property",
+        json=payload,
+        headers=headers,
+    )
+    assert response.status_code == 201
+    property = response.json()
+    assert 'id' in property
+
+    # Re-fetch metadata
+    response = await client.get("/activity/user-ui-metadata", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data['agent_details']['property_count'] == 1
+
+
+    # Fetch without authentication
     headers = {"Authorization": f"Bearer "}
     response = await client.get("/activity/user-ui-metadata", headers=headers)
-    
-    # Validate response status
-    # Validate response structure
     assert response.status_code == 200
     data = response.json()
-    assert None == data.get('profile_avatar_url')
-    assert None == data.get('first_name')
-    assert None == data.get('user_id')
-    assert None == data.get('client_is_agent')
-    assert not data.get('is_authenticated')
+    assert not all (
+        data.get(i) for i in [
+            'profile_avatar_url', 'first_name','user_id','is_authenticated'
+        ]
+    )

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, HTTPException, status, Depends, Body
 
 
+from .utils import user_ui_metadata
 from .schemas import (
     Email,
     PasswordResetSchema,
@@ -128,11 +129,7 @@ async def signin_for_access_token(
         )
     return {
         **fetched_access_token(user),
-        "id":user.id, 
-        'username': user.username,
-        'client_is_agent': True if (user.user_role.value == 'agent') else False,
-        'profile_avatar_url': user.profile_avatar.secure_url if user.profile_avatar else None,
-        'user_role': user.user_role 
+        **(await user_ui_metadata(db, user,True))
     }
 
 

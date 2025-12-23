@@ -2,9 +2,9 @@ from typing import List
 from fastapi import Query
 import redis.asyncio as redis
 from redis.asyncio import Redis
+from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
-
 
 from .services import (
     eager_asset_load,

@@ -59,7 +59,6 @@ class Token(BaseModel):
 class SigninResponse(Token, UserUIMetaDataSchema):
     id: int
     username: str
-    client_is_agent: bool
     is_authenticated: bool = True
     user_role: str
 
