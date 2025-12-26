@@ -13,16 +13,14 @@ from sqlalchemy import (
 from sqlalchemy.future import select
 from sqlalchemy import types as _types
 from sqlalchemy.orm import relationship
+from sqlalchemy.inspection import inspect
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from property_street_backend.app.enums import (
-    EmailManagementReasonChoice,
-)
-from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
-
 from sqlalchemy.ext.declarative import declared_attr
 
+from property_street_backend.config.cloudinary import delete_image
+from property_street_backend.app.enums import EmailManagementReasonChoice
 from property_street_backend.config.postgres_connection_manager import Base
+from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
 
 # abstract class dependency for models with cloud images fields
 class AbstractCloudImage(Base):
@@ -44,6 +42,31 @@ class AbstractCloudImage(Base):
     @declared_attr
     def __tablename__(cls):
         return cls.__name__.lower()  # Use class name as table name
+
+    @classmethod
+    def __declare_last__(cls):
+        """
+        Called once mapper is fully configured.
+        Safe place to attach events for abstract bases.
+        """
+
+        # BEFORE UPDATE
+        @event.listens_for(cls, "before_update", propagate=True)
+        def _before_update(mapper, connection, target):
+            state = inspect(target)
+
+            hist = state.attrs.public_id.history
+            if hist.has_changes() and hist.deleted:
+                old_public_id = hist.deleted[0]
+                if old_public_id and old_public_id != target.public_id:
+                    delete_image(old_public_id)
+
+        # AFTER DELETE
+        @event.listens_for(cls, "after_delete", propagate=True)
+        def _after_delete(mapper, connection, target):
+            if target.public_id:
+                delete_image(target.public_id)
+
 
 # asset-tag Association Table for many-to-many relationship
 asset_tag_association = Table(

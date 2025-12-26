@@ -23,6 +23,7 @@ async def test_create_property(client__fixture: dict):
     http_client: AsyncClient = client__fixture["http_client"]
 
     agent = await create_test_agent(test_db)
+    
     token = fetch_access_token(user=agent)['access_token']
     headers = {"Authorization": f"Bearer {token}"}
 

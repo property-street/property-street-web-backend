@@ -7,8 +7,10 @@ import asyncio
 import requests
 import platform
 import subprocess
+import cloudinary
 import pytest_asyncio
 from sqlalchemy import text
+from dotenv import load_dotenv
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -23,12 +25,19 @@ from property_street_backend.config.postgres_connection_manager import Base, get
 from property_street_backend.app.controllers.cache_expiration.expiry_pubsub_listener import expiry_pubsub_loop_entered 
 
 
+load_dotenv()
 
 @pytest_asyncio.fixture(scope="function")
 def test_env_var():
     os.environ["TEST_ENV"] = "true"
     yield
     os.environ.pop("TEST_ENV", None)
+
+@pytest_asyncio.fixture(scope="function")
+def test_cloud_image_del():
+    os.environ["TEST_CLOUD_IMAGE_DEL"] = "true"
+    yield
+    os.environ.pop("TEST_CLOUD_IMAGE_DEL", None)
     
 
 @pytest_asyncio.fixture(scope="function")

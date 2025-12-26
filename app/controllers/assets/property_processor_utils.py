@@ -65,7 +65,7 @@ async def notify_admin_on_new_property(property: Asset):
             html = substituted_string(
                 template or "New property ${property_title}",
                 {
-                    'agent_name': 'Unknown',
+                    'agent_name': f'Agent {property.agent.username}',
                     'property_title': property.title,
                     'property_location': property_location,
                     'property_price': str(property.price),
@@ -76,7 +76,7 @@ async def notify_admin_on_new_property(property: Asset):
             )
             # send email (do not block creation if this fails)
             send_email(
-                from_email='team@propertystreet.com',
+                from_email='support@propertystreet.ng',
                 from_name='Property street',
                 subject='New property created',
                 to_email=admin_email,
@@ -166,7 +166,7 @@ async def handle_property_create_update(
             expiry_seconds = ttl_in_seconds,
         )
         if newly_created:
-            notify_admin_on_new_property(property)
+            await notify_admin_on_new_property(property)
     except Exception as e:
         logger.warning(f"Cache update failed: {e}")
         raise
