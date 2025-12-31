@@ -15,6 +15,7 @@ from property_street_backend.config.settings import (
     AGENT_NOTIFICATION_ENTRY_OFFLOAD_SCHEDULE,
     TEST_AGENT_NOTIFICATION_ENTRY_OFFLOAD_SCHEDULE,
 )
+from property_street_backend.config.cloudinary import routine_interval as cloudinary_routine_interval
 
 # environment retrieval based on context
 TEST_ENV = os.getenv("TEST_ENV")
@@ -41,15 +42,19 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
     beat_schedule={
-        'offload-cart-items-to-db': {
-            'task': 'property_street_backend.app.controllers.cart.routines.offload_task.routine',
-            'schedule': cart_offload_schedule_secs,  # Runs every expiry seconds
-            'args': (env,),  # Arguments for the task
-        },
-        'delete_stall_agent_notification_entry': {
-            'task': 'property_street_backend.app.controllers.asset_request.routines.delete_stall_agent_notification_entries.routine',
-            'schedule': agent_stall_notification_deletion_schedule_secs,  # Runs every expiry seconds
-            'args': (env,),  # Arguments for the task
+        # 'offload-cart-items-to-db': {
+        #     'task': 'property_street_backend.app.controllers.cart.routines.offload_task.routine',
+        #     'schedule': cart_offload_schedule_secs,  # Runs every expiry seconds
+        #     'args': (env,),  # Arguments for the task
+        # },
+        # 'delete_stall_agent_notification_entry': {
+        #     'task': 'property_street_backend.app.controllers.asset_request.routines.delete_stall_agent_notification_entries.routine',
+        #     'schedule': agent_stall_notification_deletion_schedule_secs,  # Runs every expiry seconds
+        #     'args': (env,),  # Arguments for the task
+        # },
+        'delete_stale_images_from_cloudinary': {
+            'task': 'property_street_backend.app.controllers.cloudinary.routines.delete_image_from_cloud.routine',
+            'schedule': cloudinary_routine_interval(),  # Runs every expiry seconds
         },
         #...
     },
@@ -57,7 +62,8 @@ celery_app.conf.update(
 
 # Ensure tasks are discovered
 celery_app.autodiscover_tasks([
-    'property_street_backend.app.controllers.cart.routines.offload_task',
-    'property_street_backend.app.controllers.asset_request.routines.delete_stall_agent_notification_entries',
+    # 'property_street_backend.app.controllers.cart.routines.offload_task',
+    # 'property_street_backend.app.controllers.asset_request.routines.delete_stall_agent_notification_entries',
+    'property_street_backend.app.controllers.cloudinary.routines.delete_image_from_cloud',
     #...
 ])

@@ -1,16 +1,21 @@
 # test_cloudinary_delete.py
 import pytest
+import asyncio
 import cloudinary.api
+from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from property_street_backend.tests.activity.test_controller.test_objects import cloud_image_template
+from property_street_backend.app.initiator import logger
 from property_street_backend.app.models_helper import CloudImageDetail
 from property_street_backend.config.cloudinary import upload_image, delete_image
 from property_street_backend.app.schemas.cloud_image_schema import CloudImageSchema
+from property_street_backend.app.controllers.cloudinary.models import CloudDeletionOutbox
+from property_street_backend.tests.activity.test_controller.test_objects import cloud_image_template
+from property_street_backend.config.cloudinary import routine_interval as cloudinary_routine_interval
 
 
 @pytest.mark.asyncio
-async def test_cloud_image_delete(client__fixture):
+async def test_cloud_image_delete(celery_worker_and_beat, client__fixture):
     test_db: AsyncSession = client__fixture['db']
 
     # --- Arrange ---
@@ -19,7 +24,7 @@ async def test_cloud_image_delete(client__fixture):
     
     try:    
         # --- Upload ---
-        upload_response = upload_image(test_image_path, public_id)
+        upload_response: dict = upload_image(test_image_path, public_id)
 
         assert upload_response["public_id"] == public_id
         assert upload_response["secure_url"].startswith("https://")
@@ -31,8 +36,8 @@ async def test_cloud_image_delete(client__fixture):
         #==============================
         # Create model with details
         #==============================
-        upload_response["cloud_asset_id"] = upload_response["asset_id"]
-        data = CloudImageSchema(**upload_response).model_validate().model_dump()
+        cloud_image_template['public_id'] = public_id
+        data = CloudImageSchema.model_validate(cloud_image_template).model_dump()
         inst = CloudImageDetail(**data)
         test_db.add(inst)
         await test_db.commit()
@@ -43,8 +48,21 @@ async def test_cloud_image_delete(client__fixture):
         #==============================
         await test_db.delete(inst)
         await test_db.commit()
+
+        #=================================================
+        # Ensure persistence in the cloud deletion outbox
+        #=================================================
+        inst_to_del = (await test_db.execute(
+            select(CloudDeletionOutbox)
+            .where(CloudDeletionOutbox.public_id == public_id)
+        )).scalars().first()
+        if not inst_to_del:
+            logger.error("**Instance for deletion no found!")
+        assert inst_to_del
+
+        await asyncio.sleep(cloudinary_routine_interval()+5)
     finally:
-        # --- Verify deletion ---
+        # --- Cleanup on failure ---
         try:
             cloudinary.api.resource(public_id)
             delete_response = delete_image(public_id)

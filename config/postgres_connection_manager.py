@@ -12,29 +12,36 @@ from property_street_backend.config.settings import (
 
 Base = declarative_base()
 
+
+def _get_database_url() -> str:
+    if get_env() == "test":
+        return TEST_DATABASE_URL
+    return DATABASE_URL if DEBUG else PROD_DATABASE_URL
+
+
+DATABASE_URL = _get_database_url()
+
+async_engine: AsyncEngine = create_async_engine(
+    DATABASE_URL,
+    max_overflow=10,
+    pool_timeout=30,
+)
+
+AsyncSessionLocal = sessionmaker(
+    bind=async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False
+) 
+
 def get_async_session():
-    env_is_test = get_env() == 'test'
-    database_url = TEST_DATABASE_URL if env_is_test else (DATABASE_URL if DEBUG else PROD_DATABASE_URL)
-
-    async_engine = create_async_engine(database_url, echo=False) # create engine (it manages a connection pool internally)
-
-    # create a session, store its reference and increment the active connections
-    SessionMaker = sessionmaker(
-        bind=async_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-        autocommit=False,
-        autoflush=False
-    ) 
-
-    return SessionMaker
+    return AsyncSessionLocal
 
 @asynccontextmanager
 async def get_postgres_instance():
-    SessionLocal: sessionmaker = get_async_session()
-
-    async with SessionLocal() as session:
-        yield session
-
-async def get_db():
-    return get_postgres_instance()
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session  
+        finally:
+            await session.close()

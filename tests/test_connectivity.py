@@ -9,9 +9,9 @@ from httpx import AsyncClient
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .auth import create_test_user
 from property_street_backend.app.main import app
 from property_street_backend.app.models import User
-from .auth.test_user_creation import create_test_user
 from property_street_backend.config import env_is_test
 from property_street_backend.config.settings import TEST_REDIS_CACHE_DB
 from property_street_backend.app.controllers.auth.services import fetch_access_token

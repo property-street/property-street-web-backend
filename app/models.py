@@ -4,7 +4,7 @@ from .models_helper import (
     CloudImageDetail,
     GoogleOAuthDetail,
     EmailManagementModel,
-    asset_tag_association,
+    CloudDeletionOutbox,
 )
 from property_street_backend.app.controllers.chat.models import (
     Thread,
@@ -50,5 +50,6 @@ models = [
     CloudImageDetail,
     GoogleOAuthDetail,
     RoomieApplication,
+    CloudDeletionOutbox,
     EmailManagementModel,
 ]

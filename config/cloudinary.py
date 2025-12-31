@@ -11,7 +11,19 @@ import cloudinary
 from cloudinary.uploader import upload
 from cloudinary.uploader import destroy
 
-from .settings import CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+from . import env_is_test
+from .settings import (
+    DEBUG,
+    CLOUDINARY_API_KEY, 
+    CLOUDINARY_API_SECRET,
+    ROUTINE_STALE_CLOUD_PUBID_DELETION,
+    TEST_ROUTINE_STALE_CLOUD_PUBID_DELETION,
+    CLOUDINARY_DELETION_LOCK_EXPIRY,
+    TEST_CLOUDINARY_DELETION_LOCK_EXPIRY,
+)
+
+def routine_interval():
+    return TEST_ROUTINE_STALE_CLOUD_PUBID_DELETION if env_is_test() else ROUTINE_STALE_CLOUD_PUBID_DELETION
 
 cloudinary.config(
     cloud_name="dmjtks9zq",  
@@ -19,6 +31,10 @@ cloudinary.config(
     api_secret=CLOUDINARY_API_SECRET,
     secure=True,
 )
+
+def cloudinary_deletion_lock_expiry():
+    return TEST_CLOUDINARY_DELETION_LOCK_EXPIRY if env_is_test() else CLOUDINARY_DELETION_LOCK_EXPIRY
+
 
 def upload_image(file_path: str, public_id: str):
     response = upload(

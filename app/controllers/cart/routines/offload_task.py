@@ -6,18 +6,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from property_street_backend.app.celery_config import (
-    redis_db,
     celery_app,
     cart_offload_schedule_secs, 
 )
-from property_street_backend.config.context_sessions import (
-    get_db_based_on_context,
-    get_redis_based_on_context
-)
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.cart.models import CartItem
+from property_street_backend.config.redis_connection_manager import get_redis
 from property_street_backend.config.settings import TEST_CART_TTL, PROD_CART_TTL
-from property_street_backend.config.redis_connection_manager import _redis_instances
+from property_street_backend.config.postgres_connection_manager import AsyncSessionLocal
+from property_street_backend.config.context_sessions import acquire_redis_lock, release_redis_lock
 
 
 
@@ -25,16 +22,15 @@ LOCK_KEY = "cart_offload_lock"
 
 async def acquire_lock(redis_client: Redis):
     """Acquire a lock to ensure only one instance runs."""
-    return await redis_client.set(
+    return await acquire_redis_lock(
+        redis_client,
         LOCK_KEY, 
-        "locked", 
-        ex=cart_offload_schedule_secs,
-        nx=True
+        cart_offload_schedule_secs,
     )
 
 async def release_lock(redis_client: Redis):
     """Release the lock after task completion."""
-    await redis_client.delete(LOCK_KEY)
+    return await release_redis_lock(redis_client, LOCK_KEY)
 
 @celery_app.task
 def routine(env):
@@ -57,30 +53,24 @@ def routine(env):
 
 async def run_task(env):
     """Executes the offload task with a Redis lock."""
-    # get the global _redis_instances and the instance key from the global object
-    # get the redis instance based on the current context
-    redis_instance_key = f"{env}_{redis_db}"
-    redis_client = await get_redis_based_on_context(env)
+    async with get_redis() as redis_client:
 
-    if not await acquire_lock(redis_client):
-        print("Another instance is already running. Skipping execution.")
-        return
+        if not await acquire_lock(redis_client):
+            print("Another instance is already running. Skipping execution.")
+            return
 
-    try:
-        # get the cart_ttl and db
-        cart_ttl = TEST_CART_TTL if env == 'test' else PROD_CART_TTL
-        db = await get_db_based_on_context(env)
-        
-        # call the offload function
-        await handle_cart_offload(
-            cart_ttl=cart_ttl,
-            db = db,
-            redis_client=redis_client,
-        )
-    finally:
-        await release_lock(redis_client)
-        await redis_client.aclose() # explicitly close the redis client
-        _redis_instances.pop(redis_instance_key, None) # delete the entry off the global object
+        try:
+            # get the cart_ttl and db
+            cart_ttl = TEST_CART_TTL if env == 'test' else PROD_CART_TTL
+            async with AsyncSessionLocal() as db:
+                # call the offload function
+                await handle_cart_offload(
+                    cart_ttl=cart_ttl,
+                    db = db,
+                    redis_client=redis_client,
+                )
+        finally:
+            await release_lock(redis_client)
 
 
 async def handle_cart_offload(

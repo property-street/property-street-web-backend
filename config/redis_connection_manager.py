@@ -1,23 +1,23 @@
 from contextlib import asynccontextmanager
 from redis.asyncio import Redis, ConnectionPool
 
-from . import get_env
 from property_street_backend.config.settings import (
-    REDIS_HOST,
-    TEST_REDIS_CACHE_DB,
-    PROD_REDIS_CACHE_DB,
+    DEBUG,
+    DEV_REDIS_URL,
+    PROD_REDIS_URL,
 )
 
 def get_redis_db_url():
-    env = get_env()
-    env_is_test = env == 'test'
-    db = TEST_REDIS_CACHE_DB if env_is_test else PROD_REDIS_CACHE_DB
-    return f"redis://{REDIS_HOST}:6379/{db}"
+    return DEV_REDIS_URL if DEBUG else PROD_REDIS_URL
+
+redis_url = get_redis_db_url()
+pool: ConnectionPool = ConnectionPool.from_url(
+    redis_url, 
+    decode_responses=True
+)
 
 def get_redis_from_pool() -> Redis:
-    redis_url = get_redis_db_url()
-    pool = ConnectionPool.from_url(redis_url)
-    return Redis(connection_pool=pool, decode_responses=True)
+    return Redis(connection_pool=pool)
 
 @asynccontextmanager
 async def get_redis_instance():

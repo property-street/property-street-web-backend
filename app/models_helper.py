@@ -14,6 +14,7 @@ from sqlalchemy.future import select
 from sqlalchemy import types as _types
 from sqlalchemy.orm import relationship
 from sqlalchemy.inspection import inspect
+from sqlalchemy.orm import object_session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.declarative import declared_attr
 
@@ -21,6 +22,14 @@ from property_street_backend.config.cloudinary import delete_image
 from property_street_backend.app.enums import EmailManagementReasonChoice
 from property_street_backend.config.postgres_connection_manager import Base
 from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
+from property_street_backend.app.controllers.cloudinary.models import CloudDeletionOutbox
+
+
+def add_public_id_for_deletion(target,public_id: str):
+    session = object_session(target)
+    if session is None:
+        return
+    session.add(CloudDeletionOutbox(public_id=public_id))
 
 # abstract class dependency for models with cloud images fields
 class AbstractCloudImage(Base):
@@ -59,13 +68,13 @@ class AbstractCloudImage(Base):
             if hist.has_changes() and hist.deleted:
                 old_public_id = hist.deleted[0]
                 if old_public_id and old_public_id != target.public_id:
-                    delete_image(old_public_id)
+                    add_public_id_for_deletion(target,old_public_id)
 
         # AFTER DELETE
         @event.listens_for(cls, "after_delete", propagate=True)
         def _after_delete(mapper, connection, target):
             if target.public_id:
-                delete_image(target.public_id)
+                add_public_id_for_deletion(target,target.public_id)
 
 
 # asset-tag Association Table for many-to-many relationship

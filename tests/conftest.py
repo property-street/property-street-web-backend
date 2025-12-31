@@ -1,13 +1,11 @@
 import os
 import time
-import pytest
 import signal
 import pytest
 import asyncio
 import requests
 import platform
 import subprocess
-import cloudinary
 import pytest_asyncio
 from sqlalchemy import text
 from dotenv import load_dotenv
@@ -140,9 +138,9 @@ async def sessions_with_cache_expiry_event_fixture(
 
 
 @pytest_asyncio.fixture(scope="function")
-def celery_worker_and_beat():
+def celery_worker_and_beat(test_env_var):
     env = os.environ.copy()
-    env["TEST_ENV"] = "True"
+    # env["TEST_ENV"] = "True"
 
     is_windows = platform.system() == "Windows"
 
