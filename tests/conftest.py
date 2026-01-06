@@ -10,16 +10,14 @@ import pytest_asyncio
 from sqlalchemy import text
 from dotenv import load_dotenv
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import create_async_engine
 
 
 from property_street_backend.app.main import app
 from property_street_backend.app.database import get_db
-from property_street_backend.app.initiator import get_redis
-from property_street_backend.config.settings import TEST_DATABASE_URL
+from property_street_backend.app.initiator import get_redis, logger
 from property_street_backend.config.redis_connection_manager import get_redis_instance
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
-from property_street_backend.config.postgres_connection_manager import Base, get_postgres_instance
+from property_street_backend.config.postgres_connection_manager import Base, get_postgres_instance, async_engine
 from property_street_backend.app.controllers.cache_expiration.expiry_pubsub_listener import expiry_pubsub_loop_entered 
 
 
@@ -40,15 +38,13 @@ def test_cloud_image_del():
 
 @pytest_asyncio.fixture(scope="function")
 async def get_test_db__fixture(test_env_var):
-    # initialize a test engine and store its reference
-    async_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     # Create a clean database if it's a test environment
     async with async_engine.begin() as conn:
         await conn.execute(text("DROP SCHEMA public CASCADE"))
         await conn.execute(text("CREATE SCHEMA public"))
-        print("***Dropped and recreated public schema")
+        logger.info("***Dropped and recreated public schema")
         await conn.run_sync(Base.metadata.create_all)
-        print("***Created a new Base metadata")
+        logger.info("***Created a new Base metadata")
     
     async with get_postgres_instance() as session:
         yield session
@@ -140,7 +136,7 @@ async def sessions_with_cache_expiry_event_fixture(
 @pytest_asyncio.fixture(scope="function")
 def celery_worker_and_beat(test_env_var):
     env = os.environ.copy()
-    # env["TEST_ENV"] = "True"
+    #  env["TEST_ENV"] = "True"
 
     is_windows = platform.system() == "Windows"
 

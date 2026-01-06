@@ -77,7 +77,7 @@ TEST_ENV=True celery -A property_street_backend.app.celery_config worker --pool=
 ```
 ## Start the test elery Beat Scheduler
 ```bash
-TEST_ENV=True celery -A property_street_backend.app.celery_config worker --pool=solo --loglevel=info -E
+TEST_ENV=True celery -A property_street_backend.app.celery_config beat --loglevel=info
 ```
 
 ## upgrade requirements.txt dependencies

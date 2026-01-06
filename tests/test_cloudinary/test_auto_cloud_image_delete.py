@@ -2,12 +2,14 @@
 import pytest
 import asyncio
 import cloudinary.api
+from sqlalchemy import text
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.initiator import logger
 from property_street_backend.app.models_helper import CloudImageDetail
 from property_street_backend.config.cloudinary import upload_image, delete_image
+from property_street_backend.config.postgres_connection_manager import SessionLocal
 from property_street_backend.app.schemas.cloud_image_schema import CloudImageSchema
 from property_street_backend.app.controllers.cloudinary.models import CloudDeletionOutbox
 from property_street_backend.tests.activity.test_controller.test_objects import cloud_image_template
@@ -17,6 +19,8 @@ from property_street_backend.config.cloudinary import routine_interval as cloudi
 @pytest.mark.asyncio
 async def test_cloud_image_delete(celery_worker_and_beat, client__fixture):
     test_db: AsyncSession = client__fixture['db']
+
+    logger.info(f"Current database: {await test_db.execute(text("select current_database()"))}")
 
     # --- Arrange ---
     test_image_path = "tests/test_cloudinary/test.jpg"
@@ -32,6 +36,7 @@ async def test_cloud_image_delete(celery_worker_and_beat, client__fixture):
         # --- Ensure asset exists ---
         resource = cloudinary.api.resource(public_id)
         assert resource["public_id"] == public_id
+
 
         #==============================
         # Create model with details
@@ -57,8 +62,18 @@ async def test_cloud_image_delete(celery_worker_and_beat, client__fixture):
             .where(CloudDeletionOutbox.public_id == public_id)
         )).scalars().first()
         if not inst_to_del:
-            logger.error("**Instance for deletion no found!")
-        assert inst_to_del
+            raise Exception("**Instance for deletion not found in async session!")
+
+        #=================================================
+        # Ensure persistence in the cloud deletion outbox
+        #=================================================
+        with SessionLocal() as session:
+            inst_to_del = (session.execute(
+                select(CloudDeletionOutbox)
+                .where(CloudDeletionOutbox.public_id == public_id)
+            )).scalars().first()
+            if not inst_to_del:
+                raise Exception("**Instance for deletion not found in sync session!")
 
         await asyncio.sleep(cloudinary_routine_interval()+5)
     finally:

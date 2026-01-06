@@ -37,7 +37,8 @@ class Asset(Base):
             name = 'fk_assets_areas',
             ondelete = 'CASCADE',
             use_alter = True,
-        )
+        ),
+        nullable=False,
     )
     area = relationship(
         'Area',

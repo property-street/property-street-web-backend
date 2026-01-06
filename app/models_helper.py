@@ -10,6 +10,8 @@ from sqlalchemy import (
     func,
     ARRAY,
 )
+from sqlalchemy import event
+from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 from sqlalchemy import types as _types
 from sqlalchemy.orm import relationship
@@ -52,29 +54,25 @@ class AbstractCloudImage(Base):
     def __tablename__(cls):
         return cls.__name__.lower()  # Use class name as table name
 
-    @classmethod
-    def __declare_last__(cls):
-        """
-        Called once mapper is fully configured.
-        Safe place to attach events for abstract bases.
-        """
-
-        # BEFORE UPDATE
-        @event.listens_for(cls, "before_update", propagate=True)
-        def _before_update(mapper, connection, target):
-            state = inspect(target)
-
+@event.listens_for(Session, "before_flush")
+def cloud_image_outbox(session, flush_context, instances):
+    for obj in session.dirty:
+        if isinstance(obj, AbstractCloudImage):
+            state = inspect(obj)
             hist = state.attrs.public_id.history
+
             if hist.has_changes() and hist.deleted:
                 old_public_id = hist.deleted[0]
-                if old_public_id and old_public_id != target.public_id:
-                    add_public_id_for_deletion(target,old_public_id)
+                if old_public_id and old_public_id != obj.public_id:
+                    session.add(
+                        CloudDeletionOutbox(public_id=old_public_id)
+                    )
 
-        # AFTER DELETE
-        @event.listens_for(cls, "after_delete", propagate=True)
-        def _after_delete(mapper, connection, target):
-            if target.public_id:
-                add_public_id_for_deletion(target,target.public_id)
+    for obj in session.deleted:
+        if isinstance(obj, AbstractCloudImage) and obj.public_id:
+            session.add(
+                CloudDeletionOutbox(public_id=obj.public_id)
+            )
 
 
 # asset-tag Association Table for many-to-many relationship

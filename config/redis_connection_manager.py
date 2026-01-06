@@ -1,3 +1,4 @@
+import redis
 from contextlib import asynccontextmanager
 from redis.asyncio import Redis, ConnectionPool
 
@@ -36,3 +37,16 @@ async def get_redis():
         yield redis
     finally:
         await redis.aclose()
+
+
+#==============================
+# Sync section
+#==============================
+def get_sync_redis() -> Redis:
+    return redis.Redis.from_url(
+        redis_url,
+        decode_responses=True,
+        socket_connect_timeout=5,
+        socket_timeout=5,
+        health_check_interval=30,
+    )

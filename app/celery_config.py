@@ -7,9 +7,7 @@ from celery import Celery
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from property_street_backend.config.settings import (
-    REDIS_HOST,
-    TEST_REDIS_CACHE_DB,
-    PROD_REDIS_CACHE_DB,
+    REDIS_URL,
     TEST_CART_OFFLOAD_SCHEDULE,
     PROD_CART_OFFLOAD_SCHEDULE,
     AGENT_NOTIFICATION_ENTRY_OFFLOAD_SCHEDULE,
@@ -20,8 +18,6 @@ from property_street_backend.config.cloudinary import routine_interval as cloudi
 # environment retrieval based on context
 TEST_ENV = os.getenv("TEST_ENV")
 env = 'test' if TEST_ENV else 'prod'
-# db based on context
-redis_db = TEST_REDIS_CACHE_DB if TEST_ENV else PROD_REDIS_CACHE_DB
 
 # cart routine time
 cart_offload_schedule_secs = TEST_CART_OFFLOAD_SCHEDULE if TEST_ENV else PROD_CART_OFFLOAD_SCHEDULE
@@ -30,8 +26,8 @@ agent_stall_notification_deletion_schedule_secs = TEST_AGENT_NOTIFICATION_ENTRY_
 
 celery_app = Celery(
     'celery_config',
-    broker=f'redis://{REDIS_HOST}:6379/{redis_db}',
-    backend=f'redis://{REDIS_HOST}:6379/{redis_db}'
+    broker=REDIS_URL,
+    backend=REDIS_URL,
 )
 
 celery_app.conf.update(

@@ -28,9 +28,7 @@ async def test_get_env_b():
 
 
 @pytest.mark.asyncio
-async def test_db_connectivity(
-    get_test_db__fixture
-):
+async def test_db_connectivity(get_test_db__fixture):
     # fetch the testdb
     test_db = get_test_db__fixture
     assert isinstance(test_db, AsyncSession)

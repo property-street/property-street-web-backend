@@ -66,7 +66,7 @@ class UserSettingResponseSchema(BaseModel):
             user = {
                 'id': user.id,
                 'email': user.email,
-                'first_name' : user.first_name,
+                'first_name' : user.first_name or '',
                 'last_name' : user.last_name or '',
                 'profile_avatar_url' : (
                     user.profile_avatar.secure_url 
