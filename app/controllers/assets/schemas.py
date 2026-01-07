@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, condecimal
 
 from property_street_backend.app.controllers.actors.schemas import AgentResponseSchema
 from property_street_backend.app.schemas.area_schema import AreaSchema, AreaResponseSchema, AreaPatchSchema
@@ -73,7 +73,7 @@ class FlatPropertyFields(BaseModel):
     id: Optional[int] = None
     title: str = Field(..., description="The title of the asset")
     currency: str = Field(..., description="The currency used for the asset's price (e.g., USD, EUR)")
-    price: float = Field(..., description="The monetary value of the asset")
+    price: condecimal(max_digits=15, decimal_places=2) = Field(..., description="The monetary value of the asset")
     lease_duration: Optional[str] = Field(None, description="The lease duration of the asset, if it's a lease.")
     description: str = Field(..., description="A detailed description of the asset, possibly in HTML")
     category: str = Field(..., description="The category of the asset (e.g., House, Hotel)")
@@ -104,6 +104,7 @@ class PropertySchema(AssetSchema):
 
 class AssetResponseSchema(ConfigDictSetter, AssetSchema):
     id: int = Field(..., description="The id of the asset")
+    price: float = Field(..., description="The monetary value of the asset")
     has_features: Optional[bool] = Field(None, description="Boolean indicating if the asset has features or not")
     verified: bool
     created_at: datetime

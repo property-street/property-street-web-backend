@@ -49,7 +49,7 @@ class Asset(Base):
 
     currency = Column(String, nullable=False)
     status = Column(String, nullable=False)
-    price = Column(Numeric(10, 2), nullable=False)  # Up to 10 digits, 2 decimal places; returns a Decimal type
+    price = Column(Numeric(15, 2), nullable=False)  # Up to 10 digits, 2 decimal places; returns a Decimal type
     lease_duration = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     availability = Column(

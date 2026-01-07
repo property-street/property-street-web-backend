@@ -30,7 +30,7 @@ def test_env_var():
     os.environ.pop("TEST_ENV", None)
 
 @pytest_asyncio.fixture(scope="function")
-def test_cloud_image_del():
+def ignore_cloud_image_del():
     os.environ["TEST_CLOUD_IMAGE_DEL"] = "true"
     yield
     os.environ.pop("TEST_CLOUD_IMAGE_DEL", None)

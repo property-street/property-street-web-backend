@@ -93,7 +93,6 @@ async def check_limit_exceeded(
     property_count = (await db.execute(
         select(func.count(Asset.id)).where(Asset.agent_id == agent.id)
     )).scalar_one()
-    logger.info(f"***Property count: {property_count}")
     if property_count >= BETA_LAUNCH_PROPERTY_LIMIT:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

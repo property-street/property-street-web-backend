@@ -17,7 +17,7 @@ from property_street_backend.tests.activity.test_controller.test_newly_created_a
 
 
 @pytest.mark.asyncio
-async def test_create_property(client__fixture: dict):
+async def test_create_property(ignore_cloud_image_del, client__fixture: dict):
     test_db: AsyncSession = client__fixture["db"]
     redis_client: Redis = client__fixture["redis_client"]
     http_client: AsyncClient = client__fixture["http_client"]
