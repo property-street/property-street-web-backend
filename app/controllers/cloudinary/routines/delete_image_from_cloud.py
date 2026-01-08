@@ -11,7 +11,7 @@ from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.celery_config import celery_app
 from property_street_backend.config.redis_connection_manager import get_sync_redis
-from property_street_backend.config.postgres_connection_manager import SessionLocal
+from property_street_backend.config.postgres_connection_manager import runtime_sync_session_maker
 #from property_street_backend.config.context_sessions import acquire_redis_lock, release_redis_lock
 
 LOCK_KEY = "cloudinary_deletion_lock"
@@ -24,10 +24,11 @@ def routine(self):
         return
 
     try:
+        SessionLocal = runtime_sync_session_maker()
         with SessionLocal() as db:
             jobs = db.execute(select(CloudDeletionOutbox)).scalars().all()
             if DEBUG:
-                logger.info(f"**Current database: {db.execute(text("select current_database()"))}")
+                logger.info(f"**CELERY DB: {db.execute(text("select current_database()")).scalar()}")
                 logger.info(f"**Jobs: {jobs}")
 
             for job in jobs:

@@ -18,7 +18,7 @@ area_template = {
 asset_data_template = {        
     "title":"Test Asset",
     "currency":"USD",
-    "price":999000000000.00,
+    "price":1000000000000.00,
     "description":"Test description",
     "category":"House",
     "status":"auction",

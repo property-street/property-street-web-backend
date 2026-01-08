@@ -20,7 +20,7 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
 ENVIRONMENT = os.getenv('ENVIRONMENT')
 
 # SQLAlchemy database configuration for PostgreSQL
-DATABASE_URL = os.getenv('DATABASE_URL')
+DEV_DATABASE_URL = os.getenv('DEV_DATABASE_URL')
 PROD_DATABASE_URL = os.getenv('PROD_DATABASE_URL')
 TEST_DATABASE_URL = os.getenv('TEST_DATABASE_URL')
 

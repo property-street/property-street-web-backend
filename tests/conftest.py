@@ -17,8 +17,8 @@ from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis, logger
 from property_street_backend.config.redis_connection_manager import get_redis_instance
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
-from property_street_backend.config.postgres_connection_manager import Base, get_postgres_instance, async_engine
 from property_street_backend.app.controllers.cache_expiration.expiry_pubsub_listener import expiry_pubsub_loop_entered 
+from property_street_backend.config.postgres_connection_manager import Base, runtime_async_session_maker, runtime_async_engine
 
 
 load_dotenv()
@@ -39,6 +39,7 @@ def ignore_cloud_image_del():
 @pytest_asyncio.fixture(scope="function")
 async def get_test_db__fixture(test_env_var):
     # Create a clean database if it's a test environment
+    async_engine = runtime_async_engine()
     async with async_engine.begin() as conn:
         await conn.execute(text("DROP SCHEMA public CASCADE"))
         await conn.execute(text("CREATE SCHEMA public"))
@@ -46,7 +47,8 @@ async def get_test_db__fixture(test_env_var):
         await conn.run_sync(Base.metadata.create_all)
         logger.info("***Created a new Base metadata")
     
-    async with get_postgres_instance() as session:
+    async_session_maker = runtime_async_session_maker()
+    async with async_session_maker() as session:
         yield session
 
 

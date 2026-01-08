@@ -15,9 +15,7 @@ from property_street_backend.config.settings import (
 )
 from property_street_backend.config.cloudinary import routine_interval as cloudinary_routine_interval
 
-# environment retrieval based on context
 TEST_ENV = os.getenv("TEST_ENV")
-env = 'test' if TEST_ENV else 'prod'
 
 # cart routine time
 cart_offload_schedule_secs = TEST_CART_OFFLOAD_SCHEDULE if TEST_ENV else PROD_CART_OFFLOAD_SCHEDULE

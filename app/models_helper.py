@@ -26,6 +26,7 @@ from property_street_backend.config.postgres_connection_manager import Base
 from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
 from property_street_backend.app.controllers.cloudinary.models import CloudDeletionOutbox
 
+from sqlalchemy.orm.attributes import NO_VALUE
 
 def add_public_id_for_deletion(target,public_id: str):
     session = object_session(target)
@@ -54,25 +55,31 @@ class AbstractCloudImage(Base):
     def __tablename__(cls):
         return cls.__name__.lower()  # Use class name as table name
 
+
 @event.listens_for(Session, "before_flush")
-def cloud_image_outbox(session, flush_context, instances):
-    for obj in session.dirty:
-        if isinstance(obj, AbstractCloudImage):
-            state = inspect(obj)
-            hist = state.attrs.public_id.history
-
-            if hist.has_changes() and hist.deleted:
-                old_public_id = hist.deleted[0]
-                if old_public_id and old_public_id != obj.public_id:
-                    session.add(
-                        CloudDeletionOutbox(public_id=old_public_id)
-                    )
-
+def cloud_image_public_id_changes(session, flush_context, instances):
+    # Handle deletes
     for obj in session.deleted:
         if isinstance(obj, AbstractCloudImage) and obj.public_id:
             session.add(
                 CloudDeletionOutbox(public_id=obj.public_id)
             )
+    
+    # Handle updates - check for public_id changes
+    for obj in session.dirty:
+        if isinstance(obj, AbstractCloudImage):
+            state = inspect(obj)
+            hist = state.attrs.public_id.history
+            
+            if hist.has_changes():
+                old_value = hist.deleted[0] if hist.deleted else None
+                new_value = hist.added[0] if hist.added else None
+                
+                if old_value and old_value != new_value:
+                    session.add(
+                        CloudDeletionOutbox(public_id=old_value)
+                    )
+
 
 
 # asset-tag Association Table for many-to-many relationship

@@ -4,15 +4,16 @@ import json
 import pytest
 import asyncio
 import websockets
-from sqlalchemy import select
 from httpx import AsyncClient
 from redis.asyncio import Redis
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .auth import create_test_user
 from property_street_backend.app.main import app
 from property_street_backend.app.models import User
 from property_street_backend.config import env_is_test
+from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import TEST_REDIS_CACHE_DB
 from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.config.postgres_connection_manager import get_postgres_instance
@@ -32,6 +33,8 @@ async def test_db_connectivity(get_test_db__fixture):
     # fetch the testdb
     test_db = get_test_db__fixture
     assert isinstance(test_db, AsyncSession)
+    db_name = (await test_db.execute(text("select current_database()"))).scalar()
+    logger.error(f"TEST-DB-NAME: {db_name}")
 
 
 @pytest.mark.asyncio
