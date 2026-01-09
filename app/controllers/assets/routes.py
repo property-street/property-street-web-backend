@@ -118,7 +118,7 @@ async def fetch_asset_by_id(
         .where(Asset.id == asset_id)
     )
     asset = result.scalars().first()
-
+    
     if not asset:
         logger.error(
             f"Asset with ID {asset_id} not found"

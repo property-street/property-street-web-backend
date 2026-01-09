@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import create_test_user
 from property_street_backend.app.models import User
 from property_street_backend.config.settings import BETA_LAUNCHING
-from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema
+from property_street_backend.app.controllers.actors.enums import UserRoleChoice
 from property_street_backend.app.controllers.auth.services import generate_beta_signup_link
 
 
@@ -54,6 +54,7 @@ async def test_probe_user_existence(client__fixture):
     )
     assert response.status_code == 403
 
+
     # Test 3
     #================================================
     # making a request with non-existent data
@@ -62,6 +63,37 @@ async def test_probe_user_existence(client__fixture):
         "email": 'johndoe@gmail.com',
         "username": "johndoe",
         **beta_token_dict
+    }
+    response = await httpx_client.post(
+        "/auth/probe-user-existence",
+        json=payload  
+    )
+    assert response.status_code == 200
+
+    # Test 4
+    #================================================
+    # Make a request as an agent without beta-tokens
+    #================================================
+    payload = {
+        "email": 'johndoe@gmail.com',
+        "username": "johndoe",
+        "user_role": "agent",
+    }
+    response = await httpx_client.post(
+        "/auth/probe-user-existence",
+        json=payload  
+    )
+    assert response.status_code == 401
+
+    # Test 5
+    #================================================
+    # making a request with non-existent data
+    #================================================
+    payload = {
+        "email": 'johndoe@gmail.com',
+        "username": "johndoe",
+        **beta_token_dict,
+        "user_role": "agent",
     }
     response = await httpx_client.post(
         "/auth/probe-user-existence",

@@ -15,7 +15,7 @@ from httpx import AsyncClient, ASGITransport
 from property_street_backend.app.main import app
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis, logger
-from property_street_backend.config.redis_connection_manager import get_redis_instance
+from property_street_backend.config.redis_connection_manager import runtime_async_redis
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
 from property_street_backend.app.controllers.cache_expiration.expiry_pubsub_listener import expiry_pubsub_loop_entered 
 from property_street_backend.config.postgres_connection_manager import Base, runtime_async_session_maker, runtime_async_engine
@@ -54,7 +54,7 @@ async def get_test_db__fixture(test_env_var):
 
 @pytest_asyncio.fixture(scope="function")
 async def redis_client__fixture(test_env_var):
-    async with get_redis_instance() as redis_client:
+    async with runtime_async_redis() as redis_client:
         await redis_client.flushdb()
         yield redis_client
 

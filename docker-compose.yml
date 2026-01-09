@@ -106,6 +106,44 @@ services:
     networks:
       - app-network
 
+  celery-worker:
+    image: crankgig/property_street_docker_hub_fastapi_repo:latest
+    container_name: celery-worker
+    command: celery -A property_street_backend.app.celery_config worker --loglevel=info -E
+    env_file:
+      - .env.backend
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A property_street_backend.app.celery_config inspect ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+
+  celery-beat:
+    image: crankgig/property_street_docker_hub_fastapi_repo:latest
+    container_name: celery-beat
+    command: celery -A property_street_backend.app.celery_config beat --loglevel=info
+    env_file:
+      - .env.backend
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A property_street_backend.app.celery_config inspect ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network 
+
 volumes:
   certbot-etc:
   certbot-var:

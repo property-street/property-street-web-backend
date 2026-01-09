@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import User
 from property_street_backend.config.settings import BETA_LAUNCHING
+from property_street_backend.config.settings import REAL_TEST_EMAIL
 from property_street_backend.app.controllers.auth.services import generate_beta_signup_link
 
 @pytest.mark.asyncio
@@ -18,7 +19,7 @@ async def test_send_and_confirm_email_verification_code(client__fixture):
     # Define the post data for sending the email verification code
     beta_token = (await generate_beta_signup_link(redis_client))['token']
     send_code_data = {
-        "email": "crankgig@gmail.com",
+        "email": REAL_TEST_EMAIL,
         "username": "crank",
         "beta_token": beta_token if BETA_LAUNCHING else None,
     }
@@ -70,7 +71,7 @@ async def test_send_and_confirm_email_verification_code(client__fixture):
     #=======================
     confirm_code_data = {
         "email": send_code_data["email"],
-        "code": verification_code.decode('utf-8'),
+        "code": verification_code,
     }
     # Confirm the verification code with correct data
     response = await httpx_client.post(

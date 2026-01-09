@@ -57,7 +57,7 @@ async def test_db_persistence_multi_session(
 @pytest.mark.asyncio
 async def test_redis_connectivity(redis_client__fixture):
     redis_client: Redis = redis_client__fixture
-    assert redis_client.connection_pool.connection_kwargs['db'] == TEST_REDIS_CACHE_DB
+    assert redis_client.connection_pool.connection_kwargs['db'] == 2
     assert isinstance(redis_client, Redis)
 
 
@@ -78,7 +78,7 @@ async def test_client_connectivity(client__fixture):
 
     # make assertions for the test redis_client
     assert isinstance(redis_client, Redis)
-    assert redis_client.connection_pool.connection_kwargs['db'] == 1
+    assert redis_client.connection_pool.connection_kwargs['db'] == 2
     
     # assertions for client
     assert isinstance(http_client, AsyncClient)

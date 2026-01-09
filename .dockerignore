@@ -110,3 +110,6 @@ utility_scripts/
 tests/
 z.ini
 propertystreet_instance_key.pem
+run_dev.sh
+postgres_image/
+docker-compose.yml

@@ -15,8 +15,10 @@ from . import verify_password, pwd_context
 from property_street_backend.config import env_is_test
 from property_street_backend.app.schemas.auth_schemas import (
     TokenData, 
+    SendEmailCodeSchema,
     UserRegistrationSchema, 
-    SignupCodeVerificationSchema
+    ProbeUserExistenceSchema,
+    SignupCodeVerificationSchema,
 )
 from property_street_backend.app.initiator import logger
 from property_street_backend.app.utils.store import (
@@ -39,6 +41,7 @@ from property_street_backend.config import env_is_test
 from property_street_backend.app.database import get_db
 from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.log_config.logger_config import log_error
+from property_street_backend.app.controllers.actors.enums import UserRoleChoice
 
 # Constants for JWT
 SECRET_KEY = JWT_SECRET_KEY
@@ -95,8 +98,8 @@ async def authenticate_user(db: AsyncSession, login: str, password: str) -> User
 
     return user
 
-async def check_beta(redis_client: Redis, token: str) -> None:
-    if BETA_LAUNCHING:
+async def check_beta(redis_client: Redis, token: str, role: UserRoleChoice) -> None:
+    if BETA_LAUNCHING and role == UserRoleChoice.agent:
         if not token: 
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -109,12 +112,12 @@ async def check_beta(redis_client: Redis, token: str) -> None:
             )
         
 # user existence
-async def check_username_email_availability(db: AsyncSession, redis_client: Redis, data: dict):
+async def check_username_email_availability(db: AsyncSession, redis_client: Redis, data: ProbeUserExistenceSchema):
     # Check beta
-    await check_beta(redis_client,data.get("beta_token",None))
+    await check_beta(redis_client,data.beta_token, data.user_role)
     
-    username = data['username']
-    email = data['email']
+    username = data.username
+    email = data.email
     
     # Check if the username exists
     username_query = await db.execute(
@@ -274,16 +277,16 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_db)):
 
 
 async def send_email_verification_code(
-    requester_data: dict, 
+    requester_data: SendEmailCodeSchema, 
     redis_client: redis.Redis,
     ttl_in_secs: int,
 ):
     # Check beta
-    beta_token = requester_data.get("beta_token",None)
-    await check_beta(redis_client,beta_token)
+    beta_token = requester_data.beta_token
+    await check_beta(redis_client,beta_token,requester_data.user_role)
     
-    email_address = requester_data['email']
-    user_name = requester_data['username']
+    email_address = requester_data.email
+    user_name = requester_data.username
     reason = "email_verification"
 
     """
@@ -456,42 +459,22 @@ async def confirm_email_verification_code_and_sign_user_up(
             detail="Invalid verification code."
         )
 
-    # get the client type User or Agent
-    user_role = requester_data.role.lower()
-
-    # extracting names from the fullname
-    name_list = requester_data.fullname.split()
-    
-    # adding the first_name
-    first_name = name_list[0]
-
+    role = requester_data.user_role,
     user_data = UserRegistrationSchema(
         email = email_address,
         username = requester_data.username,
         password = requester_data.password,
-        role = user_role,
-        first_name = first_name,
+        role = role,
+        first_name = requester_data.first_name,
+        last_name = requester_data.last_name,
+        other_names = requester_data.other_names,
     )
-    
-    # adding last_name
-    if len(name_list) == 2:
-        user_data.last_name = name_list[-1]
-    
-    # Adding other_names (middle names or any names between the first and last)
-    if len(name_list) >= 3:
-        user_data.other_names = " ".join(name_list[1:-1])
 
-    if user_role == 'client':
+    if role == 'client':
         # Create the new user instance
-        created_client = await create_user(
-            db = db,
-            user_data = user_data   
-        ) 
-    elif user_role == 'agent':
-        created_client = await create_agent(
-            db = db,
-            user_data = user_data
-        )
+        created_client = await create_user( db, user_data ) 
+    elif role == 'agent':
+        created_client = await create_agent( db, user_data )
 
 
     try:

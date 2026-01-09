@@ -34,7 +34,6 @@ from property_street_backend.app.controllers.roommate_finder import routes as ro
 from property_street_backend.app.routers import (
     google_oauth,
 )
-from property_street_backend.config.postgres_connection_manager import get_postgres_instance
 from property_street_backend.app.initiator import (
     app, 
     get_redis,
@@ -43,15 +42,18 @@ from property_street_backend.config.settings import (
     ENVIRONMENT as environment,
     CORS_ORIGINS,
 )
+from property_street_backend.config.redis_connection_manager import runtime_async_redis
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
+from property_street_backend.config.postgres_connection_manager import runtime_async_session_maker
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
-    async with get_postgres_instance() as session:
+    AsyncSession = runtime_async_session_maker()
+    async with AsyncSession() as session:
         await ensure_admin_user(session)
-    async for redis_client in get_redis():
+    async with runtime_async_redis() as redis_client:
         (
             listener_task, 
             stop_event, 

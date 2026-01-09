@@ -2,6 +2,7 @@ from typing import Optional, Literal
 from pydantic import BaseModel, ConfigDict
 
 from property_street_backend.app.controllers.activity.schemas import UserUIMetaDataSchema
+from property_street_backend.app.controllers.actors.enums import UserRoleChoice
 
 
 class Email(BaseModel):
@@ -24,11 +25,13 @@ class ProbeUserExistenceSchema(BaseModel):
     username: str
     email: str
     beta_token: Optional[str] = None
+    user_role: UserRoleChoice = UserRoleChoice.user
 
 class SendEmailCodeSchema(BaseModel):
     email: str
     username: str
     beta_token: Optional[str] = None
+    user_role: UserRoleChoice = UserRoleChoice.user
 
 class UserRegistrationSchema(BaseModel):
     email: str
@@ -37,7 +40,7 @@ class UserRegistrationSchema(BaseModel):
     first_name: str
     last_name: Optional[str] = None
     other_names: Optional[str] = None
-    user_role: Optional[Literal['user','agent']] = None
+    user_role: Optional[Literal[UserRoleChoice.user,UserRoleChoice.agent]] = UserRoleChoice.user
     # Add other fields as needed
 
 class AgentRegistrationSchema(UserRegistrationSchema):

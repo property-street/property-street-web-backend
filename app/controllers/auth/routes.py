@@ -67,7 +67,7 @@ async def probe_user_existence(
     redis_client: Redis = Depends(get_redis),  
     db: AsyncSession = Depends(get_db)
 ):
-    return await check_username_email_availability(db, redis_client, data.model_dump())
+    return await check_username_email_availability(db, redis_client, data)
 
 
 # send email verification for signup endpoint
@@ -78,7 +78,7 @@ async def send_email_verification_code(
     expiry_time_in_secs: int = Depends(email_verification_code_ttl)
 ):
     return await controller_send_email_verification_code(
-        requester_data = data.model_dump(),
+        requester_data = data,
         redis_client = redis_client,
         ttl_in_secs = expiry_time_in_secs
     )
