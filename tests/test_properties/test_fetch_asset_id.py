@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from .test_create_asset import create_test_asset
-from property_street_backend.app.controllers.assets.schemas import AssetResponseSchema
+from property_street_backend.app.controllers.assets.schemas import PropertyResponseSchema
 from property_street_backend.tests.auth.test_user_creation import create_test_user
 
 @pytest.mark.asyncio
@@ -27,7 +27,7 @@ async def test_fetch_asset_by_id(client__fixture):
         f"/assets/{test_asset.id}"
     )
     assert response.status_code == 200
-    AssetResponseSchema.model_validate(response.json())
+    PropertyResponseSchema.model_validate(response.json())
 
 
     # Test for a non-existent asset ID

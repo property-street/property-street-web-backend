@@ -10,7 +10,10 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 
-from .schemas import AssetResponseSchema
+from .schemas import (
+    PropertyResponseSchema,
+    PartialPropertyResponseSchema,
+)
 from property_street_backend.app.models import (
     User,
     Asset, 
@@ -54,7 +57,7 @@ async def validate_assets(
 
     for asset in assets:
         try:
-            validated_asset = AssetResponseSchema.model_validate(asset)
+            validated_asset = PropertyResponseSchema.model_validate(asset)
             if verified_only and not validated_asset.verified:
                 continue
             valid_assets.append(validated_asset)
@@ -68,7 +71,7 @@ async def validate_assets(
                 )
                 refreshed_asset = result.scalars().one()
                 valid_assets.append(
-                    AssetResponseSchema.model_validate(refreshed_asset)
+                    PropertyResponseSchema.model_validate(refreshed_asset)
                 )
             except:
                 skipped_assets.append(asset_id)
@@ -102,19 +105,19 @@ async def fetch_latest_assets(
     )
 
     if newly_created_asset_cache_dict:
-        asset_list = list(newly_created_asset_cache_dict.values())
-        asset_list.reverse()
+        property_list = list(newly_created_asset_cache_dict.values())
+        property_list.reverse()
 
         # Get portion from cache
-        cache_slice = asset_list[offset:offset + size]
+        cache_slice = property_list[offset : offset + size]
         results.extend(cache_slice)
 
         # Record their IDs to skip in DB fetch
-        for asset in cache_slice:
-            if isinstance(asset, dict):
-                seen_ids.add(asset.get("id"))
+        for property in cache_slice:
+            if isinstance(property, dict):
+                seen_ids.add(property.get("id"))
             else:
-                seen_ids.add(getattr(asset, "id", None))
+                seen_ids.add(getattr(property, "id", None))
 
     cache_result_length = len(results)
     size -= cache_result_length
@@ -189,11 +192,81 @@ async def fetch_agent_assets(
         )
     
 
+async def handle_get_all_properties(
+    db: AsyncSession,
+    page: int,
+    size: int
+) -> List[PartialPropertyResponseSchema]:
+    """Returns all properties
+
+    Args:
+        db (AsyncSession): Postgress session
+        page (int): pagination track
+        size (int): pagination size
+
+    Returns:
+        _type_: a list of properties type
+    """
+    try:
+        offset = (page-1) * size
+        properties = (await db.execute(
+            eager_asset_load()
+            .offset(offset)
+            .limit(size)
+        )).scalars().all()
+        return properties
+    except Exception as e:
+        f_msg = "An error occured while retrieving all properties."
+        d_msg = f"{f_msg} Reason {e}" 
+        if DEBUG:
+            logger.error(d_msg)
+        log_message('error', d_msg)
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = f_msg
+        )
+
+async def handle_get_all_verified_properties(
+    db: AsyncSession,
+    page: int,
+    size: int
+) -> List[PropertyResponseSchema]:
+    """Returns all verified properties
+
+    Args:
+        db (AsyncSession): Postgress session
+        page (int): pagination track
+        size (int): pagination size
+
+    Returns:
+        _type_: a list of properties type
+    """
+    try:
+        offset = (page-1) * size
+        properties = (await db.execute(
+            eager_asset_load()
+            .offset(offset)
+            .limit(size)
+        )).scalars().all()
+        v_assets, _ = await validate_assets(db, properties, verified_only=True)
+        return v_assets
+    except Exception as e:
+        f_msg = "An error occured while retrieving verified properties."
+        d_msg = f"{f_msg} Reason {e}" 
+        if DEBUG:
+            logger.error(d_msg)
+        log_message('error', d_msg)
+        raise HTTPException(
+            status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail = f_msg
+        )
+    
+
 async def get_unverified_properties(
     db: AsyncSession,
     page: int,
     size: int
-) -> List[AssetResponseSchema]:
+) -> List[PropertyResponseSchema]:
     """Returns unverified properties
 
     Args:

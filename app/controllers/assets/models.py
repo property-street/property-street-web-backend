@@ -20,7 +20,11 @@ from .enums import AvailabilityStatus
 from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.app.models_helper import AbstractCloudImage
 from property_street_backend.config.postgres_connection_manager import Base
-from property_street_backend.config.settings import BETA_LAUNCHING, BETA_LAUNCH_PROPERTY_LIMIT
+from property_street_backend.config.settings import (
+    BETA_LAUNCHING, 
+    BETA_LAUNCH_PROPERTY_LIMIT,
+    UNLIMITED_BETA_AGENTS_EMAILS
+)
 
 
 class Asset(Base):
@@ -174,7 +178,7 @@ def validate_agent_and_check_beta_limit(mapper, connection, target):
 
     # --- Validate agent_id exists ---
     if not target.agent_id:
-        raise ValueError("Asset must be assigned to an agent.")
+        raise ValueError("Property must be assigned to an agent.")
 
     # --- Fetch agent data (SCALAR, SAFE) ---
     agent_row = connection.execute(
@@ -182,13 +186,14 @@ def validate_agent_and_check_beta_limit(mapper, connection, target):
             User.id,
             User.username,
             User.user_role,
+            User.email,
         ).where(User.id == target.agent_id)
     ).one_or_none()
 
     if not agent_row:
         raise ValueError(f"No agent found with ID {target.agent_id}.")
 
-    agent_id, username, role = agent_row
+    agent_id, username, role, email = agent_row
 
     # --- Validate role ---
     if role not in ("staff", "agent", "admin"):
@@ -202,7 +207,7 @@ def validate_agent_and_check_beta_limit(mapper, connection, target):
             select(func.count(Asset.id)).where(Asset.agent_id == agent_id)
         ).scalar_one()
 
-        if asset_count >= BETA_LAUNCH_PROPERTY_LIMIT:
+        if asset_count >= BETA_LAUNCH_PROPERTY_LIMIT and email not in UNLIMITED_BETA_AGENTS_EMAILS:
             raise ValueError(
                 f"Beta mode agent '{username}' has reached the 5-asset limit."
             )

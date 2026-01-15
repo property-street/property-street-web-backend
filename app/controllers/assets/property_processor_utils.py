@@ -22,11 +22,13 @@ from property_street_backend.app.models import (
 )
 from property_street_backend.config.settings import (
     DEBUG,
+    TEAM_EMAIL,
     ADMIN_EMAIL,
     BETA_LAUNCHING,
     REAL_TEST_EMAIL,
     NEWLY_CREATED_ASSET_TTL,
     BETA_LAUNCH_PROPERTY_LIMIT,
+    UNLIMITED_BETA_AGENTS_EMAILS,
     TEST_NEWLY_CREATED_ASSET_TTL,
 )
 from property_street_backend.app.utils.store import (
@@ -65,7 +67,7 @@ async def notify_admin_on_new_property(property: Asset):
             html = substituted_string(
                 template or "New property ${property_title}",
                 {
-                    'agent_name': f'Agent {property.agent.username}',
+                    'agent_name': f'Agent {property.agent.username.title()}',
                     'property_title': property.title,
                     'property_location': property_location,
                     'property_price': str(property.price),
@@ -93,7 +95,8 @@ async def check_limit_exceeded(
     property_count = (await db.execute(
         select(func.count(Asset.id)).where(Asset.agent_id == agent.id)
     )).scalar_one()
-    if property_count >= BETA_LAUNCH_PROPERTY_LIMIT:
+    unlimited_beta_agents_emails = [*UNLIMITED_BETA_AGENTS_EMAILS,TEAM_EMAIL]
+    if property_count >= BETA_LAUNCH_PROPERTY_LIMIT and agent.email not in unlimited_beta_agents_emails:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail = f"Property limit has reached for beta mode. 5 per agent."

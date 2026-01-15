@@ -21,6 +21,7 @@ from property_street_backend.app.database import (
 from property_street_backend.app.controllers.auth import routes as auth_routes
 from property_street_backend.app.controllers.chat import routes as chat_routes
 from property_street_backend.app.controllers.ws_init import routes as ws_routes
+from property_street_backend.app.controllers.admin import routes as admin_routes
 from property_street_backend.app.controllers.auth.utils import ensure_admin_user
 from property_street_backend.app.controllers.search import routes as search_routes
 from property_street_backend.app.controllers.actors import routes as actors_routes
@@ -130,6 +131,11 @@ async def test_database(
         }
 
 # Include routers
+app.include_router(
+    admin_routes.router,
+    prefix="/admin",
+    tags=["Admin"]
+)
 app.include_router(home_router)
 app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)

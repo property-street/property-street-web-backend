@@ -358,7 +358,8 @@ async def send_email_verification_code(
         await redis_client.expire(user_key, int(ttl_in_secs)) 
 
         # delete beta key if beta mode
-        await redis_client.delete(beta_token)
+        if beta_token:
+            await redis_client.delete(beta_token)
 
         return {
             "message":"A new verification code has been sent to your email.",
@@ -369,7 +370,6 @@ async def send_email_verification_code(
         d_msg = f"{f_msg}. Reason: {e}"
         if DEBUG:
             logger.error(d_msg)
-        logger.error(d_msg)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f_msg,

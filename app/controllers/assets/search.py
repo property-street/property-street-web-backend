@@ -53,6 +53,7 @@ async def search_assets(query_data: Dict[str, Any]) -> List[PropertySearchRespon
             .join(Area, Asset.area_id == Area.id)
             .join(Asset.tags, isouter=True)
             .where(where_clause)
+            .where(Asset.verified.is_(True))
             .distinct()
             .limit(20)
         )

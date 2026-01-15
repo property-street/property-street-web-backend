@@ -127,11 +127,16 @@ class PatchPropertySchema(FlatFieldsPatchSchema,UtilitySchemaMixin):
     unfeatured_images: Optional[List[CloudImagePatchSchema]] = None
 
 
+partial_property_response = make_optional(PropertyResponseSchema)
+class PartialPropertyResponseSchema(partial_property_response):
+    pass
+
+
 class LatestAssetsFetchResponseSchema(ConfigDictSetter):
     assets: List[PropertyResponseSchema]
 
 class PropertySearchResponse(BaseModel):
     type: str = 'property'
-    data: AssetResponseSchema
+    data: PropertyResponseSchema
 
 SearchList = List[PropertySearchResponse]

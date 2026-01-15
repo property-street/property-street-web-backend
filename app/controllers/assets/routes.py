@@ -9,9 +9,9 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from .services import (
     eager_asset_load,
     fetch_agent_assets,
+    handle_delete_property,
     get_unverified_properties,
     update_verification_state,
-    handle_delete_property,
 )
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import (
@@ -25,7 +25,7 @@ from property_street_backend.app.controllers.auth.services import (
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.controllers.assets.schemas import (
     PropertySchema,
-    AssetResponseSchema,
+    PropertyResponseSchema,
     PatchPropertySchema,
     PropertyResponseSchema,
 )
@@ -36,7 +36,7 @@ from property_street_backend.app.controllers.assets.services import fetch_latest
 router = APIRouter(prefix="/assets", tags=["assets"])
 
 
-@router.get("/latests", response_model=List[AssetResponseSchema])
+@router.get("/latests", response_model=List[PropertyResponseSchema])
 async def latest(
     session: AsyncSession = Depends(get_db),
     redis_client: Redis = Depends(get_redis),
@@ -74,7 +74,7 @@ async def update_property_endpoint(
     return await handle_property_create_update(data, db, redis_client, agent, newly_created=False)
 
 
-@router.get("/agent-assets/{agent_id}", response_model=List[AssetResponseSchema])
+@router.get("/agent-assets/{agent_id}", response_model=List[PropertyResponseSchema])
 async def retrieve_agent_assets(
     agent_id: int,
     session: AsyncSession = Depends(get_db),
@@ -90,7 +90,7 @@ async def retrieve_agent_assets(
     )
     
 
-@router.get("/my-properties", response_model=List[AssetResponseSchema])
+@router.get("/my-properties", response_model=List[PropertyResponseSchema])
 async def retrieve_agent_assets(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
@@ -105,7 +105,7 @@ async def retrieve_agent_assets(
     )
     
 
-@router.get("/{asset_id}", response_model=AssetResponseSchema)
+@router.get("/{asset_id}", response_model=PropertyResponseSchema)
 async def fetch_asset_by_id(
     asset_id: int,  # Accept asset ID as a path parameter
     session: AsyncSession = Depends(get_db),
@@ -131,7 +131,7 @@ async def fetch_asset_by_id(
     return asset
 
 
-@router.get("/unverified-properties/", response_model=List[AssetResponseSchema])
+@router.get("/unverified-properties/", response_model=List[PropertyResponseSchema])
 async def unverified_properties(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
@@ -141,7 +141,7 @@ async def unverified_properties(
     return await get_unverified_properties(db,page,size)
 
 
-@router.post("/confirm-verification/{asset_id}/", response_model=AssetResponseSchema)
+@router.post("/confirm-verification/{asset_id}/", response_model=PropertyResponseSchema)
 async def confirm_verification(
     asset_id: int,
     db: AsyncSession = Depends(get_db),
@@ -151,7 +151,7 @@ async def confirm_verification(
     return await update_verification_state(asset_id, db, 'verify')
 
 
-@router.post("/cancel-verification/{asset_id}/", response_model=AssetResponseSchema)
+@router.post("/cancel-verification/{asset_id}/", response_model=PropertyResponseSchema)
 async def cancel_verification_route(
     asset_id: int,
     db: AsyncSession = Depends(get_db),
