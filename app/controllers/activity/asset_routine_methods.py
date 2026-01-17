@@ -3,6 +3,7 @@ from datetime import datetime
 from redis.asyncio import Redis
 
 from property_street_backend.app.initiator import logger
+from property_street_backend.config.settings import DEBUG
 from property_street_backend.log_config.logger_config import (
     log_message
 )
@@ -73,7 +74,8 @@ async def create_or_update_newly_created_asset_cache(
             log_type = 'success',
             message = s_message
         )
-        logger.info(s_message)
+        if DEBUG:
+            logger.info(s_message)
 
     except Exception as e:
         e_message=f"Error caching asset {asset_id}: {e}"
@@ -81,4 +83,5 @@ async def create_or_update_newly_created_asset_cache(
             log_type = 'success',
             message = e_message
         )
-        logger.error(e_message)
+        if DEBUG:
+            logger.error(e_message)

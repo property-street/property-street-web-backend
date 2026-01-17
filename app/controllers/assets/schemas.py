@@ -1,5 +1,7 @@
+from decimal import Decimal
 from datetime import datetime
 from typing import List, Optional
+from typing_extensions import Annotated
 from pydantic import BaseModel, ConfigDict, Field, model_validator, condecimal
 
 from property_street_backend.app.controllers.actors.schemas import AgentResponseSchema
@@ -69,16 +71,24 @@ class TagSchemaResponse(TagSchema):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
+
 class FlatPropertyFields(BaseModel):
     id: Optional[int] = None
     title: str = Field(..., description="The title of the asset")
     currency: str = Field(..., description="The currency used for the asset's price (e.g., USD, EUR)")
-    price: condecimal(max_digits=15, decimal_places=2) = Field(..., description="The monetary value of the asset")
+    price: Annotated[
+        Decimal,
+        Field(
+            max_digits=15,
+            decimal_places=2,
+            description="The monetary value of the asset",
+        ),
+    ] = Field(..., description="The monetary value of the asset")
     lease_duration: Optional[str] = Field(None, description="The lease duration of the asset, if it's a lease.")
     description: str = Field(..., description="A detailed description of the asset, possibly in HTML")
     category: str = Field(..., description="The category of the asset (e.g., House, Hotel)")
     status: str = Field(..., description="The status of the asset (e.g., Available, Sold)")
-    availability: str = Field('available', description="availability status")
+    listing_type: str = Field('available', description="availability status")
     agent_id: int
 
 FlatPropertyFieldsPatch = make_optional(FlatPropertyFields)

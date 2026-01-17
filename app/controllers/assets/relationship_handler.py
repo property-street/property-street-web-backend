@@ -1,9 +1,9 @@
-from typing import Dict, Any
 from sqlalchemy.future import select
 from sqlalchemy.inspection import inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import RelationshipProperty
 from property_street_backend.app.initiator import logger
+from typing import Dict, Any, Callable, Optional, Union, Awaitable
 
 def normalize_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     """Ensures consistency: convert nested dicts, primitives, lists, relationships."""
@@ -233,8 +233,12 @@ class RelationshipExecutor:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
 
+ExtraHook = Union[
+    Callable[[Any], None],
+    Callable[[Any], Awaitable[None]],
+]
 
-async def apply_model(model_cls, db: AsyncSession, data: dict, instance=None):
+async def apply_model(model_cls, db: AsyncSession, data: dict, instance=None, extra_before_commit: Optional[ExtraHook] = None):
     normalized = normalize_payload(data)
 
     if instance is None:
@@ -242,6 +246,12 @@ async def apply_model(model_cls, db: AsyncSession, data: dict, instance=None):
 
     executor = RelationshipExecutor(db)
     await executor.apply(instance, normalized)
+
+    if extra_before_commit:
+        result = extra_before_commit(instance)
+        if hasattr(result, "__await__"):
+            await result
+
 
     await db.flush()
     await db.commit()

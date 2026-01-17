@@ -22,6 +22,6 @@ asset_data_template = {
     "description":"Test description",
     "category":"House",
     "status":"auction",
-    "availability":"available",
+    "listing_type":"Rent",
 }
 tags_template = [{"name":"house"}, {"name":"condo"}]
