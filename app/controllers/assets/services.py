@@ -157,7 +157,6 @@ async def fetch_latest_assets(
     return valid_assets
 
 
-
 async def fetch_agent_assets(
     session: AsyncSession,
     size: int,
@@ -195,7 +194,9 @@ async def fetch_agent_assets(
 async def handle_get_all_properties(
     db: AsyncSession,
     page: int,
-    size: int
+    size: int,
+    verified_only: bool = False,
+    from_latest: bool = True,
 ) -> List[PartialPropertyResponseSchema]:
     """Returns all properties
 
@@ -209,11 +210,16 @@ async def handle_get_all_properties(
     """
     try:
         offset = (page-1) * size
-        properties = (await db.execute(
+        query = (
             eager_asset_load()
+            .order_by(Asset.created_at.desc() if from_latest else Asset.created_at.asc())
             .offset(offset)
             .limit(size)
-        )).scalars().all()
+        )
+        if verified_only:
+            query = query.where(Asset.verified == verified_only)
+
+        properties = (await db.execute(query)).scalars().all()
         return properties
     except Exception as e:
         f_msg = "An error occured while retrieving all properties."
@@ -225,6 +231,7 @@ async def handle_get_all_properties(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail = f_msg
         )
+
 
 async def handle_get_all_verified_properties(
     db: AsyncSession,

@@ -23,5 +23,6 @@ asset_data_template = {
     "category":"House",
     "status":"auction",
     "listing_type":"Rent",
+    "lease_duration": "12 months"
 }
 tags_template = [{"name":"house"}, {"name":"condo"}]

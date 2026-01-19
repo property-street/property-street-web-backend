@@ -1,4 +1,5 @@
 import json
+import asyncio
 import pytest
 from typing import List
 from sqlalchemy import select
@@ -17,8 +18,13 @@ from property_street_backend.app.models import (
     CloudImageDetail,
 )
 from property_street_backend.app.initiator import logger
+from property_street_backend.config.settings import ADMIN_EMAIL
 from property_street_backend.tests.auth.test_create_agent import (
     create_test_agent
+)
+from property_street_backend.app.controllers.activity import (
+    auto_category_hset_key,
+    newly_created_asset_set_key, 
 )
 from property_street_backend.tests.activity.test_controller.test_objects import (
     area_template,
@@ -26,10 +32,8 @@ from property_street_backend.tests.activity.test_controller.test_objects import 
 )
 from property_street_backend.app.controllers.assets.services import eager_asset_load
 from property_street_backend.app.controllers.assets.schemas import AssetResponseSchema
-from property_street_backend.app.controllers.activity import (
-    auto_category_hset_key,
-    newly_created_asset_set_key, 
-)
+from property_street_backend.tests.test_properties.test_processing import property_payload
+from property_street_backend.app.controllers.assets.relationship_handler import apply_model
 
 
 def pre_commit_test_asset_collection(agent_id: int ,size: int = 10) -> List[Asset]: 
@@ -74,60 +78,46 @@ def pre_commit_test_asset_collection(agent_id: int ,size: int = 10) -> List[Asse
 async def test_latest_collection(client__fixture):
 
     # Unpack the client and test database from the fixture
-    async for fixture_obj in client__fixture:
-        httpx_client: AsyncClient = fixture_obj['http_client'] 
-        test_db: AsyncSession = fixture_obj['db']
-        redis_client: Redis = fixture_obj['redis_client']
-        break
+    httpx_client: AsyncClient = client__fixture['http_client'] 
+    test_db: AsyncSession = client__fixture['db']
+    redis_client: Redis = client__fixture['redis_client']
 
-    # Create a test agent/user
+    # Create a test agent, give it a more prioritize email
     created_agent: User = await create_test_agent(test_db)
+    created_agent.email = ADMIN_EMAIL
+    test_db.add(created_agent)
+    await test_db.commit()
+    await test_db.refresh(created_agent)
 
     # Create 10 assets
-    test_assets = pre_commit_test_asset_collection(created_agent.id)
+    test_properties = []
+    for _ in range(10):
+        payload = property_payload(created_agent.id)
+        inst = await apply_model(Asset, test_db, payload)
+        assert inst is not None
+        test_properties.append(inst)
+        await asyncio.sleep(1)
 
-    # Save the last 5 asset to the database
-    test_db.add_all(test_assets[:5])
+    # Loop through the first five, save to the cache
+    # properties_to_cache = {}
+    # for property in test_properties[:5]:
+    #     dumped_property = AssetResponseSchema.model_validate(property).model_dump()
+    #     properties_to_cache[dumped_property['id']] = dumped_property
+    # 
+    # await redis_client.hset(
+    #     auto_category_hset_key, 
+    #     newly_created_asset_set_key, 
+    #     json.dumps(properties_to_cache)
+    # )
 
-    # Loop through the first five, 
-    # add an id, has_features attribute
-    # and validate em against the Schema class
-    # and save to the cache
-    assets_to_cache = {}
-    for asset in test_assets[5:]:
-        test_db.add(asset)
-        await test_db.flush()
-        await test_db.refresh(asset)
+    # Verify the last five, an persist
+    verified_properties = []
+    for property in test_properties[5:]:
+        property.verified = True
+        verified_properties.append(property)
+    test_db.add_all(verified_properties)
+    await test_db.commit()
 
-        stmt = (
-            eager_asset_load()
-            .where(Asset.id == asset.id)
-        )
-        result = await test_db.execute(stmt)
-        queried_asset = result.scalars().first()
-        if not queried_asset:
-            raise Exception(message="Queried asset not unavailable") 
-        
-        schematized_asset = AssetResponseSchema.model_validate(queried_asset)
-        schematized_asset_dict = schematized_asset.model_dump()
-        assets_to_cache[schematized_asset_dict['id']] = schematized_asset_dict
-    
-    await redis_client.hset(
-        auto_category_hset_key, 
-        newly_created_asset_set_key, 
-        json.dumps(assets_to_cache)
-    )
-
-
-    cloud_image_detail = {
-        "cloud_asset_id":"dkajdlkajdlkajsdkfjasldkfj",
-        "format":"jpg",
-        "bytes":102400,
-        "height":800,
-        "public_id":f"test_image",
-        "secure_url":"https://example.com/test_image.jpg",
-        "width":600,
-    }
     # construct payload
     payload = {
         'area': {
@@ -139,7 +129,7 @@ async def test_latest_collection(client__fixture):
         'max_roomies': 4,
         'room_images': [
             {
-                **cloud_image_detail,
+                **cloud_image_template,
                 "cloud_asset_id":f"dkajdlkajdlkajsdkfjasldkfj{i}",
                 "public_id":f"test_image_{i}",
             } for i in range(3)
@@ -171,8 +161,13 @@ async def test_latest_collection(client__fixture):
     await test_db.flush()
 
 
-    response = await httpx_client.get(f"/activity/latest-collection")
+    response = await httpx_client.get(
+        f"/activity/latest-collection",
+        headers = { "Authorization": "Bearer " } 
+    )
     assert response.status_code == 200
     response_json = response.json()
-    assert len(response_json['properties']) == 10
-    assert len(response_json['roommates_requests']) == roommates_request_size
+    properties = response_json['properties']
+    assert len(properties['latests']) == 5
+    assert len(properties['all']) == 5
+    assert len(response_json['roommates_finder']['requests']) == roommates_request_size

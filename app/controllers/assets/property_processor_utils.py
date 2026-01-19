@@ -51,11 +51,11 @@ def property_create_persistence_ttl() -> int:
     Returns:
         int: time in seconds
     """
-    (TEST_NEWLY_CREATED_ASSET_TTL 
+    return (TEST_NEWLY_CREATED_ASSET_TTL 
         if env_is_test() else 
     NEWLY_CREATED_ASSET_TTL)
 
-async def notify_admin_on_new_property(property: Asset):
+def notify_admin_on_new_property(property: Asset, new: bool = True):
     try:
         admin_email = REAL_TEST_EMAIL if DEBUG else ADMIN_EMAIL 
 
@@ -65,8 +65,10 @@ async def notify_admin_on_new_property(property: Asset):
             property_view_link = f"{host}/properties/{property.title}/{property.id}"
             property_location = f"{property.area.street}, {property.area.city_or_town}" if property.area else ""
             html = substituted_string(
-                template or "New property ${property_title}",
+                template or ("New property ${property_title}" if new else "Updated property ${property_title}"),
                 {
+                    'title': 'New property created' if new else 'Updated property',
+                    'message': 'A new property has been created' if new else 'A property has been updated',
                     'agent_name': f'Agent {property.agent.username.title()}',
                     'property_title': property.title,
                     'property_location': property_location,
@@ -80,12 +82,12 @@ async def notify_admin_on_new_property(property: Asset):
             send_email(
                 from_email='support@propertystreet.ng',
                 from_name='Property street',
-                subject='New property created',
+                subject='New property created' if new else 'Property updated',
                 to_email=admin_email,
                 html_email=html,
             )
     except Exception as e:
-        logger.error(f"Failed to send new property notification: {e}")
+        logger.error(f"Failed to send new or update property notification: {e}")
 
 
 async def check_limit_exceeded(
@@ -95,7 +97,7 @@ async def check_limit_exceeded(
     property_count = (await db.execute(
         select(func.count(Asset.id)).where(Asset.agent_id == agent.id)
     )).scalar_one()
-    unlimited_beta_agents_emails = [*UNLIMITED_BETA_AGENTS_EMAILS,TEAM_EMAIL]
+    unlimited_beta_agents_emails = UNLIMITED_BETA_AGENTS_EMAILS
     if property_count >= BETA_LAUNCH_PROPERTY_LIMIT and agent.email not in unlimited_beta_agents_emails:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -133,9 +135,29 @@ async def handle_property_create_update(
     property = await db.get(Asset,data.id) if getattr(data,'id') else None
 
     try:
-        payload = data.model_dump(exclude_none=True)
+        # Remove unaccounted None entries
+        ALLOWED_NONE_FIELDS = {"lease_duration"}
+        payload = {
+            k: v
+            for k, v in data.model_dump().items()
+            if v is not None or k in ALLOWED_NONE_FIELDS
+        }
+
         # logger.info(f"**Payload: {payload}")
-        result = await apply_model(Asset, db, payload, instance=property)
+
+        # Preparation of extra before commit function
+        extra_before_commit = None
+        if not newly_created:
+            def extra(instance: Asset):
+                instance.datetime_declined = None
+                instance.verified = False
+            extra_before_commit = extra 
+
+        # Application of data
+        result: Asset = await apply_model(
+            Asset, db, payload, instance=property,
+            extra_before_commit=extra_before_commit
+        )
         property = (await db.execute(
             eager_asset_load()
             .where(Asset.id == result.id)
@@ -154,7 +176,7 @@ async def handle_property_create_update(
             status_code = status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail = "An error occurred while creating the property."
         )
-    # logger.info(f"**Validated Features: {[AssetFeatureResponseSchema.model_validate(feature) for feature in property.features]}")
+    
     # ===============
     # Handle caching
     # ===============
@@ -168,14 +190,14 @@ async def handle_property_create_update(
             newly_created = True,
             expiry_seconds = ttl_in_seconds,
         )
-        if newly_created:
-            await notify_admin_on_new_property(property)
     except Exception as e:
         logger.warning(f"Cache update failed: {e}")
         raise
+    
+    # ========================
+    # Handle notification
+    # ========================
+    notify_admin_on_new_property(property, newly_created)
 
-    # ========================
-    # Handle loggging
-    # ========================
             
     return property

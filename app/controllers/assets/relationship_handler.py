@@ -66,6 +66,10 @@ class RelationshipExecutor:
     def can_delete(self, data: dict) -> bool:
         return data.get("action") == "delete"
 
+    def remove_null_id(self, data: dict) -> None:
+        if 'id' in data and data.get('id') == None:
+            del data['id']
+
     async def rmv_frm_parent(self, *, instance, rel_type, parent=None, rel_name=None):
         # MANY-TO-MANY → unlink only
         if rel_type == "many_to_many":
@@ -97,10 +101,12 @@ class RelationshipExecutor:
 
 
     async def apply(self, instance, normalized_data: dict):
+        # logger.info(f"Instance: {instance}, Normalized data: {normalized_data}")
         transformer = ORMTransformer(instance.__class__, self.db)
 
-        for field, value in normalized_data.items():
+        self.remove_null_id(normalized_data)
 
+        for field, value in normalized_data.items():
             # 1️⃣ Plain column
             if transformer.is_column(field):
                 setattr(instance, field, value)
@@ -139,7 +145,7 @@ class RelationshipExecutor:
             setattr(instance, field, None)
             return
 
-        if isinstance(value, dict) and "id" in value:
+        if isinstance(value, dict) and value.get("id"):
             obj = await self.db.get(related_cls, value["id"])
             
             if self.can_delete(value): # Handle deletion
@@ -167,32 +173,33 @@ class RelationshipExecutor:
         # Collect objects that will be kept after merge
         merged_list = []
 
-        for item in items:
-            # Case 1 → Update via explicit ID
-            if isinstance(item, dict) and "id" in item:
-                obj = existing_by_id.get(item["id"]) or await self.db.get(related_cls, item["id"])
-                if self.can_delete(item): # Handle deletion
-                    await self.rmv_frm_parent(
-                        instance=obj,
-                        rel_type=rel_type,
-                        parent=instance,
-                        rel_name=field
-                    )
-                    continue
+        if items:
+            for item in items:
+                # Case 1 → Update via explicit ID
+                if isinstance(item, dict) and item.get("id"):
+                    obj = existing_by_id.get(item["id"]) or await self.db.get(related_cls, item["id"])
+                    if self.can_delete(item): # Handle deletion
+                        await self.rmv_frm_parent(
+                            instance=obj,
+                            rel_type=rel_type,
+                            parent=instance,
+                            rel_name=field
+                        )
+                        continue
+                    else:
+                        await self.apply(obj, item)
+
                 else:
+                    # Case 2 → Attempt to match unique constraints (name, email, slug, etc.)
+                    obj = await self._find_existing_match(related_cls, item)
+
+                    # Case 3 → No match → create new instance
+                    if not obj:
+                        obj = related_cls()
+
                     await self.apply(obj, item)
 
-            else:
-                # Case 2 → Attempt to match unique constraints (name, email, slug, etc.)
-                obj = await self._find_existing_match(related_cls, item)
-
-                # Case 3 → No match → create new instance
-                if not obj:
-                    obj = related_cls()
-
-                await self.apply(obj, item)
-
-            merged_list.append(obj)
+                merged_list.append(obj)
 
         # Merge: keep existing items not referenced in the payload
         for existing_obj in existing_list:

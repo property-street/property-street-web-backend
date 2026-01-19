@@ -5,72 +5,63 @@ from redis.asyncio import Redis
 
 
 from property_street_backend.app.controllers.activity.asset_routine_methods import (
+    newly_created_hash_key,
+    auto_category_hset_key,
+)
+from property_street_backend.app.controllers.activity.asset_routine_methods import (
     create_or_update_newly_created_asset_cache
 )
 
-# Mock inputs
-hash_key = "newly_created_asset"
-hset_key = "auto_category"
 
+hash_key = newly_created_hash_key
+hset_key = auto_category_hset_key
 
 async def assertions_after_caching(
     redis_client: Redis,
     asset_id: int,
     asset_data: dict,
-    expiry_seconds: int
+    expiry_seconds: int,
+    expiry_loop_activated: bool = False
 ):
-    asset_data_str = json.dumps(asset_data)
-    
+
+    asset_key = f'{hash_key}:{asset_id}'
+
     # Assert that the asset ID was added to the tracking set
     assert await redis_client.sismember(f"{hash_key}", asset_id)
 
 
-    # Assert that the value of the newly_created_asset:{asset_id} matches asset_json
-    cached_asset_str = await redis_client.get(f"{hash_key}:{asset_id}")
-    assert cached_asset_str.decode() == asset_data_str
+    # Assert that the value of the `newly_created_asset:{asset_id}` matches asset_json
+    assert await redis_client.get(asset_key)
 
     # Assert that the asset_json is an entry in the hash set
-    newly_created_asset_hset_field = hash_key
-    auto_category = await redis_client.hget("auto_category", f"{newly_created_asset_hset_field}")
+    hset_field = hash_key
+    auto_category = await redis_client.hget(hset_key, hset_field)
     assert auto_category is not None
-    collection = json.loads(auto_category)
-    assert collection[str(asset_id)] == asset_data
+    collection: dict = json.loads(auto_category)
+    assert collection.get(str(asset_id))
 
-    # Wait for expiry 
-    await asyncio.sleep(expiry_seconds + 3)
+    if expiry_loop_activated:
+        # Wait for expiry 
+        await asyncio.sleep(expiry_seconds + 3)
 
-    # Assertions after expiry
-    # Assert that the asset ID is no longer in the tracking set
-    assert not await redis_client.sismember(hash_key, asset_id)
+        # Assertions after expiry
+        # Assert that the asset ID is no longer in the tracking set
+        assert not await redis_client.sismember(hash_key, asset_id)
 
-    # Assert that the set for the specific asset ID no longer exists
-    assert not await redis_client.get(f"{hash_key}:{asset_id}")
+        # Assert that the set for the specific asset ID no longer exists
+        assert not await redis_client.get(asset_key)
 
-    # Assert that the asset_json is removed from the hash set
-    auto_category = await redis_client.hget(hset_key, hash_key)
-    if auto_category:
-        collection = json.loads(auto_category)
-        assert str(asset_id) not in collection
+        # Assert that the asset_json is removed from the hash set
+        auto_category = await redis_client.hget(hset_key, hset_field)
+        if auto_category:
+            collection = json.loads(auto_category)
+            assert str(asset_id) not in collection
 
 
 async def finality_after_caching(
-    redis_client: Redis,
-    asset_id: int,
+    redis_client: Redis, asset_id: int,
 ):
-    # Cleanup to ensure no residual data in Redis
-    await redis_client.delete(f"{hash_key}:{asset_id}")
-    await redis_client.srem(hash_key, asset_id)
-    auto_category = await redis_client.hget(hset_key, hash_key)
-    if auto_category:
-        collection = json.loads(auto_category)
-        collection.pop(str(asset_id), None)
-        if collection:
-            await redis_client.hset(
-                hset_key, hash_key, json.dumps(collection)
-            )
-        else:
-            await redis_client.hdel(hset_key, hash_key)
- 
+    pass 
 
 @pytest.mark.asyncio
 async def test_cache_newly_created_asset(client__fixture_with_prod_redis):

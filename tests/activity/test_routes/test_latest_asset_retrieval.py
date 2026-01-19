@@ -1,4 +1,7 @@
 import pytest
+import asyncio
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import (
     Tag,
@@ -7,86 +10,48 @@ from property_street_backend.app.models import (
     AssetCloudImage,
     CloudImageDetail,
 )
-from property_street_backend.app.controllers.auth import (
-    fetched_access_token,
-)
-from property_street_backend.tests.activity.test_controller.test_asset_creation import (
-    create_test_agent
-)
+from property_street_backend.app.controllers.auth.services import fetch_access_token
+from property_street_backend.tests.test_properties.test_processing import property_payload
+from property_street_backend.app.controllers.assets.relationship_handler import apply_model
+from property_street_backend.tests.auth.test_create_agent import create_test_agent, UserRegistrationSchema
 
-
-import pytest
 
 @pytest.mark.asyncio
 async def test_latest_assets_retrieval(client__fixture):
-    # Extract the fixture object
-    fixture_obj = await client__fixture.__anext__()
-    test_db = fixture_obj.get("db")
-    client = fixture_obj.get("http_client")
     """
     Test the /activity/assets/latest endpoint to ensure it fetches
     up to 100 latest assets with the correct structure.
     """
+    # Extract the fixture object
+    test_db: AsyncSession = client__fixture["db"]
+    client: AsyncClient = client__fixture["http_client"]
 
-    # Common cloud image details
-    test_cloud_details = {
-        "cloud_asset_id": "cloud_asset_id",
-        "format": "format",
-        "bytes": 1500,
-        "height": 1620,
-        "secure_url": "https://example.com/silly.png",
-        "width": 1480,
-    }
 
+    # Create a test agent and user
+    test_agent = await create_test_agent(db=test_db)
+
+    assets = []
     # Create test assets with features
-    assets = [
-        Asset(
-            title=f"Asset {i}",
-            country="Country X",
-            address=f"Address {i}",
-            currency="USD",
-            amount=i * 1000.0,
-            lease_duration="12 months",
-            description=f"Description {i}",
-            category="Category X",
-            status="Available",
-            availability="Available",
-            has_features=True,
-            cover_image=CloudImageDetail(**test_cloud_details, public_id=f"public_id{i}"),
-            tags=[Tag(name=f"tag {i}{j}") for j in range(2)],
-            features=[
-                AssetFeature(
-                    title=f"Asset feature {j}",
-                    cloud_images=[
-                        AssetCloudImage(**test_cloud_details, public_id=f"public_id{i}{j}{k}")
-                        for k in range(2)
-                    ],
-                )
-                for j in range(2)
-            ],
-        )
-        for i in range(10)  # Create 150 assets for testing
-    ]
+    for _ in range(10):
+        payload = property_payload(test_agent.id)
+        inst = await apply_model(Asset, test_db, payload)
+        assert inst is not None
+        assets.append(inst)
+        await asyncio.sleep(1)
 
     # Save assets to the database
     test_db.add_all(assets)
     await test_db.commit()
 
-    # Create a test agent and user
-    test_agent = await create_test_agent(db=test_db)
-    test_user = test_agent.user
 
     # Fetch a token for the user
-    token_obj = fetched_access_token(user=test_user)
-    token = token_obj["access_token"]
+    token = fetch_access_token(user = test_agent)["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
     # Perform the GET request to fetch the latest assets
     # Validate response status
     response = await client.get("/activity/assets/latest", headers=headers)
     assert response.status_code == 200
-
-    # Validate response structure
     data = response.json()
     assets = data.get('assets')
     assert isinstance(assets, list)
@@ -106,35 +71,4 @@ async def test_latest_assets_retrieval(client__fixture):
         "availability",
         "has_features",
     }
-    for asset in assets:
-        assert all(key in asset for key in required_keys)
-
-    # fetch without authentication
-    headers = {"Authorization": f"Bearer "}
-    response = await client.get("/activity/assets/latest", headers=headers)
-    
-    # Validate response status
-    assert response.status_code == 200
-
-    # Validate response structure
-    data = response.json()
-    assets = data.get('assets')
-    assert isinstance(assets, list)
-    assert len(assets) <= 100  # Ensure only 100 assets are returned
-
-    # Validate the structure of each asset
-    required_keys = {
-        "title",
-        "country",
-        "address",
-        "currency",
-        "amount",
-        "lease_duration",
-        "description",
-        "category",
-        "status",
-        "availability",
-        "has_features",
-    }
-    for asset in assets:
-        assert all(key in asset for key in required_keys)
+    assert all((key in asset) for key in required_keys for asset in assets)

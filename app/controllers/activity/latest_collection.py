@@ -5,7 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.initiator import logger
 from property_street_backend.app.controllers.actors.models import User
-from property_street_backend.app.controllers.assets.services import fetch_latest_assets
+from property_street_backend.app.controllers.assets.services import (
+    fetch_latest_assets,
+    handle_get_all_properties
+)
 from property_street_backend.app.controllers.asset_request.services import fetch_recent_asset_request
 from property_street_backend.app.controllers.roommate_finder.fetch_latest_requests import fetch_recent_roommate_finder_request
 
@@ -17,11 +20,16 @@ async def fetch_latest_collection(
     requester: User
 ):
     try:
-        properties = await fetch_latest_assets(
+        latests = await fetch_latest_assets(
             page = page,
             size = size,
             session = session,
             redis_client = redis_client
+        )
+
+        all = await handle_get_all_properties(
+            session, page = page, size = size,
+            verified_only = True
         )
 
         roommates_finder_requests = await fetch_recent_roommate_finder_request(
@@ -38,7 +46,10 @@ async def fetch_latest_collection(
         # )
 
         return {
-            'properties': properties,
+            'properties': {
+                'latests': latests,
+                'all': all,
+            },
             'roommates_finder': roommates_finder_requests,
             # 'asset_requests': asset_requests
         }

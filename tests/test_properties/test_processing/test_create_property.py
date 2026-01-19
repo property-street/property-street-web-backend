@@ -39,13 +39,14 @@ async def test_create_property(ignore_cloud_image_del, client__fixture: dict):
     assert response.status_code == 201
     property = response.json()
     assert 'id' in property
+
     # cache assertions
-    # await assertions_after_caching(
-    #     redis_client=redis_client,
-    #     asset_id=property["id"],
-    #     asset_data=property,
-    #     expiry_seconds = property_create_persistence_ttl()
-    # )
+    await assertions_after_caching(
+        redis_client=redis_client,
+        asset_id=property["id"],
+        asset_data=property,
+        expiry_seconds = property_create_persistence_ttl()
+    )
     property = await test_db.get(Asset, property['id'])
     await test_db.delete(property)
     await test_db.commit()

@@ -18,7 +18,7 @@ from property_street_backend.app.controllers.assets.schemas import PatchProperty
 
 
 @pytest.mark.asyncio
-async def test_update_property(client__fixture: dict):
+async def test_update_property(ignore_cloud_image_del, client__fixture: dict):
     # Get the yielded client object
     client: AsyncClient = client__fixture['http_client']
     test_db: AsyncSession = client__fixture['db']
@@ -32,6 +32,10 @@ async def test_update_property(client__fixture: dict):
     prop_id = created_property.id
 
     # Retrieve some existing details
+    
+    #=======================
+    # Process tag
+    #=======================
     new_covr_img_public_id = 'new_covr_img_public_id'
     condo_tag_id: int = None
     tag_name_to_remove = "condo"
@@ -40,6 +44,10 @@ async def test_update_property(client__fixture: dict):
         if tag.name == tag_name_to_remove:
             condo_tag_id = tag.id
     assert condo_tag_id
+
+    #=======================
+    # Process features
+    #=======================
     feat_0_id: int = (await test_db.execute(
         select(AssetFeature)
         .where(AssetFeature.asset_id == prop_id, 
@@ -61,7 +69,7 @@ async def test_update_property(client__fixture: dict):
         "status": "Lease",
         "price": 500000,
         "category": "Peng house",
-        "lease_duration": "12 months (1 year)",
+        "lease_duration": None,
     }
     payload = {
         **flat_fields,
@@ -145,7 +153,9 @@ async def test_update_property(client__fixture: dict):
     assert feat3 is not None
     assert any(ci['public_id'] == new_feat_3_cld_img_pub_id for ci in feat3.get('cloud_images', []))
 
-    # Now, change the property from featured -> unfeatured by providing cloud_images only
+    #====================================================================================
+    # Now, change the property from featured -> unfeatured
+    #====================================================================================
     new_unfeat_pub_id = 'new_unfeat_img_pub_id'
     payload_unfeatured = {
         "id": prop_id,
@@ -153,7 +163,7 @@ async def test_update_property(client__fixture: dict):
             {"id": obj['id'], "action":"delete"}
             for obj in property['features']
         ],
-        "cloud_images": [{**cloud_image_template, "public_id": new_unfeat_pub_id}]
+        "unfeatured_images": [{**cloud_image_template, "public_id": new_unfeat_pub_id}]
     }
     response = await client.patch(
         f"/assets/{prop_id}",
@@ -164,4 +174,4 @@ async def test_update_property(client__fixture: dict):
     property_unfeat = response.json()
     assert not property_unfeat.get('has_features')
     assert not property_unfeat.get('features')
-    assert any(ci['public_id'] == new_unfeat_pub_id for ci in property_unfeat.get('cloud_images', []))
+    assert any(ci['public_id'] == new_unfeat_pub_id for ci in property_unfeat.get('unfeatured_images', []))

@@ -64,7 +64,7 @@ async def user_profile_thumbnail_update(
     )
 
 
-@router.get("/latest-collection")
+@router.get("/latest-collection", response_model=LatestCollectionSchema)
 async def latest_collection(
     page: int = 1,
     size: int = 20,
