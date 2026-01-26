@@ -60,7 +60,7 @@ alembic history
 ## build image to docker hub repo
 docker build -t crankgig/property_street_docker_hub_fastapi_repo:latest .
 ### push the image to docker hub
-docker push crankgig/property_street_docker_hub_fastapi_repo:latest
+docker push crankgig/property_street_docker_hub_fastapi_repo
 
 ## start the celery worker
 ```bash

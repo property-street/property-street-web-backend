@@ -1,6 +1,7 @@
 from .models_helper import (
     Area,
     AddOn,
+    Singleton,
     CloudImageDetail,
     GoogleOAuthDetail,
     EmailManagementModel,
@@ -40,6 +41,7 @@ models = [
     Rating,
     Message,
     CartItem,
+    Singleton,
     ChatSession,
     UserSetting,
     AssetRequest,

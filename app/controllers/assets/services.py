@@ -14,6 +14,7 @@ from .schemas import (
     PropertyResponseSchema,
     PartialPropertyResponseSchema,
 )
+from . import property_create_persistence_ttl
 from property_street_backend.app.models import (
     User,
     Asset, 
@@ -21,15 +22,19 @@ from property_street_backend.app.models import (
 )
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
-from property_street_backend.log_config.logger_config import log_message
+from property_street_backend.app.utils.store import (
+    send_email,
+    substituted_string,
+    read_email_from_html_template_name,
+)
 from property_street_backend.app.controllers.activity import (
     auto_category_hset_key,
     newly_created_asset_set_key, 
 )
-from property_street_backend.app.utils.store import (
-    send_email,
-    read_email_from_html_template_name,
-    substituted_string,
+from property_street_backend.log_config.logger_config import log_message
+from property_street_backend.app.controllers.activity.asset_routine_methods import (
+    create_or_update_newly_created_asset_cache,
+    remove_asset_from_newly_created_asset_cache
 )
 
 def eager_asset_load():
@@ -50,7 +55,7 @@ def eager_asset_load():
 async def validate_assets(
     session: AsyncSession, 
     assets: list[Asset],
-    verified_only: bool = True
+    verified_only: bool = True,
 ):
     valid_assets = []
     skipped_assets = []
@@ -119,6 +124,7 @@ async def fetch_latest_assets(
             else:
                 seen_ids.add(getattr(property, "id", None))
 
+    # logger.info(f"Results: {results}")
     cache_result_length = len(results)
     size -= cache_result_length
 
@@ -406,6 +412,7 @@ async def send_verification_state_email(
 async def update_verification_state(
     asset_id: int,
     db: AsyncSession,
+    redis_client: Redis,
     action: Literal['verify','cancel'],
     cancellation_reason: str = None,
 ):
@@ -423,22 +430,25 @@ async def update_verification_state(
     # Fetch asset with agent relationship loaded
     stmt = eager_asset_load().where(Asset.id == asset_id)
     result = await db.execute(stmt)
-    asset = result.scalars().first()
+    property = result.scalars().first()
     
-    if not asset:
+    if not property:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Property not found.",
         )
 
+    property_id = property.id
     now = datetime.now(timezone.utc)
-    if action == 'verify':
-        asset.verified = True
-        asset.datetime_declined = None
-        asset.datetime_verified = now
-    elif action == 'cancel':
-        asset.verified = False
-        asset.datetime_declined = now
+    action_is_verify = action == 'verify'
+    action_is_cancel = action == 'cancel'
+    if action_is_verify:
+        property.verified = True
+        property.datetime_declined = None
+        property.datetime_verified = now
+    elif action_is_cancel:
+        property.verified = False
+        property.datetime_declined = now
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -446,17 +456,12 @@ async def update_verification_state(
         )
     
     try:
-        db.add(asset)
+        db.add(property)
         await db.commit()
-        await db.refresh(asset)
+        await db.refresh(property)
         if DEBUG:
             log_message('info', f"Asset {asset_id} marked as {action}")
         
-        # Send appropriate email notification
-        await send_verification_state_email(asset, action, cancellation_reason=cancellation_reason)
-        
-        return asset
-
     except Exception as e:
         await db.rollback()
         f_msg = f"Failed to {action} property."
@@ -468,6 +473,36 @@ async def update_verification_state(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f_msg,
         )
+    
+    # ===============
+    # Handle caching
+    # ===============
+    try:
+        if action_is_verify:
+            ttl_in_seconds = property_create_persistence_ttl()
+            dumped_property = PropertyResponseSchema.model_validate(
+                property
+            ).model_dump()
+            await create_or_update_newly_created_asset_cache(
+                asset_id = property.id,
+                asset_data = dumped_property,
+                redis_client = redis_client,
+                newly_created = False,
+                expiry_seconds = ttl_in_seconds,
+            )
+        elif action_is_cancel:
+            await remove_asset_from_newly_created_asset_cache(
+                property_id, redis_client
+            )
+    except Exception as e:
+        logger.warning(f"Cache update failed: {e}")
+        raise
+
+    # Send appropriate email notification
+    await send_verification_state_email(property, action, cancellation_reason=cancellation_reason)
+    
+    return property
+
 
 
 async def handle_delete_property(db: AsyncSession, id: int, agent: User):

@@ -11,7 +11,7 @@ from property_street_backend.app.models import (
 from tests.auth.test_create_agent import create_test_agent
 from app.controllers.auth.services import fetch_access_token
 from app.controllers.assets.property_processor_utils import property_create_persistence_ttl
-from property_street_backend.tests.activity.test_controller.test_newly_created_asset_cache_management import (
+from property_street_backend.tests.test_properties.test_processing.test_newly_created_asset_cache_management import (
     assertions_after_caching,
 )
 
@@ -44,7 +44,6 @@ async def test_create_property(ignore_cloud_image_del, client__fixture: dict):
     await assertions_after_caching(
         redis_client=redis_client,
         asset_id=property["id"],
-        asset_data=property,
         expiry_seconds = property_create_persistence_ttl()
     )
     property = await test_db.get(Asset, property['id'])

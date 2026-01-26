@@ -34,9 +34,10 @@ trap 'log "❌ Something went wrong during deployment"' ERR
 : "${GIT_ACTION_AWS_SERVER_HOST:?Environment variable GIT_ACTION_AWS_SERVER_HOST is required}"
 : "${GIT_ACTION_COMPOSE_PROJECT_DIR_NAME:?Environment variable GIT_ACTION_COMPOSE_PROJECT_DIR_NAME is required}"
 : "${GIT_ACTION_AWS_SSH_KEY_PATH:?Environment variable GIT_ACTION_AWS_SSH_KEY_PATH is required}"
+: "${LAST_DEPLOYMENT_DATE:?Environment variable LAST_DEPLOYMENT_DATE is required}"
 
 IMAGES=(
-  crankgig/property_street_docker_hub_fastapi_repo:latest
+  crankgig/property_street_docker_hub_fastapi_repo:$LAST_DEPLOYMENT_DATE
 )
 IMAGES_STRING=$(printf " %s" "${IMAGES[@]}")
 
@@ -51,6 +52,7 @@ log "📤 Uploading docker-compose.yml and env file to remote server..."
 ssh -i "$GIT_ACTION_AWS_SSH_KEY_PATH" -o StrictHostKeyChecking=no "$GIT_ACTION_AWS_SERVER_USER@$GIT_ACTION_AWS_SERVER_HOST" "mkdir -p ~/$GIT_ACTION_COMPOSE_PROJECT_DIR_NAME"
 scp -i "$GIT_ACTION_AWS_SSH_KEY_PATH" "$SCRIPT_DIR/docker-compose.yml" "$GIT_ACTION_AWS_SERVER_USER@$GIT_ACTION_AWS_SERVER_HOST:~/$GIT_ACTION_COMPOSE_PROJECT_DIR_NAME/docker-compose.yml"
 scp -i "$GIT_ACTION_AWS_SSH_KEY_PATH" "$FILTERED_ENV_FILE" "$GIT_ACTION_AWS_SERVER_USER@$GIT_ACTION_AWS_SERVER_HOST:~/$GIT_ACTION_COMPOSE_PROJECT_DIR_NAME/.env.${SERVICE_NAME}"
+scp -i "$GIT_ACTION_AWS_SSH_KEY_PATH" "$SCRIPT_DIR/.env" "$GIT_ACTION_AWS_SERVER_USER@$GIT_ACTION_AWS_SERVER_HOST:~/$GIT_ACTION_COMPOSE_PROJECT_DIR_NAME/.env"
 
 # Remote deployment
 log "🔐 Connecting to EC2 instance and deploying..."

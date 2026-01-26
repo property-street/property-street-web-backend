@@ -1,4 +1,5 @@
 from sqlalchemy import inspect
+from redis.asyncio import Redis
 from typing import Type, Dict, Any
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,10 @@ from property_street_backend.app.models import (
 
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
+from property_street_backend.app.models_helper import Singleton
+from property_street_backend.app.controllers.activity.asset_routine_methods import (
+    remove_all_newly_created_assets_cache,
+)
 
 def return_model_from_string(str_value: str):
     """
@@ -190,3 +195,34 @@ async def create_or_update_object(
     
     # Return the instance
     return instance
+
+
+async def get_or_create_singleton_instance(db: AsyncSession):
+    singleton = (await db.execute(select(Singleton))).scalars().first()
+    if not singleton:
+        singleton = Singleton(action={})
+        db.add(singleton)
+        await db.commit()
+        await db.refresh(singleton)
+    return singleton
+
+
+async def remove_all_newly_created_cached_asset_once_on_app_startup(redis_client: Redis, db: AsyncSession):
+    instance = await get_or_create_singleton_instance(db)
+    action_entry = 'cache_cleared_of_newly_created'
+    
+    if instance.action.get(action_entry):
+        if DEBUG:
+            logger.info("**Cache already cleared")
+        return
+    
+    if DEBUG:
+        logger.info("**Cached newly-created assets clearing...")
+    await remove_all_newly_created_assets_cache(redis_client)
+
+    instance.action = {action_entry: True}  # overwrite dictionary
+    db.add(instance)
+    await db.commit()
+
+    if DEBUG:
+        logger.info("**Cached newly-created assets cleared")

@@ -7,14 +7,13 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-
 from .schemas import (
     PropertySchema,
     PatchPropertySchema,
-    AssetFeatureResponseSchema,
     PropertyResponseSchema,
 )
 from .services import eager_asset_load
+from . import property_create_persistence_ttl
 from .relationship_handler import apply_model
 from property_street_backend.app.models import (
     User,
@@ -22,7 +21,6 @@ from property_street_backend.app.models import (
 )
 from property_street_backend.config.settings import (
     DEBUG,
-    TEAM_EMAIL,
     ADMIN_EMAIL,
     BETA_LAUNCHING,
     REAL_TEST_EMAIL,
@@ -45,15 +43,6 @@ from property_street_backend.app.controllers.activity.asset_routine_methods impo
     create_or_update_newly_created_asset_cache
 )
 
-def property_create_persistence_ttl() -> int:
-    """returns the cache persistence property depending on context
-
-    Returns:
-        int: time in seconds
-    """
-    return (TEST_NEWLY_CREATED_ASSET_TTL 
-        if env_is_test() else 
-    NEWLY_CREATED_ASSET_TTL)
 
 def notify_admin_on_new_property(property: Asset, new: bool = True):
     try:
@@ -187,12 +176,12 @@ async def handle_property_create_update(
             asset_id = property.id,
             asset_data = schematized_asset_to_dict,
             redis_client = redis_client,
-            newly_created = True,
+            newly_created = newly_created,
             expiry_seconds = ttl_in_seconds,
         )
     except Exception as e:
-        logger.warning(f"Cache update failed: {e}")
-        raise
+        if DEBUG:
+            logger.warning(f"Cache update failed: {e}")
     
     # ========================
     # Handle notification

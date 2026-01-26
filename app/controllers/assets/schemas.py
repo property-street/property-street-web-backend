@@ -88,7 +88,7 @@ class FlatPropertyFields(BaseModel):
     description: str = Field(..., description="A detailed description of the asset, possibly in HTML")
     category: str = Field(..., description="The category of the asset (e.g., House, Hotel)")
     status: str = Field(..., description="The status of the asset (e.g., Available, Sold)")
-    listing_type: str = Field('available', description="availability status")
+    listing_type: str = Field(..., description="availability status")
     agent_id: int
 
 FlatPropertyFieldsPatch = make_optional(FlatPropertyFields)

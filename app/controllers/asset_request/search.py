@@ -3,12 +3,13 @@ from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import AssetRequest
-from .schemas import PropertyRequestSchema, PropertyRequestSearchResponse
 from property_street_backend.app.models import Area
-from property_street_backend.config.postgres_connection_manager import get_postgres_instance as async_session_maker
+from .schemas import PropertyRequestSchema, PropertyRequestSearchResponse
+from property_street_backend.config.postgres_connection_manager import runtime_async_session_maker
 
 async def search_asset_requests(query_data: dict) -> List[PropertyRequestSearchResponse]:
-    async with async_session_maker() as db:
+    AsyncSessionLocal = runtime_async_session_maker()
+    async with AsyncSessionLocal() as db:
         keywords = query_data['keywords']
         if not keywords:
             return []

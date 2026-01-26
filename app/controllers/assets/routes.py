@@ -145,20 +145,22 @@ async def unverified_properties(
 async def confirm_verification(
     asset_id: int,
     db: AsyncSession = Depends(get_db),
+    redis_client: Redis = Depends(get_redis),
     _: User = Depends(require_roles('admin','staff')),
 ):
     """Mark the property as verified (admin only)."""
-    return await update_verification_state(asset_id, db, 'verify')
+    return await update_verification_state(asset_id, db, redis_client, 'verify')
 
 
 @router.post("/cancel-verification/{asset_id}/", response_model=PropertyResponseSchema)
 async def cancel_verification_route(
     asset_id: int,
     db: AsyncSession = Depends(get_db),
+    redis_client: Redis = Depends(get_redis),
     _: User = Depends(require_roles('admin','staff')),
 ):
     """Cancel a property's verification (admin only)."""
-    return await update_verification_state(asset_id, db, 'cancel')
+    return await update_verification_state(asset_id, db, redis_client, 'cancel')
 
 
 @router.delete("/delete/{property_id}/", status_code=status.HTTP_204_NO_CONTENT)

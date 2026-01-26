@@ -1,7 +1,7 @@
 services:
   # ===== Frontend Build Container =====
   frontend:
-    image: crankgig/property_street_docker_hub_react_repo:latest
+    image: ${LATEST_FRONTEND_IMAGE}
     restart: always
     container_name: frontend
     ports:
@@ -49,7 +49,7 @@ services:
 
   # ===== Backend API =====
   backend:
-    image: crankgig/property_street_docker_hub_fastapi_repo:latest
+    image: ${LATEST_BACKEND_IMAGE}
     container_name: backend
     ports:
       - "8001:8001"

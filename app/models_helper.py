@@ -1,14 +1,15 @@
 from sqlalchemy import (
-    Column, 
-    Integer,
-    String,
-    DateTime,
+    text,
     event,
-    ForeignKey, 
     Table,
-    Enum as SQLAlchemyEnum, 
     func,
     ARRAY,
+    String,
+    Column, 
+    Integer,
+    DateTime,
+    ForeignKey, 
+    Enum as SQLAlchemyEnum, 
 )
 from sqlalchemy import event
 from sqlalchemy.orm import Session
@@ -18,6 +19,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import object_session
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declared_attr
 
 from property_street_backend.config.cloudinary import delete_image
@@ -296,6 +298,13 @@ class AddOn(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tag_list = Column(ARRAY(String))  # Or JSON, based on your preference
+
+
+class Singleton(Base): 
+    __tablename__ = 'singleton'
+    
+    id = Column(Integer, primary_key=True, server_default=text("1"))
+    action = Column(JSONB)
 
 
 @event.listens_for(AbstractCloudImage, 'before_insert')

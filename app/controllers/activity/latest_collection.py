@@ -31,6 +31,7 @@ async def fetch_latest_collection(
             session, page = page, size = size,
             verified_only = True
         )
+        logger.info(f"All: {all}")
 
         roommates_finder_requests = await fetch_recent_roommate_finder_request(
             page = page,

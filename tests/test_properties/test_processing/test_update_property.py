@@ -1,19 +1,26 @@
+import json
 import pytest
 from httpx import AsyncClient
+from redis.asyncio import Redis
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from . import property_payload
 from property_street_backend.app.models import (
     Asset,
     AssetFeature,
 )
-from .test_apply_model import create_test_asset
 from tests.auth.test_create_agent import create_test_agent
 from tests.activity.test_controller.test_objects import (
     cloud_image_template,
 )
 from property_street_backend.tests.auth.test_create_agent import create_test_agent
 from property_street_backend.app.controllers.auth.services import fetch_access_token
+from property_street_backend.app.controllers.activity.asset_routine_methods import (
+    newly_created_hash_key,
+    auto_category_hset_key,
+    get_property_from_newly_created_asset,
+)
 from property_street_backend.app.controllers.assets.schemas import PatchPropertySchema
 
 
@@ -22,13 +29,21 @@ async def test_update_property(ignore_cloud_image_del, client__fixture: dict):
     # Get the yielded client object
     client: AsyncClient = client__fixture['http_client']
     test_db: AsyncSession = client__fixture['db']
+    redis_client: Redis = client__fixture['redis_client']
 
 
     test_agent = await create_test_agent(test_db)
-    created_property: Asset = await create_test_asset(
-        test_db, test_agent.id
+    token = fetch_access_token(user=test_agent)['access_token']
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = property_payload(test_agent.id)
+    response = await client.post(
+        "/assets/create-property",
+        json=payload,
+        headers=headers,
     )
-    assert created_property
+    assert response.status_code == 201
+    json_resp = response.json()
+    created_property: Asset = await test_db.get(Asset,json_resp['id'])
     prop_id = created_property.id
 
     # Retrieve some existing details
@@ -175,3 +190,8 @@ async def test_update_property(ignore_cloud_image_del, client__fixture: dict):
     assert not property_unfeat.get('has_features')
     assert not property_unfeat.get('features')
     assert any(ci['public_id'] == new_unfeat_pub_id for ci in property_unfeat.get('unfeatured_images', []))
+    #---Test update reflection in cache.
+    cached_property = await get_property_from_newly_created_asset(redis_client, prop_id)
+    assert cached_property
+    assert not cached_property.get('features')
+    assert cached_property.get('unfeatured_images')

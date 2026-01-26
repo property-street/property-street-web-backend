@@ -9,10 +9,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncSession
 )
+from contextlib import AsyncExitStack
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.middleware.cors import CORSMiddleware
-
 
 
 from property_street_backend.app.database import (
@@ -46,21 +46,25 @@ from property_street_backend.config.settings import (
 from property_street_backend.config.redis_connection_manager import runtime_async_redis
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
 from property_street_backend.config.postgres_connection_manager import runtime_async_session_maker
+from property_street_backend.app.controllers.utils import remove_all_newly_created_cached_asset_once_on_app_startup
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
-    AsyncSession = runtime_async_session_maker()
-    async with AsyncSession() as session:
+    async with AsyncExitStack() as stack:
+        AsyncSessionLocal = runtime_async_session_maker()
+        session = await stack.enter_async_context(AsyncSessionLocal())
+        redis_client = await stack.enter_async_context(runtime_async_redis())
+        # All resources are now OPEN
+
         await ensure_admin_user(session)
-    async with runtime_async_redis() as redis_client:
-        (
-            listener_task, 
-            stop_event, 
-            _
-        ) = await cache_expiry_initializer(redis_client)
+
+        await remove_all_newly_created_cached_asset_once_on_app_startup(redis_client, session)
     
+        listener_task, stop_event, _ = await cache_expiry_initializer(
+            redis_client
+        )
     yield  
     # Application runs here
     # Shutdown logic (if needed)

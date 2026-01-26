@@ -1,6 +1,5 @@
 from typing import Dict, List, Any
-from sqlalchemy import select, or_, false
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, or_
 
 
 from .models import Asset
@@ -12,12 +11,13 @@ from property_street_backend.app.models import (
     Tag,
     Area, 
 )
-from property_street_backend.config.postgres_connection_manager import get_postgres_instance as async_session_maker
-
+from property_street_backend.app.initiator import logger
+from property_street_backend.config.postgres_connection_manager import runtime_async_session_maker
 
 
 async def search_assets(query_data: Dict[str, Any]) -> List[PropertySearchResponse]:
-    async with async_session_maker() as db:
+    AsyncSessionLocal = runtime_async_session_maker()
+    async with AsyncSessionLocal() as db:
         keywords: List[str] = query_data.get('keywords', [])
         numbers: List[int] = query_data.get('numbers', [])
 
@@ -34,6 +34,10 @@ async def search_assets(query_data: Dict[str, Any]) -> List[PropertySearchRespon
                 Asset.title.ilike(like_pattern),
                 Asset.description.ilike(like_pattern),
                 Asset.category.ilike(like_pattern),
+                Asset.lease_duration.ilike(like_pattern),
+                Asset.status.ilike(like_pattern),
+                Asset.listing_type.ilike(like_pattern),
+                # Tag pattern
                 Tag.name.ilike(like_pattern),
                 # Area fields (no `name` in your model)
                 Area.country.ilike(like_pattern),
@@ -66,16 +70,16 @@ async def search_assets(query_data: Dict[str, Any]) -> List[PropertySearchRespon
         # -----------------------------
         # Optionally: Apply numeric filter for price proximity
         # -----------------------------
-        if numbers:
-            filtered = []
-            for asset in results:
-                price_val = float(asset.price or 0)
-                for n in numbers:
-                    # Example: consider close prices within ₦200,000 difference
-                    if abs(price_val - n) < 200_000:
-                        filtered.append(asset)
-                        break
-            results = filtered
+        # if numbers:
+        #     filtered = []
+        #     for asset in results:
+        #         price_val = float(asset.price or 0)
+        #         for n in numbers:
+        #             # Example: consider close prices within ₦200,000 difference
+        #             if abs(price_val - n) < 200_000:
+        #                 filtered.append(asset)
+        #                 break
+        #     results = filtered
 
         # -----------------------------
         # Return structured output

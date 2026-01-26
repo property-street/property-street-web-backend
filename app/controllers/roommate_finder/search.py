@@ -7,10 +7,11 @@ from .schemas import (
     RoommateRequestSearchResponse,
 )
 from property_street_backend.app.models import Area, RoommateFinder
-from property_street_backend.config.postgres_connection_manager import get_postgres_instance as async_session_maker
+from property_street_backend.config.postgres_connection_manager import runtime_async_session_maker
 
 async def search_roommates(query_data: dict) -> List[RoommateRequestSearchResponse]:
-    async with async_session_maker() as db:
+    AsyncSessionLocal = runtime_async_session_maker()
+    async with AsyncSessionLocal() as db:
         keywords = query_data['keywords']
         stmt = (
             select(RoommateFinder)

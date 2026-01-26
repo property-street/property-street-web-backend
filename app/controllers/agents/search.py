@@ -5,11 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .schemas import AgentSearchResponseSchema
 from property_street_backend.app.models import User
 from property_street_backend.app.controllers.actors.schemas import AgentResponseSchema
-from property_street_backend.config.postgres_connection_manager import get_postgres_instance as async_session_maker
+from property_street_backend.config.postgres_connection_manager import runtime_async_session_maker
 
 
 async def search_agents(query_data: dict) -> List[AgentSearchResponseSchema]:
-    async with async_session_maker() as db:
+    AsyncSessionLocal = runtime_async_session_maker()
+    async with AsyncSessionLocal() as db:
         keywords = query_data['keywords']
         if not keywords:
             return []
