@@ -2,13 +2,13 @@ import json
 from fastapi import status
 from sqlalchemy import and_
 from redis.asyncio import Redis
-from typing import List, Literal
 from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
+from sqlalchemy.orm import selectinload
+from typing import List, Literal, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .schemas import (
     PropertyResponseSchema,
@@ -514,3 +514,26 @@ async def handle_delete_property(db: AsyncSession, id: int, agent: User):
         )
     await db.delete(property)
     await db.commit()
+
+
+def category_candidates_stmt(
+    category: str,
+    cursor: Optional[str],
+    seen_ids: List[int],
+    limit: int = 10,
+):
+    stmt = (
+        select(Asset)
+        .where(
+            Asset.category == category,
+            Asset.verified.is_(True),
+            Asset.id.notin_(seen_ids),
+        )
+        .order_by(Asset.created_at.desc())
+        .limit(limit)
+    )
+
+    if cursor:
+        stmt = stmt.where(Asset.created_at < cursor)
+
+    return stmt
