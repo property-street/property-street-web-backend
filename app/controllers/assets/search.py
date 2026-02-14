@@ -14,6 +14,13 @@ from property_street_backend.app.models import (
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.postgres_connection_manager import runtime_async_session_maker
 
+def area_ilike_tuple(like_pattern):
+    return(
+        Area.country.ilike(like_pattern),
+        Area.state_or_province.ilike(like_pattern),
+        Area.city_or_town.ilike(like_pattern),
+        Area.street.ilike(like_pattern),
+    )
 
 async def search_assets(query_data: Dict[str, Any]) -> List[PropertySearchResponse]:
     AsyncSessionLocal = runtime_async_session_maker()
@@ -40,10 +47,7 @@ async def search_assets(query_data: Dict[str, Any]) -> List[PropertySearchRespon
                 # Tag pattern
                 Tag.name.ilike(like_pattern),
                 # Area fields (no `name` in your model)
-                Area.country.ilike(like_pattern),
-                Area.state_or_province.ilike(like_pattern),
-                Area.city_or_town.ilike(like_pattern),
-                Area.street.ilike(like_pattern),
+                *area_ilike_tuple(like_pattern)
             ))
 
         # Combine conditions into a single OR

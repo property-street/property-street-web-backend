@@ -89,6 +89,7 @@ async def load_stream_state(redis: Redis, user_id: int) -> StreamState:
     Loads stream state from Redis.
     Handles cold start gracefully.
     """
+    
 
     seen_key = f"stream:{user_id}:seen"
     weights_key = f"stream:{user_id}:weights"
