@@ -537,3 +537,7 @@ def category_candidates_stmt(
         stmt = stmt.where(Asset.created_at < cursor)
 
     return stmt
+
+
+async def handle_stream():
+    pass

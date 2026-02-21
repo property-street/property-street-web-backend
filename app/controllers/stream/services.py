@@ -14,7 +14,7 @@ class StreamState:
 
 
 async def fetch_candidates(
-    db,
+    db: AsyncSession,
     state: StreamState,
     quotas: Dict[str, int],
 ):

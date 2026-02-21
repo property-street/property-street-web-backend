@@ -25,6 +25,7 @@ from property_street_backend.app.controllers.cart.models import CartItem
 from property_street_backend.app.controllers.ratings.models import Rating
 from property_street_backend.app.controllers.settings.models import UserSetting
 from property_street_backend.app.controllers.notification.models import Notification
+from property_street_backend.app.controllers.assets.utils import UserPerPropertyStats
 from property_street_backend.app.controllers.asset_request.models import AssetRequest
 from property_street_backend.app.controllers.roommate_finder.models import RoomieApplication, RoommateFinder
 
@@ -54,4 +55,5 @@ models = [
     RoomieApplication,
     CloudDeletionOutbox,
     EmailManagementModel,
+    UserPerPropertyStats,
 ]

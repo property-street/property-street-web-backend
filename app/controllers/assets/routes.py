@@ -21,6 +21,7 @@ from property_street_backend.app.initiator import (
 from property_street_backend.app.models import Asset, User
 from property_street_backend.app.controllers.auth.services import (
     require_roles,
+    decode_user_from_token,
 )
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.controllers.assets.schemas import (
@@ -171,3 +172,12 @@ async def delete_property(
 ):
     """Delete property."""
     return await handle_delete_property(db, property_id, agent)
+
+
+@router.get("/stream/")
+async def stream_property(
+    user: User = Depends(decode_user_from_token),
+    redis_client: Redis = Depends(get_redis),
+):
+    seen_ids = []
+    pass

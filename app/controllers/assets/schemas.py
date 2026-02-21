@@ -111,8 +111,13 @@ class AssetSchema(FlatPropertyFields):
 class PropertySchema(AssetSchema):
     pass
 
+class UserPropertyStats(ConfigDictSetter):
+    liked: bool = False
+    save: bool = False
+    share_count: int = 0
+    view_count: int = 0
 
-class AssetResponseSchema(ConfigDictSetter, AssetSchema):
+class PropertyResponseSchema(ConfigDictSetter, AssetSchema):
     id: int = Field(..., description="The id of the asset")
     price: float = Field(..., description="The monetary value of the asset")
     has_features: Optional[bool] = Field(None, description="Boolean indicating if the asset has features or not")
@@ -125,8 +130,12 @@ class AssetResponseSchema(ConfigDictSetter, AssetSchema):
     features: Optional[List[AssetFeatureResponseSchema]] = None
     unfeatured_images: Optional[Optional[List[CloudImageResponseSchema]]] = None
     agent: AgentResponseSchema
+    total_ratings: int = 0
+    total_stars: int = 0
+    likes: int = 0
+    user_stats: Optional[UserPropertyStats] = None
 
-class PropertyResponseSchema(AssetResponseSchema):
+class AssetResponseSchema(PropertyResponseSchema):
     pass
 
 class PatchPropertySchema(FlatFieldsPatchSchema,UtilitySchemaMixin):
@@ -137,16 +146,16 @@ class PatchPropertySchema(FlatFieldsPatchSchema,UtilitySchemaMixin):
     unfeatured_images: Optional[List[CloudImagePatchSchema]] = None
 
 
-partial_property_response = make_optional(PropertyResponseSchema)
+partial_property_response = make_optional(AssetResponseSchema)
 class PartialPropertyResponseSchema(partial_property_response):
     pass
 
 
 class LatestAssetsFetchResponseSchema(ConfigDictSetter):
-    assets: List[PropertyResponseSchema]
+    assets: List[AssetResponseSchema]
 
 class PropertySearchResponse(BaseModel):
     type: str = 'property'
-    data: PropertyResponseSchema
+    data: AssetResponseSchema
 
 SearchList = List[PropertySearchResponse]

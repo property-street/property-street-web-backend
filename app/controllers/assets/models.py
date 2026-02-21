@@ -16,18 +16,19 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 
-from .enums import AvailabilityStatus
-from property_street_backend.app.controllers.actors.models import User
-from property_street_backend.app.models_helper import AbstractCloudImage
-from property_street_backend.config.postgres_connection_manager import Base
 from property_street_backend.config.settings import (
     BETA_LAUNCHING, 
     BETA_LAUNCH_PROPERTY_LIMIT,
     UNLIMITED_BETA_AGENTS_EMAILS
 )
+from .enums import IntentFactor, ImpressionFactor
+from property_street_backend.app.controllers.actors.models import User
+from property_street_backend.app.models_helper import AbstractCloudImage
+from property_street_backend.config.postgres_connection_manager import Base
+from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
 
 
-class Asset(Base):
+class Asset(Base, AggregateRatingAClass):
     __tablename__ = 'assets'
 
     id = Column(Integer, primary_key=True, index=True)
@@ -156,6 +157,21 @@ class Asset(Base):
     def has_features(self):
         return bool(self.features)  # works in Python
 
+    likes = Column(Integer, default=0)
+    saves = Column(Integer, default=0)
+    shares = Column(Integer, default=0)
+    views = Column(Integer, default=0)
+    clicks = Column(Integer, default=0)
+    contacts = Column(Integer, default=0)
+
+    _user_stats = None
+
+    @hybrid_property
+    def user_stats(self):
+        return self._user_stats
+    @user_stats.setter
+    def user_stats(self, value):
+        self._user_stats = value
 
 @event.listens_for(Asset, 'before_insert')
 def validate_agent_and_check_beta_limit(mapper, connection, target):
@@ -302,3 +318,65 @@ class Tag(Base):
 # Listen for the 'before_insert' event to set updated_at
 def set_updated_at_before_insert(mapper, connection, target):
     target.updated_at = func.now()
+
+
+
+class EventBase(Base):
+    __abstract__ = True  # ← Important
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class IntentEvent(EventBase):
+    __tablename__ = "intent_events"
+
+    asset_id = Column(
+        Integer, 
+        ForeignKey(
+            "assets.id",
+            name="fk_intent_event_asset_id",
+            ondelete="CASCADE"
+        ), 
+        index=True, nullable=False
+    )
+    user_id = Column(
+        Integer, 
+        ForeignKey(
+            "users.id",
+            name="fk_intent_events_user_id",
+            ondelete="CASCADE"
+        ), index=True, nullable=False
+    )
+
+    factor = Column(
+        SqlalchemyEnum(IntentFactor, name="intent_factor_enum"),
+        nullable=False, index=True,
+    )
+
+
+class ImpressionEvent(EventBase):
+    __tablename__ = "impression_events"
+
+    asset_id = Column(
+        Integer, 
+        ForeignKey(
+            "assets.id",
+            name="fk_intent_event_asset_id",
+            ondelete="CASCADE"
+        ), 
+        index=True, nullable=False
+    )
+    user_id = Column(
+        Integer, 
+        ForeignKey(
+            "users.id",
+            name="fk_intent_events_user_id",
+            ondelete="CASCADE"
+        ), index=True, nullable=False
+    )
+
+    factor = Column(
+        SqlalchemyEnum(ImpressionFactor, name="impression_factor_enum"),
+        nullable=False, index=True,
+    )
