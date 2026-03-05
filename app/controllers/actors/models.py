@@ -161,6 +161,7 @@ class User(AggregateRatingAClass, UniqueIDArrayMixin, UserAssetAbsCls):
 
     cached_roomies_application_ids = Column(ARRAY(Integer), default=list)
     array_field_name = "cached_roomies_application_ids"
+    
 
     # method for a user to become an agent
     async def become_agent(self, session: AsyncSession):

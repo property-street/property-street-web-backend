@@ -7,13 +7,23 @@ from pydantic import ValidationError
 from sqlalchemy.future import select
 from datetime import datetime, timezone
 from sqlalchemy.orm import selectinload
-from typing import List, Literal, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Literal, Optional, Dict
 
+
+from .models import (
+    PropertyInteractionEvent,
+)
+from .utils import (
+    UserStatsPerProperty,
+)
 from .schemas import (
+    InteractionEvents,
+    NormalizedInteraction,
     PropertyResponseSchema,
     PartialPropertyResponseSchema,
 )
+from .enums import InteractionType
 from . import property_create_persistence_ttl
 from property_street_backend.app.models import (
     User,
@@ -541,3 +551,139 @@ def category_candidates_stmt(
 
 async def handle_stream():
     pass
+
+
+async def handle_persist_property_interaction(
+    data: InteractionEvents,
+    user: User,
+    db: AsyncSession
+):
+    """
+    Persist user interactions with properties.
+    
+    Creates PropertyInteractionEvent records for each interaction and updates
+    UserStatsPerProperty to track user engagement metrics (likes, saves, etc.)
+    
+    Args:
+        data: List of PropertyInteraction objects containing property_id and interaction data
+        user: Optional current user (can be anonymous)
+        db: Database session
+        
+    Returns:
+        Dict with success status and count of processed interactions
+    """
+    user_id = user.id
+    interaction_count = 0
+    user_stats_per_asset_map: Dict[int, UserStatsPerProperty] = {}
+    normalized_interactions: List[NormalizedInteraction] = []
+    try:
+        for property_id, interactions in data.items():
+            for type, data in interactions.items():
+                normalized_interactions.append({
+                    "id": property_id,
+                    "type": type,
+                    "data": data
+                })
+    
+        for interaction in normalized_interactions:
+            property_id = interaction['id']
+
+            user_stats: UserStatsPerProperty = user_stats_per_asset_map.get(property_id)
+            if not user_stats:
+                stats_result = await db.execute(
+                    select(UserStatsPerProperty).where(
+                        and_(
+                            UserStatsPerProperty.asset_id == property_id,
+                            UserStatsPerProperty.user_id == user_id,
+                        )
+                    )
+                )
+                user_stats = stats_result.scalars().first()
+                
+                if not user_stats:
+                    user_stats = UserStatsPerProperty(
+                        asset_id=property_id,
+                        user_id=user.id,
+                        liked=False,
+                        saved=False,
+                        cart=False,
+                        share_count=0,
+                        view_count=0,
+                        click_count=0,
+                        contact_count=0
+                    )
+                user_stats_per_asset_map[property_id] = user_stats
+                db.add(user_stats)
+            
+            event_type = interaction['type']
+
+            for interaction_data in interaction['data']:
+                # Verify property existence
+                asset = await db.get(Asset, property_id)
+                
+                if not asset:
+                    logger.warning(f"Property with ID {property_id} not found, skipping")
+                    continue
+
+                action = interaction_data.action
+                timestamp = interaction_data.timestamp
+                
+                # Convert Unix timestamp to datetime
+                event_timestamp = datetime.fromtimestamp(timestamp / 1000)  # Convert from milliseconds
+                
+                # Create PropertyInteractionEvent
+                interaction_event = PropertyInteractionEvent(
+                    property_id=property_id,
+                    created_at=event_timestamp,
+                    factor=event_type,
+                    user_id=user_id
+                )
+                db.add(interaction_event)
+                
+                # Update user stats and asset stat based on action type
+                match event_type:
+                    case InteractionType.like:
+                        user_stats.liked = True if action else False
+                        asset.likes = max(0, asset.likes + (1 if action else -1))
+                    case InteractionType.save:
+                        user_stats.saved = True if action else False
+                        asset.saves = max(0, asset.saves + (1 if action else -1))
+                    case InteractionType.cart:
+                        user_stats.cart = True if action else False
+                        asset.carts = max(0, asset.carts + (1 if action else -1))
+                    case InteractionType.share:
+                        user_stats.share_count += 1
+                        asset.shares += 1
+                    case InteractionType.view:
+                        # check that the user-id is not the asset's agent-id
+                        if user.id != asset.agent_id:
+                            user_stats.view_count += 1
+                            asset.views += 1
+                    case InteractionType.click:
+                        user_stats.click_count += 1
+                        asset.clicks += 1
+                    case InteractionType.contact:
+                        user_stats.contact_count += 1
+                        asset.contacts += 1
+                    case _:
+                        raise ValueError(f"Unsupported interaction type: {event_type}")
+                interaction_count += 1
+            
+        # Commit all changes
+        await db.commit()
+        
+        logger.info(f"Successfully processed {interaction_count} interactions")
+        
+        return {
+            "status": "success",
+            "message": f"Processed {interaction_count} property interactions",
+            "count": interaction_count,
+        }
+    
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error processing property interactions: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process interactions: {str(e)}"
+        )

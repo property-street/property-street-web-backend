@@ -4,30 +4,27 @@ from sqlalchemy import (
     Boolean, 
     ForeignKey,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, declared_attr
 
 from property_street_backend.config.postgres_connection_manager import Base
 
-class UserPerAssetStatsAbsCls(Base):
+class UserStatsPerAssetAbsCls(Base):
     __abstract__ = True
 
-    id = Column(Integer, primary_key=True, index=True)
+    # id = Column(Integer, primary_key=True, index=True)
     liked = Column(Boolean, default=False)
     saved = Column(Boolean, default=False)
     cart = Column(Boolean, default=False)
     share_count = Column(Integer, default=0)
     view_count = Column(Integer, default=0)
+    click_count = Column(Integer, default=0)
+    contact_count = Column(Integer, default=0)
 
 
-class UserPerPropertyStats(UserPerAssetStatsAbsCls):
-    __tablename__ = "user_per_property_stats"
+class UserStatsPerProperty(UserStatsPerAssetAbsCls):
+    __tablename__ = "user_stats_per_property"
 
     id = Column(Integer, primary_key=True, index=True)
-    liked = Column(Boolean, default=False)
-    saved = Column(Boolean, default=False)
-    cart = Column(Boolean, default=False)
-    share_count = Column(Integer, default=0)
-    view_count = Column(Integer, default=0)
 
     asset_id  = Column(
         Integer,
@@ -35,7 +32,7 @@ class UserPerPropertyStats(UserPerAssetStatsAbsCls):
         nullable=False
     )
     asset = relationship(
-        "Asset", lazy="selectin", useList=False
+        "Asset", lazy="selectin", uselist=False
     )
 
     user_id = Column(
@@ -47,9 +44,12 @@ class UserPerPropertyStats(UserPerAssetStatsAbsCls):
         "User", lazy='selectin', uselist=False, back_populates="user_per_property_stats"
     )
 
+
 class UserAssetAbsCls(Base):
     __abstract__ = True
 
-    user_per_property_stats = relationship(
-        "UserPerPropertyStats", lazy="seletin", back_populates="user"
-    )
+    @declared_attr
+    def user_per_property_stats(cls): 
+        return relationship(
+            "UserStatsPerProperty", lazy="selectin", back_populates="user"
+        )

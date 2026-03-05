@@ -6,12 +6,20 @@ from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
+from .schemas import (
+    PropertySchema,
+    InteractionEvents,
+    PatchPropertySchema,
+    PropertyResponseSchema,
+    PropertyInteractionSchema,
+)
 from .services import (
     eager_asset_load,
     fetch_agent_assets,
     handle_delete_property,
     get_unverified_properties,
     update_verification_state,
+    handle_persist_property_interaction,
 )
 from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import (
@@ -22,17 +30,13 @@ from property_street_backend.app.models import Asset, User
 from property_street_backend.app.controllers.auth.services import (
     require_roles,
     decode_user_from_token,
-)
-from property_street_backend.app.initiator import get_redis
-from property_street_backend.app.controllers.assets.schemas import (
-    PropertySchema,
-    PropertyResponseSchema,
-    PatchPropertySchema,
-    PropertyResponseSchema,
+    decode_user_from_token_optional,
 )
 from .property_processor_utils import handle_property_create_update
 # from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.assets.services import fetch_latest_assets
+from datetime import datetime
+from sqlalchemy import select, and_
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -181,3 +185,11 @@ async def stream_property(
 ):
     seen_ids = []
     pass
+
+@router.post("/persist-interaction/")
+async def persist_property_interaction(
+    data: InteractionEvents,
+    user: User = Depends(decode_user_from_token_optional),
+    db: AsyncSession = Depends(get_db),
+):
+    return await handle_persist_property_interaction(data, user, db)

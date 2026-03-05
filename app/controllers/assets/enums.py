@@ -20,3 +20,13 @@ class IntentFactor(str, Enum):
 class ImpressionFactor(str, Enum):
     view = "view"
     search_result_appearance = "search_result_appearance"
+
+class InteractionType(str, Enum):
+    like = "like"
+    save = "save"
+    share = "share"
+    cart = "cart"
+    click = "click"
+    contact = "contact"
+    view = "view"
+    search_result_appearance = "search_result_appearance"

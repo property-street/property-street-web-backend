@@ -1,9 +1,10 @@
 from decimal import Decimal
 from datetime import datetime
-from typing import List, Optional
 from typing_extensions import Annotated
-from pydantic import BaseModel, ConfigDict, Field, model_validator, condecimal
+from typing import List, Optional, Literal
+from pydantic import BaseModel, ConfigDict, Field, model_validator, condecimal, RootModel
 
+from .enums import InteractionType
 from property_street_backend.app.controllers.actors.schemas import AgentResponseSchema
 from property_street_backend.app.schemas.area_schema import AreaSchema, AreaResponseSchema, AreaPatchSchema
 from property_street_backend.app.schemas import ConfigDictSetter, make_optional, UtilitySchemaMixin
@@ -159,3 +160,18 @@ class PropertySearchResponse(BaseModel):
     data: AssetResponseSchema
 
 SearchList = List[PropertySearchResponse]
+
+class PropertyInteraction(BaseModel):
+    timestamp: int
+    action: Literal[0,1]
+    
+InteractionEvent = dict[InteractionType, List[PropertyInteraction]]
+InteractionEvents = dict[int, dict[InteractionType, List[PropertyInteraction]]]
+
+class PropertyInteractionSchema(RootModel[InteractionEvents]):
+    pass
+
+class NormalizedInteraction(BaseModel):
+    id: int
+    type: InteractionType
+    data: List[PropertyInteraction]

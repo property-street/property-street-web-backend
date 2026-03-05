@@ -16,19 +16,19 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 
+from .enums import InteractionType as IntentFactor
 from property_street_backend.config.settings import (
     BETA_LAUNCHING, 
     BETA_LAUNCH_PROPERTY_LIMIT,
     UNLIMITED_BETA_AGENTS_EMAILS
 )
-from .enums import IntentFactor, ImpressionFactor
 from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.app.models_helper import AbstractCloudImage
 from property_street_backend.config.postgres_connection_manager import Base
 from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
 
 
-class Asset(Base, AggregateRatingAClass):
+class Asset(AggregateRatingAClass):
     __tablename__ = 'assets'
 
     id = Column(Integer, primary_key=True, index=True)
@@ -163,6 +163,7 @@ class Asset(Base, AggregateRatingAClass):
     views = Column(Integer, default=0)
     clicks = Column(Integer, default=0)
     contacts = Column(Integer, default=0)
+    carts = Column(Integer, default=0)
 
     _user_stats = None
 
@@ -328,18 +329,9 @@ class EventBase(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
-class IntentEvent(EventBase):
-    __tablename__ = "intent_events"
-
-    asset_id = Column(
-        Integer, 
-        ForeignKey(
-            "assets.id",
-            name="fk_intent_event_asset_id",
-            ondelete="CASCADE"
-        ), 
-        index=True, nullable=False
-    )
+class InteractionEventAbsCls(EventBase):
+    __abstract__ = True  # ← Important
+    # For analytical purposes
     user_id = Column(
         Integer, 
         ForeignKey(
@@ -355,28 +347,15 @@ class IntentEvent(EventBase):
     )
 
 
-class ImpressionEvent(EventBase):
-    __tablename__ = "impression_events"
-
-    asset_id = Column(
-        Integer, 
+class PropertyInteractionEvent(InteractionEventAbsCls):
+    __tablename__ = "property_interaction_event"
+    
+    property_id = Column(
+        Integer,
         ForeignKey(
             "assets.id",
-            name="fk_intent_event_asset_id",
+            name="fk_property_interaction_event_asset_id",
             ondelete="CASCADE"
-        ), 
+        ),
         index=True, nullable=False
-    )
-    user_id = Column(
-        Integer, 
-        ForeignKey(
-            "users.id",
-            name="fk_intent_events_user_id",
-            ondelete="CASCADE"
-        ), index=True, nullable=False
-    )
-
-    factor = Column(
-        SqlalchemyEnum(ImpressionFactor, name="impression_factor_enum"),
-        nullable=False, index=True,
     )
