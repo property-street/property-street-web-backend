@@ -14,16 +14,19 @@ from typing import List, Literal, Optional, Dict
 from .models import (
     PropertyInteractionEvent,
 )
-from .utils import (
+from .model_utils import (
     UserStatsPerProperty,
 )
 from .schemas import (
+    StreamPayload,
     InteractionEvents,
     NormalizedInteraction,
     PropertyResponseSchema,
     PartialPropertyResponseSchema,
 )
 from .enums import InteractionType
+from .utils import eager_asset_load
+from .stream import load_stream_state
 from . import property_create_persistence_ttl
 from property_street_backend.app.models import (
     User,
@@ -46,20 +49,6 @@ from property_street_backend.app.controllers.activity.asset_routine_methods impo
     create_or_update_newly_created_asset_cache,
     remove_asset_from_newly_created_asset_cache
 )
-
-def eager_asset_load():
-    return (
-        select(Asset)
-        .options(
-            selectinload(Asset.features),
-            selectinload(Asset.tags),
-            selectinload(Asset.area),
-            selectinload(Asset.unfeatured_images),
-            selectinload(Asset.cover_image),
-            selectinload(Asset.agent)
-            .selectinload(User.profile_avatar)
-        )
-    )
 
 
 async def validate_assets(
@@ -549,8 +538,71 @@ def category_candidates_stmt(
     return stmt
 
 
-async def handle_stream():
-    pass
+async def handle_stream(
+    user: Optional[User],
+    db: AsyncSession,
+    redis_client: Redis,
+    stream_payload: StreamPayload,
+):
+    """Build stream response.
+
+    The stream is personalized when the user is authenticated by including
+    the user's per-property stats (likes, saves, view counts, etc.) on each asset.
+
+    Args:
+        user: Optional current user.
+        db: Database session.
+        redis_client: Redis client.
+        stream_payload: dictionary of 
+         - seen_ids: IDs that should be excluded from the stream.
+         - db_cursor: `created-at` of the last asset
+         - auto_cat_cursor: Last float for the auto-category zset (deduping).
+
+    Returns:
+        List of assets with `user_stats` injected when a user is present.
+    """
+
+    stream_result = await load_stream_state(
+        user,
+        db,
+        redis_client,
+        stream_payload
+    )
+    assets = stream_result['data']
+
+    # If a user is present, attach the user's per-property stats to each asset
+    if user:
+        asset_ids = [asset.id for asset in assets]
+        if asset_ids:
+            stmt = select(UserStatsPerProperty).where(
+                UserStatsPerProperty.user_id == user.id,
+                UserStatsPerProperty.asset_id.in_(asset_ids),
+            )
+            result = await db.execute(stmt)
+            stats_rows = result.scalars().all()
+            stats_map = {s.asset_id: s for s in stats_rows}
+
+            for asset in assets:
+                stats = stats_map.get(asset.id)
+                if stats:
+                    asset.user_stats = {
+                        "liked": bool(stats.liked),
+                        "save": bool(stats.saved),
+                        "share_count": stats.share_count or 0,
+                        "view_count": stats.view_count or 0,
+                    }
+                else:
+                    asset.user_stats = {
+                        "liked": False,
+                        "save": False,
+                        "share_count": 0,
+                        "view_count": 0,
+                    }
+
+    return {
+        **stream_result,
+        "data": assets
+    }
 
 
 async def handle_persist_property_interaction(

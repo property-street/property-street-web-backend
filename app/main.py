@@ -49,6 +49,12 @@ from property_street_backend.config.postgres_connection_manager import runtime_a
 from property_street_backend.app.controllers.utils import remove_all_newly_created_cached_asset_once_on_app_startup
 
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
@@ -77,7 +83,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-
+# create limiter (use your Redis URL here)
+# register limiter in app state + attach middleware/exception handler
+# limiter = Limiter(
+#     key_func=get_remote_address,
+#     storage_uri="redis://localhost:6379/0",  # or use your config
+# )
+# app.state.limiter = limiter
+# app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# app.add_middleware(SlowAPIMiddleware)
+# app.state.limiter.limit("100/hour")(app)  # apply to all routes
 
 # CORS middleware
 app.add_middleware(

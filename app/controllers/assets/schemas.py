@@ -175,3 +175,11 @@ class NormalizedInteraction(BaseModel):
     id: int
     type: InteractionType
     data: List[PropertyInteraction]
+
+class StreamPayload(BaseModel):
+    seen_ids: List[int] = []
+    db_cursor: datetime | None = None
+    auto_cat_cursor: float | None = None
+    
+class StreamResponse(StreamPayload):
+    data: List[PropertyResponseSchema] = []

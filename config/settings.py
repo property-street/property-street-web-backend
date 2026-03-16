@@ -1,7 +1,11 @@
 import os
 import socket
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)\
 
 # Explicitly load your custom env file first
 load_dotenv(".env.backend")

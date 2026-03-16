@@ -26,7 +26,7 @@ from property_street_backend.config.settings import (
 )
 from property_street_backend.app.controllers.auth import verify_password
 from property_street_backend.config.postgres_connection_manager import Base
-from property_street_backend.app.controllers.assets.utils import UserAssetAbsCls
+from property_street_backend.app.controllers.assets.model_utils import UserAssetAbsCls
 from property_street_backend.app.controllers.ratings.utils import AggregateRatingAClass
 
 class User(AggregateRatingAClass, UniqueIDArrayMixin, UserAssetAbsCls):

@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import Asset
-
+from .settings import STREAM_CURSOR_EXPIRY
 default_zset_subs = {
     # ----------------------------
     # Property category intent
@@ -79,7 +79,19 @@ MAX_RESULTS_PER_STREAM = 15
 auto_cat_tracker_zset_key = "auto:categories:tracker"
 db_fallback_stream_cursor = "db:stream:cursor"
 db_stream_cursor = "db:stream:cursor"
-auto_cat_stream_last_score = "auto:cat:stream:cursor"
+
+class AutoCategoryStreamLastScoreManager:
+    def __init__(self, user_id: int):
+        self.user_id = user_id
+        self.hash = f"auto:cat:stream:cursor:{user_id}"
+    async def get_auto_cat_stream_last_score(self, redis_client: Redis) -> float | None: 
+        score_bytes = await redis_client.get(self.hash)
+        if score_bytes:
+            return float(score_bytes.decode() if isinstance(score_bytes, bytes) else score_bytes)
+        return None
+    async def update_auto_cat_stream_last_score(self, score: float | None, redis_client: Redis): 
+        if score is not None:
+            await redis_client.set(self.hash, score, ex=STREAM_CURSOR_EXPIRY)
 
 async def load_datetime_cursor_from_redis(key: str, redis_client: Redis) -> datetime|None:
     datetime_str = await redis_client.get(key)

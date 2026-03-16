@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, status, HTTPException
 
 from .schemas import (
+    StreamPayload,
+    StreamResponse,
     PropertySchema,
     InteractionEvents,
     PatchPropertySchema,
@@ -14,6 +16,7 @@ from .schemas import (
     PropertyInteractionSchema,
 )
 from .services import (
+    handle_stream,
     eager_asset_load,
     fetch_agent_assets,
     handle_delete_property,
@@ -178,18 +181,20 @@ async def delete_property(
     return await handle_delete_property(db, property_id, agent)
 
 
-@router.get("/stream/")
+@router.post("/stream/", response_model=StreamResponse)
 async def stream_property(
-    user: User = Depends(decode_user_from_token),
+    data: StreamPayload,
+    user: User = Depends(decode_user_from_token_optional),
+    db: AsyncSession = Depends(get_db),
     redis_client: Redis = Depends(get_redis),
 ):
-    seen_ids = []
-    pass
+    return await handle_stream(user, db, redis_client, data)
+
 
 @router.post("/persist-interaction/")
 async def persist_property_interaction(
     data: InteractionEvents,
-    user: User = Depends(decode_user_from_token_optional),
+    user: User = Depends(decode_user_from_token),
     db: AsyncSession = Depends(get_db),
 ):
     return await handle_persist_property_interaction(data, user, db)
