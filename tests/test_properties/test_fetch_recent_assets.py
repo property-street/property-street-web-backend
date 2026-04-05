@@ -1,6 +1,6 @@
-import json
 import pytest
 from typing import List
+from datetime import datetime, timezone
 from httpx import AsyncClient
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,20 +14,14 @@ from property_street_backend.app.models import (
     AssetCloudImage,
     CloudImageDetail,
 )
-from property_street_backend.app.initiator import logger
-from property_street_backend.tests.auth.test_create_agent import (
-    create_test_agent
-)
+from property_street_backend.app.controllers.auth.utils import ensure_admin_user
 from property_street_backend.tests.activity.test_controller.test_objects import (
     area_template,
     cloud_image_template,
 )
-from property_street_backend.app.controllers.assets.schemas import AssetResponseSchema
-from property_street_backend.app.controllers.activity import (
-    auto_category_hset_key,
-    newly_created_asset_set_key, 
+from property_street_backend.app.controllers.assets.asset_routine_methods import (
+    newly_created_asset_zset_key,
 )
-from property_street_backend.app.controllers.assets.services import eager_asset_load
 
 def pre_commit_test_asset_collection(agent_id: int ,size: int = 10) -> List[Asset]: 
     # Create 10 assets
@@ -41,7 +35,7 @@ def pre_commit_test_asset_collection(agent_id: int ,size: int = 10) -> List[Asse
             description="Test Description",
             category="Category Y",
             status="Available",
-            availability="available",
+            listing_type="Rent",
             area = Area(**area_template),
             cover_image=CloudImageDetail(
                 **{
@@ -54,7 +48,7 @@ def pre_commit_test_asset_collection(agent_id: int ,size: int = 10) -> List[Asse
                     name=f"tag {i}{j}"
                 ) for j in range(2)
             ],
-            cloud_images=[
+            unfeatured_images=[
                 AssetCloudImage(
                     **{
                         **cloud_image_template, 
@@ -63,8 +57,12 @@ def pre_commit_test_asset_collection(agent_id: int ,size: int = 10) -> List[Asse
                 )
                 for j in range(2)
             ],
+            verified=True
         ) for i in range(size)
     ]
+
+
+
 
 
 @pytest.mark.asyncio
@@ -75,8 +73,8 @@ async def test_latest_collection(client__fixture):
     test_db: AsyncSession = client__fixture['db']
     redis_client: Redis = client__fixture['redis_client']
 
-    # Create a test agent/user
-    created_agent: User = await create_test_agent(test_db)
+    # Make the agent an admin to by pass the 5-property limit
+    created_agent: User = await ensure_admin_user(test_db)
 
     # Create 10 assets
     test_assets = pre_commit_test_asset_collection(created_agent.id)
@@ -85,41 +83,27 @@ async def test_latest_collection(client__fixture):
     test_db.add_all(test_assets[:5])
     await test_db.commit()
 
-    # Loop through the first five, 
-    # add an id, has_features attribute
-    # and validate em against the Schema class
-    # and save to the cache
-    assets_to_cache = {}
+    # Loop through the next 5, add to DB, and cache their IDs
     for asset in test_assets[5:]:
         test_db.add(asset)
         await test_db.flush()
         await test_db.refresh(asset)
 
-        stmt = (
-            eager_asset_load()
-            .where(Asset.id == asset.id)
+        # Add asset ID to the cache (not the full property data)
+        timestamp = datetime.now(timezone.utc).timestamp()
+        await redis_client.zadd(
+            newly_created_asset_zset_key,
+            {asset.id: timestamp}
         )
-        result = await test_db.execute(stmt)
-        queried_asset = result.scalars().first()
-        if not queried_asset:
-            raise Exception(message="Queried asset not unavailable") 
-        
-        schematized_asset = AssetResponseSchema.model_validate(queried_asset)
-        schematized_asset_dict = schematized_asset.model_dump()
-        assets_to_cache[schematized_asset_dict['id']] = schematized_asset_dict
-    await redis_client.hset(
-        auto_category_hset_key, 
-        newly_created_asset_set_key, 
-        json.dumps(assets_to_cache)
-    )
 
-    # Perform the GET request with authentication
+    # Perform the GET request
     size = 10
     response = await httpx_client.get(f"/assets/latests?size={size}")
     assert response.status_code == 200
 
-    # Validate response structure for authenticated user
+    # Validate response structure
     assets = response.json()
-    # logger.info(data)
     assert len(assets) == size
     assert [tag['name'] for tag in assets[0]['tags']]
+    # assert for user_stats
+    assert all(asset.get('user_stats') for asset in assets)

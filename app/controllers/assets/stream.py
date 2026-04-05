@@ -27,6 +27,7 @@ max_result_per_stream = MAX_RESULTS_PER_STREAM
 
 async def load_stream_state(
     user: User | None,
+    size: int,
     db: AsyncSession,
     redis_client: Redis,
     stream_payload: StreamPayload,
@@ -41,6 +42,7 @@ async def load_stream_state(
     db_cursor = stream_payload.db_cursor
     auto_category_next_score = stream_payload.auto_cat_cursor
     next_cursor = db_cursor
+    max_result_per_stream = size or MAX_RESULTS_PER_STREAM
 
     # ----------------------------
     # 1. Preference-based stream
@@ -63,12 +65,12 @@ async def load_stream_state(
     # 2. Auto-categories discovery
     # ----------------------------
     auto_category_next_score = "+inf"
-    if len(results) < MAX_RESULTS_PER_STREAM:
+    if len(results) < max_result_per_stream:
         
         rows, auto_category_next_score = await load_stream_state_from_auto_categories(
             db,
             redis_client,
-            limit=MAX_RESULTS_PER_STREAM - len(results),
+            limit=max_result_per_stream  - len(results),
             seen_ids=list(seen_ids_set),
             last_score=stream_payload.auto_cat_cursor,
             user_id=user_id
@@ -83,11 +85,11 @@ async def load_stream_state(
     # ----------------------------
     # 3. DB hard fallback
     # ----------------------------
-    if len(results) < MAX_RESULTS_PER_STREAM:
+    if len(results) < max_result_per_stream:
 
         rows, next_cursor = await load_stream_state_from_db(
             db,
-            limit=MAX_RESULTS_PER_STREAM - len(results),
+            limit=max_result_per_stream - len(results),
             cursor=db_cursor,
             seen_ids=list(seen_ids_set),
         )

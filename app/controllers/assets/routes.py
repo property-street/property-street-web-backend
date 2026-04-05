@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import Query
 import redis.asyncio as redis
 from redis.asyncio import Redis
@@ -48,6 +48,7 @@ router = APIRouter(prefix="/assets", tags=["assets"])
 async def latest(
     session: AsyncSession = Depends(get_db),
     redis_client: Redis = Depends(get_redis),
+    user: Optional[User] = Depends(decode_user_from_token_optional),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
 ):
@@ -58,7 +59,8 @@ async def latest(
         page = page,
         size = size,
         session = session,
-        redis_client = redis_client
+        redis_client = redis_client,
+        user = user,
     )
 
 
@@ -86,7 +88,7 @@ async def update_property_endpoint(
 async def retrieve_agent_assets(
     agent_id: int,
     session: AsyncSession = Depends(get_db),
-    # _: User = Depends(decode_user_from_token),
+    user: Optional[User] = Depends(decode_user_from_token_optional),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
 ):
@@ -94,7 +96,8 @@ async def retrieve_agent_assets(
         session = session,
         agent_id = agent_id,
         page = page,
-        size = size
+        size = size,
+        user = user,
     )
     
 
@@ -109,7 +112,8 @@ async def retrieve_agent_assets(
         session = session,
         agent_id = current_user.id,
         page = page,
-        size = size
+        size = size,
+        user = current_user,
     )
     
 
@@ -184,11 +188,12 @@ async def delete_property(
 @router.post("/stream/", response_model=StreamResponse)
 async def stream_property(
     data: StreamPayload,
+    size: int = Query(5, ge=1, le=100),
     user: User = Depends(decode_user_from_token_optional),
     db: AsyncSession = Depends(get_db),
     redis_client: Redis = Depends(get_redis),
 ):
-    return await handle_stream(user, db, redis_client, data)
+    return await handle_stream(user, size, db, redis_client, data)
 
 
 @router.post("/persist-interaction/")

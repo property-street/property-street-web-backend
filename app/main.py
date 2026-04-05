@@ -49,10 +49,10 @@ from property_street_backend.config.postgres_connection_manager import runtime_a
 from property_street_backend.app.controllers.utils import remove_all_newly_created_cached_asset_once_on_app_startup
 
 
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
+# from slowapi import Limiter, _rate_limit_exceeded_handler
+# from slowapi.middleware import SlowAPIMiddleware
+# from slowapi.util import get_remote_address
+# from slowapi.errors import RateLimitExceeded
 
 
 @asynccontextmanager

@@ -39,8 +39,8 @@ from property_street_backend.app.initiator import logger
 from property_street_backend.log_config.logger_config import (
     log_message
 )
-from property_street_backend.app.controllers.activity.asset_routine_methods import (
-    create_or_update_newly_created_asset_cache
+from property_street_backend.app.controllers.assets.asset_routine_methods import (
+    add_asset_id_to_newly_created_cache
 )
 
 
@@ -170,14 +170,10 @@ async def handle_property_create_update(
     # Handle caching
     # ===============
     try:
-        schematized_asset = PropertyResponseSchema.model_validate(property) 
-        schematized_asset_to_dict = schematized_asset.model_dump()
-        await create_or_update_newly_created_asset_cache(
-            asset_id = property.id,
-            asset_data = schematized_asset_to_dict,
-            redis_client = redis_client,
-            newly_created = newly_created,
-            expiry_seconds = ttl_in_seconds,
+        await add_asset_id_to_newly_created_cache(
+            asset_id=property.id,
+            redis_client=redis_client,
+            expiry_seconds=ttl_in_seconds,
         )
     except Exception as e:
         if DEBUG:

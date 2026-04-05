@@ -2,7 +2,7 @@ from decimal import Decimal
 from datetime import datetime
 from typing_extensions import Annotated
 from typing import List, Optional, Literal
-from pydantic import BaseModel, ConfigDict, Field, model_validator, condecimal, RootModel
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator, RootModel
 
 from .enums import InteractionType
 from property_street_backend.app.controllers.actors.schemas import AgentResponseSchema
@@ -114,7 +114,7 @@ class PropertySchema(AssetSchema):
 
 class UserPropertyStats(ConfigDictSetter):
     liked: bool = False
-    save: bool = False
+    saved: bool = False
     share_count: int = 0
     view_count: int = 0
 
@@ -136,6 +136,25 @@ class PropertyResponseSchema(ConfigDictSetter, AssetSchema):
     likes: int = 0
     user_stats: Optional[UserPropertyStats] = None
 
+    @field_validator(
+        "likes",
+        "total_ratings",
+        "total_stars",
+        # "saves",
+        # "shares",
+        # "views",
+        # "clicks",
+        # "contacts",
+        # "carts",
+        mode="before",
+    )
+    @classmethod
+    def none_to_zero(cls, v):
+        if v is None:
+            return 0
+        return v
+
+
 class AssetResponseSchema(PropertyResponseSchema):
     pass
 
@@ -153,7 +172,7 @@ class PartialPropertyResponseSchema(partial_property_response):
 
 
 class LatestAssetsFetchResponseSchema(ConfigDictSetter):
-    assets: List[AssetResponseSchema]
+    assets: List[PropertyResponseSchema]
 
 class PropertySearchResponse(BaseModel):
     type: str = 'property'
@@ -162,11 +181,11 @@ class PropertySearchResponse(BaseModel):
 SearchList = List[PropertySearchResponse]
 
 class PropertyInteraction(BaseModel):
-    timestamp: int
+    timestamp_ms: int
     action: Literal[0,1]
     
 InteractionEvent = dict[InteractionType, List[PropertyInteraction]]
-InteractionEvents = dict[int, dict[InteractionType, List[PropertyInteraction]]]
+InteractionEvents = dict[int, InteractionEvent]
 
 class PropertyInteractionSchema(RootModel[InteractionEvents]):
     pass

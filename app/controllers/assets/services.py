@@ -19,6 +19,7 @@ from .model_utils import (
 )
 from .schemas import (
     StreamPayload,
+    UserPropertyStats,
     InteractionEvents,
     NormalizedInteraction,
     PropertyResponseSchema,
@@ -44,10 +45,10 @@ from property_street_backend.app.controllers.activity import (
     auto_category_hset_key,
     newly_created_asset_set_key, 
 )
+from .asset_routine_methods import add_asset_id_to_newly_created_cache
 from property_street_backend.log_config.logger_config import log_message
-from property_street_backend.app.controllers.activity.asset_routine_methods import (
-    create_or_update_newly_created_asset_cache,
-    remove_asset_from_newly_created_asset_cache
+from property_street_backend.app.controllers.assets.asset_routine_methods import (
+    get_newly_created_asset_ids
 )
 
 
@@ -91,55 +92,48 @@ async def fetch_latest_assets(
     page: int,
     size: int,
     session: AsyncSession,
-    redis_client: Redis
+    redis_client: Redis,
+    user: Optional[User] = None,
 ):
     offset = (page - 1) * size
     results = []
-    seen_ids = set()  # Track IDs to avoid duplication
+    cache_ids = set()
 
-    # === Step 1: Try Redis Cache ===
-    newly_created_asset_serialized_cache_dict = await redis_client.hget(
-        auto_category_hset_key, newly_created_asset_set_key
+    # === Step 1: Get asset IDs from Redis Cache ===
+    cached_asset_ids = await get_newly_created_asset_ids(
+        redis_client=redis_client,
+        offset=offset,
+        limit=size
     )
 
-    newly_created_asset_cache_dict = (
-        json.loads(newly_created_asset_serialized_cache_dict)
-        if newly_created_asset_serialized_cache_dict
-        else {}
-    )
+    cache_result_length = len(cached_asset_ids)
+    
+    # Query database for cached asset IDs
+    if cached_asset_ids:
+        result = await session.execute(
+            eager_asset_load()
+            .where(Asset.id.in_(cached_asset_ids))
+            .order_by(Asset.id.in_(cached_asset_ids))  # Maintain cache order
+        )
+        cached_assets = result.scalars().all()
+        results.extend(cached_assets)
+        cache_ids = set(cached_asset_ids)
 
-    if newly_created_asset_cache_dict:
-        property_list = list(newly_created_asset_cache_dict.values())
-        property_list.reverse()
-
-        # Get portion from cache
-        cache_slice = property_list[offset : offset + size]
-        results.extend(cache_slice)
-
-        # Record their IDs to skip in DB fetch
-        for property in cache_slice:
-            if isinstance(property, dict):
-                seen_ids.add(property.get("id"))
-            else:
-                seen_ids.add(getattr(property, "id", None))
-
-    # logger.info(f"Results: {results}")
-    cache_result_length = len(results)
-    size -= cache_result_length
+    remaining_size = size - cache_result_length
 
     # === Step 2: Fill remaining slots from DB ===
-    if size > 0:
-        db_offset = offset + cache_result_length
+    if remaining_size > 0:
+        db_offset = offset if not cache_ids else 0
         stmt = (
             eager_asset_load()
             .order_by(Asset.created_at.desc())
             .offset(db_offset)
-            .limit(size)
+            .limit(remaining_size)
         )
 
         # Skip already retrieved IDs
-        if seen_ids:
-            stmt = stmt.where(~Asset.id.in_(seen_ids))
+        if cache_ids:
+            stmt = stmt.where(~Asset.id.in_(cache_ids))
 
         result = await session.execute(stmt)
         raw_assets = result.scalars().all()
@@ -159,7 +153,55 @@ async def fetch_latest_assets(
         f"{len(valid_assets)} valid assets returned. {len(skipped_assets)} skipped due to schema errors."
     )
 
-    return valid_assets
+    assets_with_stats = await enrich_property_engagement_data(valid_assets, session, user)
+    return assets_with_stats
+
+
+async def enrich_property_engagement_data(
+    assets: List[Asset],
+    db: AsyncSession,
+    user: Optional[User] = None,
+):
+    if not assets:
+        return assets
+
+    asset_ids = [asset.id for asset in assets if asset.id is not None]
+
+    # Normalize underlying asset counters to non-null values
+    for asset in assets:
+        asset.total_ratings = asset.total_ratings or 0
+        asset.total_stars = asset.total_stars or 0
+        asset.likes = asset.likes or 0
+
+    user_stats_by_asset_id: Dict[int, UserStatsPerProperty] = {}
+    logger.info(f"**User: {user}")
+
+    if user and asset_ids:
+        result = await db.execute(
+            select(UserStatsPerProperty).where(
+                and_(
+                    UserStatsPerProperty.user_id == user.id,
+                    UserStatsPerProperty.asset_id.in_(asset_ids),
+                )
+            )
+        )
+        user_stats_by_asset_id = {
+            stat.asset_id: stat
+            for stat in result.scalars().all()
+        }
+
+    for asset in assets:
+        stats = user_stats_by_asset_id.get(asset.id)
+        # if DEBUG:
+        #    logger.info(f"**User stats for {asset.id} {UserPropertyStats.model_validate(stats).model_dump()}") 
+        asset.user_stats = UserPropertyStats(
+            liked = bool(stats.liked) if stats else False,
+            saved = bool(stats.saved) if stats else False,
+            share_count = (stats.share_count or 0) if stats else 0,
+            view_count = (stats.view_count or 0) if stats else 0,
+        )
+
+    return assets
 
 
 async def fetch_agent_assets(
@@ -167,6 +209,7 @@ async def fetch_agent_assets(
     size: int,
     page: int,
     agent_id: int,
+    user: Optional[User] = None,
 ):
     offset  = (page-1) * size
     # Query the agent and related assets
@@ -183,8 +226,10 @@ async def fetch_agent_assets(
     
     v_assets, _ = await validate_assets(session, assets, verified_only=False)
 
+    assets_with_stats = await enrich_property_engagement_data(v_assets, session, user)
+
     try:
-        return v_assets
+        return assets_with_stats
     except Exception as e:
         f_message = "An error occured while retrieving your assets."
         d_message = f"An error occured while retrieving agent {agent_id} asset. Reason {e}" 
@@ -437,7 +482,6 @@ async def update_verification_state(
             detail="Property not found.",
         )
 
-    property_id = property.id
     now = datetime.now(timezone.utc)
     action_is_verify = action == 'verify'
     action_is_cancel = action == 'cancel'
@@ -472,36 +516,11 @@ async def update_verification_state(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f_msg,
         )
-    
-    # ===============
-    # Handle caching
-    # ===============
-    try:
-        if action_is_verify:
-            ttl_in_seconds = property_create_persistence_ttl()
-            dumped_property = PropertyResponseSchema.model_validate(
-                property
-            ).model_dump()
-            await create_or_update_newly_created_asset_cache(
-                asset_id = property.id,
-                asset_data = dumped_property,
-                redis_client = redis_client,
-                newly_created = False,
-                expiry_seconds = ttl_in_seconds,
-            )
-        elif action_is_cancel:
-            await remove_asset_from_newly_created_asset_cache(
-                property_id, redis_client
-            )
-    except Exception as e:
-        logger.warning(f"Cache update failed: {e}")
-        raise
 
     # Send appropriate email notification
     await send_verification_state_email(property, action, cancellation_reason=cancellation_reason)
     
     return property
-
 
 
 async def handle_delete_property(db: AsyncSession, id: int, agent: User):
@@ -540,6 +559,7 @@ def category_candidates_stmt(
 
 async def handle_stream(
     user: Optional[User],
+    size: int,
     db: AsyncSession,
     redis_client: Redis,
     stream_payload: StreamPayload,
@@ -551,6 +571,7 @@ async def handle_stream(
 
     Args:
         user: Optional current user.
+        size: Size per stream.
         db: Database session.
         redis_client: Redis client.
         stream_payload: dictionary of 
@@ -559,11 +580,12 @@ async def handle_stream(
          - auto_cat_cursor: Last float for the auto-category zset (deduping).
 
     Returns:
-        List of assets with `user_stats` injected when a user is present.
+        Object including seen_ids, cursors, and assets with `user_stats` injected when a user is present.
     """
 
     stream_result = await load_stream_state(
         user,
+        size,
         db,
         redis_client,
         stream_payload
@@ -637,6 +659,38 @@ async def handle_persist_property_interaction(
                     "data": data
                 })
     
+        singleton_types = {
+            InteractionType.like,
+            InteractionType.save,
+            InteractionType.cart,
+        }
+
+        if DEBUG:
+            stats_by_user = None
+
+        # Keep the last event for singleton types per user per property to avoid duplicate count bump
+        singleton_latest: Dict[tuple[int, InteractionType], list] = {}
+        non_singleton_events: List[Dict] = []
+
+        for interaction in normalized_interactions:
+            property_id = interaction['id']
+            event_type = interaction['type']
+            event_data = interaction['data']
+
+            if event_type in singleton_types:
+                singleton_latest[(property_id, event_type)] = event_data[-1:] if event_data else []
+            else:
+                non_singleton_events.append(interaction)
+
+        normalized_interactions = non_singleton_events[:]
+        for (property_id, event_type), event_data in singleton_latest.items():
+            if event_data:
+                normalized_interactions.append({
+                    'id': property_id,
+                    'type': event_type,
+                    'data': event_data,
+                })
+
         for interaction in normalized_interactions:
             property_id = interaction['id']
 
@@ -665,28 +719,32 @@ async def handle_persist_property_interaction(
                         contact_count=0
                     )
                 user_stats_per_asset_map[property_id] = user_stats
+                if DEBUG:
+                    stats_by_user = user_stats
                 db.add(user_stats)
             
             event_type = interaction['type']
 
+            seen_event_keys = set()
             for interaction_data in interaction['data']:
+                event_key = f"{property_id}:{event_type}:{interaction_data.timestamp_ms}:{interaction_data.action}"
+                if event_key in seen_event_keys:
+                    continue
+                seen_event_keys.add(event_key)
+
                 # Verify property existence
                 asset = await db.get(Asset, property_id)
                 
-                if not asset:
+                if not asset and DEBUG:
                     logger.warning(f"Property with ID {property_id} not found, skipping")
                     continue
 
                 action = interaction_data.action
-                timestamp = interaction_data.timestamp
-                
-                # Convert Unix timestamp to datetime
-                event_timestamp = datetime.fromtimestamp(timestamp / 1000)  # Convert from milliseconds
                 
                 # Create PropertyInteractionEvent
                 interaction_event = PropertyInteractionEvent(
                     property_id=property_id,
-                    created_at=event_timestamp,
+                    timestamp_ms=interaction_data.timestamp_ms,
                     factor=event_type,
                     user_id=user_id
                 )
@@ -695,34 +753,51 @@ async def handle_persist_property_interaction(
                 # Update user stats and asset stat based on action type
                 match event_type:
                     case InteractionType.like:
-                        user_stats.liked = True if action else False
-                        asset.likes = max(0, asset.likes + (1 if action else -1))
+                        prev_liked = user_stats.liked
+                        new_liked = True if action else False
+                        if prev_liked != new_liked:
+                            delta = 1 if new_liked else -1
+                            asset.likes = max(0, (asset.likes or 0) + delta)
+                        user_stats.liked = new_liked
                     case InteractionType.save:
-                        user_stats.saved = True if action else False
-                        asset.saves = max(0, asset.saves + (1 if action else -1))
+                        prev_saved = user_stats.saved
+                        new_saved = True if action else False
+                        if prev_saved != new_saved:
+                            delta = 1 if new_saved else -1
+                            asset.saves = max(0, (asset.saves or 0) + delta)
+                        user_stats.saved = new_saved
                     case InteractionType.cart:
-                        user_stats.cart = True if action else False
-                        asset.carts = max(0, asset.carts + (1 if action else -1))
+                        prev_cart = user_stats.cart
+                        new_cart = True if action else False
+                        if prev_cart != new_cart:
+                            delta = 1 if new_cart else -1
+                            asset.carts = max(0, (asset.carts or 0) + delta)
+                        user_stats.cart = new_cart
                     case InteractionType.share:
-                        user_stats.share_count += 1
-                        asset.shares += 1
+                        user_stats.share_count = (user_stats.share_count or 0) + 1
+                        asset.shares = ( asset.shares or 0) + 1
                     case InteractionType.view:
                         # check that the user-id is not the asset's agent-id
                         if user.id != asset.agent_id:
-                            user_stats.view_count += 1
-                            asset.views += 1
+                            user_stats.view_count = (user_stats.view_count or 0) + 1
+                            asset.views = (asset.views or 0) + 1
                     case InteractionType.click:
-                        user_stats.click_count += 1
-                        asset.clicks += 1
+                        user_stats.click_count = (user_stats.click_count or 0) + 1
+                        asset.clicks = (asset.clicks or 0) + 1
                     case InteractionType.contact:
-                        user_stats.contact_count += 1
-                        asset.contacts += 1
+                        user_stats.contact_count = (user_stats.contact_count or 0) + 1
+                        asset.contacts = (asset.contacts or 0) + 1
                     case _:
                         raise ValueError(f"Unsupported interaction type: {event_type}")
                 interaction_count += 1
             
         # Commit all changes
         await db.commit()
+
+        if DEBUG:
+            await db.refresh(stats_by_user)
+            logger.info(f"**User stats {UserPropertyStats.model_validate(stats_by_user).model_dump()}")
+
         
         logger.info(f"Successfully processed {interaction_count} interactions")
         

@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Response
 
 from . import verify_password, pwd_context
+
 from property_street_backend.config import env_is_test
 from property_street_backend.app.schemas.auth_schemas import (
     TokenData, 
@@ -49,6 +50,7 @@ ALGORITHM = JWT_ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = JWT_EXPIRATION_DELTA
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 
 app = FastAPI()
 router = APIRouter()
@@ -65,20 +67,14 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-
-def fetched_access_token(user: User):
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
-
 def fetch_access_token(user: User):
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+fetched_access_token = fetch_access_token
 
 # signin
 async def authenticate_user(db: AsyncSession, login: str, password: str) -> User|None:
@@ -251,6 +247,9 @@ async def decode_user_from_token_optional(
     Decode user from token without raising exceptions.
     Returns None if the token is invalid or the user is not found.
     """
+    if not token:
+        return None
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")

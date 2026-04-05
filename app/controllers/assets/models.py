@@ -10,6 +10,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    BigInteger,
     Enum as SqlalchemyEnum,
 )
 from sqlalchemy.future import select
@@ -326,7 +327,7 @@ class EventBase(Base):
     __abstract__ = True  # ← Important
 
     id = Column(Integer, primary_key=True, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    timestamp_ms = Column(BigInteger)
 
 
 class InteractionEventAbsCls(EventBase):
@@ -342,7 +343,7 @@ class InteractionEventAbsCls(EventBase):
     )
 
     factor = Column(
-        SqlalchemyEnum(IntentFactor, name="intent_factor_enum"),
+        SqlalchemyEnum(IntentFactor, name="intent_factor"),
         nullable=False, index=True,
     )
 
