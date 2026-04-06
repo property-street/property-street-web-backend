@@ -3,7 +3,8 @@ from redis.asyncio import Redis
 from fastapi import (
     APIRouter, 
     Depends, 
-    FastAPI
+    FastAPI,
+    Request,
 )
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -11,8 +12,12 @@ from sqlalchemy.ext.asyncio import (
 )
 from contextlib import AsyncExitStack
 from contextlib import asynccontextmanager
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy.ext.asyncio import AsyncSession
+from slowapi.middleware import SlowAPIMiddleware
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
 
 
 from property_street_backend.app.database import (
@@ -40,8 +45,9 @@ from property_street_backend.app.initiator import (
     get_redis,
 )
 from property_street_backend.config.settings import (
-    ENVIRONMENT as environment,
+    REDIS_URL,
     CORS_ORIGINS,
+    ENVIRONMENT as environment,
 )
 from property_street_backend.config.redis_connection_manager import runtime_async_redis
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
@@ -49,10 +55,6 @@ from property_street_backend.config.postgres_connection_manager import runtime_a
 from property_street_backend.app.controllers.utils import remove_all_newly_created_cached_asset_once_on_app_startup
 
 
-# from slowapi import Limiter, _rate_limit_exceeded_handler
-# from slowapi.middleware import SlowAPIMiddleware
-# from slowapi.util import get_remote_address
-# from slowapi.errors import RateLimitExceeded
 
 
 @asynccontextmanager
@@ -85,14 +87,23 @@ app = FastAPI(lifespan=lifespan)
 
 # create limiter (use your Redis URL here)
 # register limiter in app state + attach middleware/exception handler
-# limiter = Limiter(
-#     key_func=get_remote_address,
-#     storage_uri="redis://localhost:6379/0",  # or use your config
-# )
-# app.state.limiter = limiter
-# app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-# app.add_middleware(SlowAPIMiddleware)
-# app.state.limiter.limit("100/hour")(app)  # apply to all routes
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=REDIS_URL,  # or use your config
+    default_limits=["100/minute", "1000/hour"],
+    enabled=True,
+)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# Apply globally to all routes
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    # Rate limit by IP address
+    await limiter.hit(request, "global", get_remote_address(request))
+    response = await call_next(request)
+    return response
 
 # CORS middleware
 app.add_middleware(
