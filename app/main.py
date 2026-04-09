@@ -87,6 +87,7 @@ app = FastAPI(lifespan=lifespan)
 
 # create limiter (use your Redis URL here)
 # register limiter in app state + attach middleware/exception handler
+"""
 limiter = Limiter(
     key_func=get_remote_address,
     storage_uri=REDIS_URL,  # or use your config
@@ -104,6 +105,7 @@ async def rate_limit_middleware(request: Request, call_next):
     await limiter.hit(request, "global", get_remote_address(request))
     response = await call_next(request)
     return response
+"""
 
 # CORS middleware
 app.add_middleware(
