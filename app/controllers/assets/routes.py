@@ -16,6 +16,7 @@ from .schemas import (
     PropertyInteractionSchema,
 )
 from .services import (
+    discover_properties,
     handle_stream,
     eager_asset_load,
     fetch_agent_assets,
@@ -61,6 +62,39 @@ async def latest(
         session = session,
         redis_client = redis_client,
         user = user,
+    )
+
+
+@router.get("/discover", response_model=List[PropertyResponseSchema])
+async def discover(
+    session: AsyncSession = Depends(get_db),
+    user: Optional[User] = Depends(decode_user_from_token_optional),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    query: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    area: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    min_price: Optional[str] = Query(None),
+    max_price: Optional[str] = Query(None),
+    tags: Optional[str] = Query(None),
+    features: Optional[str] = Query(None),
+    seen_ids: Optional[str] = Query(None),
+):
+    return await discover_properties(
+        session=session,
+        user=user,
+        page=page,
+        size=size,
+        query=query,
+        category=category,
+        area=area,
+        status=status,
+        min_price=min_price,
+        max_price=max_price,
+        tags=tags,
+        features=features,
+        seen_ids=seen_ids,
     )
 
 

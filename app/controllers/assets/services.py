@@ -1,6 +1,9 @@
 import json
+import re
+import unicodedata
 from fastapi import status
-from sqlalchemy import and_
+from decimal import Decimal, InvalidOperation
+from sqlalchemy import and_, or_
 from redis.asyncio import Redis
 from fastapi import HTTPException
 from pydantic import ValidationError
@@ -32,8 +35,10 @@ from . import property_create_persistence_ttl
 from property_street_backend.app.models import (
     User,
     Asset, 
-    Area
+    Area,
+    Tag,
 )
+from property_street_backend.app.controllers.assets.models import AssetFeature
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.utils.store import (
@@ -155,6 +160,138 @@ async def fetch_latest_assets(
 
     assets_with_stats = await enrich_property_engagement_data(valid_assets, session, user)
     return assets_with_stats
+
+
+def normalize_search_text(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    normalized = unicodedata.normalize("NFKD", value)
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"\s+", " ", ascii_text).strip().lower()
+
+
+def split_csv_or_space(value: Optional[str]) -> list[str]:
+    if not value:
+        return []
+    normalized = normalize_search_text(value.replace(",", " "))
+    return [token for token in normalized.split(" ") if token]
+
+
+def parse_seen_ids(seen_ids: Optional[list[int] | str]) -> list[int]:
+    if not seen_ids:
+        return []
+    if isinstance(seen_ids, list):
+        return [int(entry) for entry in seen_ids]
+    return [int(entry) for entry in re.findall(r"\d+", seen_ids)]
+
+
+def parse_decimal_or_none(value: Optional[str | float | int]) -> Optional[Decimal]:
+    if value in [None, ""]:
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+
+
+async def discover_properties(
+    session: AsyncSession,
+    user: Optional[User] = None,
+    *,
+    page: int = 1,
+    size: int = 20,
+    query: Optional[str] = None,
+    category: Optional[str] = None,
+    area: Optional[str] = None,
+    status: Optional[str] = None,
+    min_price: Optional[str | float | int] = None,
+    max_price: Optional[str | float | int] = None,
+    tags: Optional[str] = None,
+    features: Optional[str] = None,
+    seen_ids: Optional[list[int] | str] = None,
+):
+    offset = max(0, (page - 1) * size)
+    normalized_query = split_csv_or_space(query)
+    normalized_area = split_csv_or_space(area)
+    normalized_tags = split_csv_or_space(tags)
+    normalized_features = split_csv_or_space(features)
+    normalized_category = normalize_search_text(category)
+    normalized_status = normalize_search_text(status)
+    parsed_seen_ids = parse_seen_ids(seen_ids)
+
+    stmt = (
+        eager_asset_load()
+        .join(Area, Asset.area_id == Area.id)
+        .outerjoin(Asset.tags)
+        .outerjoin(Asset.features)
+        .where(Asset.verified.is_(True))
+        .distinct()
+        .offset(offset)
+        .limit(size)
+    )
+
+    if parsed_seen_ids:
+        stmt = stmt.where(~Asset.id.in_(parsed_seen_ids))
+
+    if normalized_category:
+        stmt = stmt.where(Asset.category.ilike(f"%{normalized_category}%"))
+
+    if normalized_status:
+        stmt = stmt.where(Asset.status.ilike(f"%{normalized_status}%"))
+
+    minimum = parse_decimal_or_none(min_price)
+    maximum = parse_decimal_or_none(max_price)
+    if minimum is not None:
+        stmt = stmt.where(Asset.price >= minimum)
+    if maximum is not None:
+        stmt = stmt.where(Asset.price <= maximum)
+
+    if normalized_area:
+        stmt = stmt.where(and_(*[
+            or_(
+                Area.country.ilike(f"%{token}%"),
+                Area.state_or_province.ilike(f"%{token}%"),
+                Area.city_or_town.ilike(f"%{token}%"),
+                Area.street.ilike(f"%{token}%"),
+                Area.building_name_or_suite.ilike(f"%{token}%"),
+            )
+            for token in normalized_area
+        ]))
+
+    if normalized_tags:
+        stmt = stmt.where(and_(*[
+            Asset.tags.any(Tag.name.ilike(f"%{token}%"))
+            for token in normalized_tags
+        ]))
+
+    if normalized_features:
+        stmt = stmt.where(and_(*[
+            Asset.features.any(AssetFeature.title.ilike(f"%{token}%"))
+            for token in normalized_features
+        ]))
+
+    if normalized_query:
+        stmt = stmt.where(and_(*[
+            or_(
+                Asset.title.ilike(f"%{token}%"),
+                Asset.description.ilike(f"%{token}%"),
+                Asset.category.ilike(f"%{token}%"),
+                Asset.status.ilike(f"%{token}%"),
+                Asset.listing_type.ilike(f"%{token}%"),
+                Area.country.ilike(f"%{token}%"),
+                Area.state_or_province.ilike(f"%{token}%"),
+                Area.city_or_town.ilike(f"%{token}%"),
+                Area.street.ilike(f"%{token}%"),
+                Asset.tags.any(Tag.name.ilike(f"%{token}%")),
+                Asset.features.any(AssetFeature.title.ilike(f"%{token}%")),
+            )
+            for token in normalized_query
+        ]))
+
+    result = await session.execute(stmt.order_by(Asset.created_at.desc()))
+    assets = result.scalars().all()
+    valid_assets, _ = await validate_assets(session, assets, verified_only=True)
+    return await enrich_property_engagement_data(valid_assets, session, user)
 
 
 async def enrich_property_engagement_data(
