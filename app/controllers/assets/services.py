@@ -311,7 +311,6 @@ async def enrich_property_engagement_data(
         asset.likes = asset.likes or 0
 
     user_stats_by_asset_id: Dict[int, UserStatsPerProperty] = {}
-    logger.info(f"**User: {user}")
 
     if user and asset_ids:
         result = await db.execute(
@@ -478,7 +477,7 @@ async def get_unverified_properties(
             .where(
                 and_(
                     Asset.verified.isnot(True),
-                    Asset.datetime_declined.is_(None)   # exclude where datetime_declined is not null
+                    # Asset.datetime_declined.is_(None)   # exclude where datetime_declined is not null
                 )
             )
             .offset(offset)

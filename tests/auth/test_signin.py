@@ -3,19 +3,15 @@ from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from httpx import AsyncClient
 
+from . import create_test_user, user_data
 from property_street_backend.app.models import User
-from .test_user_creation import create_test_user, user_data
 from property_street_backend.app.controllers.auth.services import create_user, authenticate_user
 from property_street_backend.app.schemas.auth_schemas import UserRegistrationSchema, SigninResponse
 
 
 @pytest.mark.asyncio
 async def test_controller_authenticate_user(get_test_db__fixture):
-    test_db = None
-    # get the yield client objects
-    async for test_db in get_test_db__fixture:
-        test_db: AsyncSession
-        break    
+    test_db = get_test_db__fixture   
 
     # Define a test user
     user_data = UserRegistrationSchema(

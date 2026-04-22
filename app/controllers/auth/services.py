@@ -240,7 +240,7 @@ async def decode_user_from_token(
 
 
 async def decode_user_from_token_optional(
-    token: str = Depends(oauth2_scheme),
+    token: str | None = Depends(oauth2_scheme_optional),
     db: AsyncSession = Depends(get_db)
 ):
     """
