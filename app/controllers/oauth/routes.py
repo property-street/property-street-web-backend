@@ -2,6 +2,7 @@
 OAuth routes for Google OAuth authentication.
 """
 from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.database import get_db
@@ -31,7 +32,6 @@ async def initiate_google_oauth(request: Request):
 @router.get("/google/callback")
 async def google_oauth_callback(
     request: Request,
-    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -46,7 +46,6 @@ async def google_oauth_callback(
     
     Args:
         request: FastAPI Request
-        response: FastAPI Response
         db: Database session
     
     Returns:
@@ -67,14 +66,16 @@ async def google_oauth_callback(
         
         # Determine frontend URL and redirect with token
         frontend_url = get_frontend_url(request)
-        return response.redirect(
-            f"{frontend_url}/google_oauth/callback?access_token={access_token}"
+        return RedirectResponse(
+            url=f"{frontend_url}/google_oauth/callback?access_token={access_token}",
+            status_code=302
         )
 
     except Exception as e:
         # Log the error in production
         frontend_url = get_frontend_url(request)
         error_message = "authentication_failed"
-        return response.redirect(
-            f"{frontend_url}/signin?error={error_message}"
+        return RedirectResponse(
+            url=f"{frontend_url}/signin?error={error_message}",
+            status_code=302
         )
