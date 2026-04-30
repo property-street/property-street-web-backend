@@ -49,24 +49,30 @@ async def test_controller_authenticate_user(get_test_db__fixture):
     assert user != None
 
 
+async def signin_user(client: AsyncClient, db: AsyncSession):
+    user = await create_test_user(db)
+    response = await client.post(
+        "/auth/signin",
+        json={
+            "email": user.email,
+            "password": user_data.password,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["access_token"]
+    assert payload["refresh_token"]
+    assert payload["refresh_session_id"]
+    assert "session_id" in client.cookies
+    return user, payload
+
+
 @pytest.mark.asyncio
-async def test_route_signin(client__fixture):
+async def test_signin(client__fixture):
     # Extract the fisxture object
     test_db: AsyncSession = client__fixture['db']
     client: AsyncClient = client__fixture['http_client']
 
-    # Call the create_user function
-    created_user = await create_test_user(test_db)
-    signin_post_data = {
-        'email': created_user.email,
-        'password': user_data.password
-    }
-    response = await client.post(
-        "/auth/signin",
-        json=signin_post_data  # Use json instead of data for a JSON body
-    )
-
-    # Assertions
-    assert response.status_code == 200
-    json_response = response.json()
-    SigninResponse.model_validate(json_response)
+    user, payload = await signin_user(client, test_db)
+    assert user
+    assert payload
