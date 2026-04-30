@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI, APIRouter, HTTPException, status, Depends, Response
+from fastapi import Cookie, FastAPI, APIRouter, HTTPException, status, Depends, Response, Request
 
 from . import verify_password, pwd_context
 
@@ -30,6 +30,8 @@ from property_street_backend.app.utils.store import (
 from property_street_backend.config.settings import (
     DEBUG,
     JWT_SECRET_KEY,
+    REFRESH_SECRET_KEY,
+    REFRESH_TOKEN_EXPIRY_MINUTES,
     JWT_EXPIRATION_DELTA,
     JWT_ALGORITHM,
     PASSWORD_LINK_TTL,
@@ -41,6 +43,7 @@ from property_street_backend.config.settings import (
 from property_street_backend.config import env_is_test
 from property_street_backend.app.database import get_db
 from property_street_backend.app.controllers.actors.models import User
+from property_street_backend.app.controllers.auth.models import RefreshSession
 from property_street_backend.log_config.logger_config import log_error
 from property_street_backend.app.controllers.actors.enums import UserRoleChoice
 
@@ -60,6 +63,14 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 
+def hash_token(token: str) -> str:
+    return pwd_context.hash(token)
+
+
+def verify_token(plain_token: str, hashed_token: str) -> bool:
+    return pwd_context.verify(plain_token, hashed_token)
+
+
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
@@ -67,14 +78,28 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+
+def create_token(data: dict, expiry: datetime, secret_key: str) -> str:
+    to_encode = data.copy()
+    to_encode.update({"exp": expiry})
+    return jwt.encode(to_encode, secret_key, algorithm=ALGORITHM)
+
+
+def fetch_token(user: User, token_type: str) -> tuple[str, datetime]:
+    if token_type not in {"access", "refresh"}:
+        raise ValueError("Token type should either be 'access' or 'refresh'")
+
+    is_access = token_type == "access"
+    expiry_minutes = ACCESS_TOKEN_EXPIRE_MINUTES if is_access else REFRESH_TOKEN_EXPIRY_MINUTES
+    expiry = datetime.now(timezone.utc) + timedelta(minutes=expiry_minutes)
+    secret_key = SECRET_KEY if is_access else REFRESH_SECRET_KEY
+    return create_token({"sub": user.username}, expiry, secret_key), expiry
+
+
 def fetch_access_token(user: User):
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
+    access_token, _ = fetch_token(user, "access")
     return {"access_token": access_token, "token_type": "bearer"}
 
-fetched_access_token = fetch_access_token
 
 # signin
 async def authenticate_user(db: AsyncSession, login: str, password: str) -> User|None:
@@ -93,6 +118,107 @@ async def authenticate_user(db: AsyncSession, login: str, password: str) -> User
         return None
 
     return user
+
+
+def is_secure_request(request: Request) -> bool:
+    return request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+
+
+async def signin(db: AsyncSession, user_data: dict, request: Request, response: Response) -> dict:
+    user = await authenticate_user(
+        db=db,
+        login=user_data.get("email") or user_data.get("username"),
+        password=user_data["password"],
+    )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect signin credentials!",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token, _ = fetch_token(user, "access")
+    refresh_token, refresh_expiry = fetch_token(user, "refresh")
+    refresh_session = RefreshSession(
+        user_id=user.id,
+        access_token_hash=hash_token(access_token),
+        token_hash=hash_token(refresh_token),
+        expires_at=refresh_expiry,
+        user_agent=request.headers.get("user-agent"),
+        ip_address=request.client.host if request.client else None,
+        is_revoked=False,
+    )
+    db.add(refresh_session)
+    await db.flush()
+    await db.commit()
+
+    response.set_cookie(
+        key="session_id",
+        value=str(refresh_session.id),
+        httponly=True,
+        secure=is_secure_request(request),
+        samesite="lax",
+        max_age=REFRESH_TOKEN_EXPIRY_MINUTES * 60,
+        path="/",
+    )
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "refresh_session_id": refresh_session.id,
+        "token_type": "bearer",
+        **(await user_ui_metadata_for_signin(db, user)),
+    }
+
+
+async def handle_refresh(db: AsyncSession, refresh_token: str, refresh_id: int) -> dict:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid refresh token",
+    )
+    try:
+        payload = jwt.decode(refresh_token, REFRESH_SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    user = (await db.execute(select(User).where(User.username == username))).scalars().first()
+    if not user:
+        raise credentials_exception
+
+    refresh_session = (
+        await db.execute(
+            select(RefreshSession).where(
+                RefreshSession.user_id == user.id,
+                RefreshSession.id == refresh_id,
+            )
+        )
+    ).scalars().first()
+    now = datetime.now(timezone.utc)
+    if not refresh_session or refresh_session.is_revoked or refresh_session.expires_at <= now:
+        raise credentials_exception
+
+    if not verify_token(refresh_token, refresh_session.token_hash):
+        refresh_session.is_revoked = True
+        db.add(refresh_session)
+        await db.commit()
+        raise credentials_exception
+
+    access_token, _ = fetch_token(user, "access")
+    refresh_session.access_token_hash = hash_token(access_token)
+    refresh_session.last_used_at = now
+    db.add(refresh_session)
+    await db.commit()
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+async def user_ui_metadata_for_signin(db: AsyncSession, user: User) -> dict:
+    from .utils import user_ui_metadata
+
+    return await user_ui_metadata(db, user, True)
+
 
 async def check_beta(redis_client: Redis, token: str, role: UserRoleChoice) -> None:
     if BETA_LAUNCHING and role == UserRoleChoice.agent:
@@ -215,6 +341,8 @@ def require_roles(*allowed_roles: List[str]) -> Callable:
 
 # Session token validity
 async def decode_user_from_token(
+    request: Request,
+    session_id: int | None = Cookie(default=None),
     token: str = Depends(oauth2_scheme), 
     db: AsyncSession = Depends(get_db)
 ):
@@ -236,7 +364,58 @@ async def decode_user_from_token(
     user = result.scalars().first()
     if user is None:
         raise credentials_exception
+    request.state.db = db
+    request.state.user = user
+
+    if session_id is not None:
+        now = datetime.now(timezone.utc)
+        refresh_session = (
+            await db.execute(
+                select(RefreshSession).where(
+                    RefreshSession.id == session_id,
+                    RefreshSession.user_id == user.id,
+                )
+            )
+        ).scalars().first()
+        if (
+            not refresh_session
+            or refresh_session.is_revoked
+            or not refresh_session.access_token_hash
+            or not verify_token(token, refresh_session.access_token_hash)
+            or refresh_session.expires_at <= now
+        ):
+            request.state.user = None
+            raise credentials_exception
+
+        user.refresh = {"id": session_id}
+
     return user
+
+
+async def revoke_refresh_session(
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(decode_user_from_token),
+):
+    session_id = getattr(user, "refresh", {}).get("id")
+    if not session_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Refresh token not found")
+
+    refresh_session = (
+        await db.execute(
+            select(RefreshSession).where(
+                RefreshSession.id == session_id,
+                RefreshSession.user_id == user.id,
+            )
+        )
+    ).scalars().first()
+    if not refresh_session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Refresh token not found")
+
+    refresh_session.is_revoked = True
+    db.add(refresh_session)
+    await db.commit()
+    response.delete_cookie(key="session_id", path="/")
 
 
 async def decode_user_from_token_optional(
@@ -781,4 +960,3 @@ async def validate_beta_signup_token(
     key = hset_beta_signup_key(token)
     result = await redis_client.get(key)
     return result is not None
-    

@@ -1,5 +1,5 @@
 from typing import Dict, List, Any
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_
 
 
 from .models import Asset
@@ -22,7 +22,10 @@ def area_ilike_tuple(like_pattern):
         Area.street.ilike(like_pattern),
     )
 
-async def search_assets(query_data: Dict[str, Any]) -> List[PropertySearchResponse]:
+async def search_assets(query_data: Dict[str, Any], limit: int = 20, seen_ids: List[int] = None) -> List[PropertySearchResponse]:
+    if seen_ids is None:
+        seen_ids = []
+    
     AsyncSessionLocal = runtime_async_session_maker()
     async with AsyncSessionLocal() as db:
         keywords: List[str] = query_data.get('keywords', [])
@@ -52,6 +55,10 @@ async def search_assets(query_data: Dict[str, Any]) -> List[PropertySearchRespon
 
         # Combine conditions into a single OR
         where_clause = or_(*text_conditions)
+        
+        # Add filter for seen_ids
+        if seen_ids:
+            where_clause = and_(where_clause, ~Asset.id.in_(seen_ids))
 
         # -----------------------------
         # Build the base query
@@ -63,7 +70,7 @@ async def search_assets(query_data: Dict[str, Any]) -> List[PropertySearchRespon
             .where(where_clause)
             .where(Asset.verified.is_(True))
             .distinct()
-            .limit(20)
+            .limit(limit)
         )
 
         # -----------------------------
@@ -88,4 +95,4 @@ async def search_assets(query_data: Dict[str, Any]) -> List[PropertySearchRespon
         # -----------------------------
         # Return structured output
         # -----------------------------
-        return [{"type": "property", "data": AssetResponseSchema.model_validate(asset).model_dump()} for asset in results]
+        return [{"type": "property", "id": asset.id, "data": AssetResponseSchema.model_validate(asset).model_dump()} for asset in results]

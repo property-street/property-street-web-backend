@@ -58,6 +58,7 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     refresh_token: Optional[str] = None
+    refresh_session_id: Optional[int] = None
 
 
 class SigninResponse(Token, UserUIMetaDataSchema):

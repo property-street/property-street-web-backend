@@ -52,7 +52,7 @@ class User(AggregateRatingAClass, UniqueIDArrayMixin, UserAssetAbsCls):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True)
     username = Column(String, unique=True, index=True)
-    password_hash = Column(String, nullable=False)
+    password_hash = Column(String, nullable=True)
     first_name = Column(String)
     last_name = Column(String)
     other_names = Column(String)

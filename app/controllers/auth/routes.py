@@ -1,6 +1,6 @@
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, HTTPException, status, Depends, Body
+from fastapi import APIRouter, HTTPException, status, Depends, Body, Request, Response
 
 
 from .utils import user_ui_metadata
@@ -16,6 +16,7 @@ from property_street_backend.app.database import get_db
 from property_street_backend.app.initiator import get_redis
 from property_street_backend.app.schemas.auth_schemas import (
     TokenData, 
+    Token,
     SigninResponse, 
     UserSigninSchema, 
     SendEmailCodeSchema,
@@ -27,20 +28,20 @@ from property_street_backend.app.models import User
 from property_street_backend.app.utils.store import email_verification_code_ttl
 from property_street_backend.config.settings import BETA_LAUNCHING
 from .services import (
+    signin,
     create_user, 
     create_agent,
-    change_password,
-    authenticate_user, 
-    fetched_access_token, 
-    decode_user_from_token, 
     require_roles,
+    handle_refresh,
+    change_password,
+    decode_user_from_token, 
+    revoke_refresh_session,
     send_password_reset_mail,
+    generate_beta_signup_link,
     process_token_validate_user,
     confirm_email_verification_code,
     check_username_email_availability,
     check_password_reset_email_validity,
-    generate_beta_signup_link,
-    validate_beta_signup_token,
     send_email_verification_code as controller_send_email_verification_code,
     confirm_email_verification_code_and_sign_user_up as controller_confirm_email_verification_code_and_sign_user_up,
 )
@@ -114,23 +115,25 @@ async def handle_email_verification_code(
 @router.post("/signin", response_model=SigninResponse, status_code=status.HTTP_200_OK)
 async def signin_for_access_token(
     user_data: UserSigninSchema, 
+    request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
-    user = await authenticate_user(
-        db = db, 
-        login = user_data.email, 
-        password = user_data.password
-    )
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect signin credentials!",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return {
-        **fetched_access_token(user),
-        **(await user_ui_metadata(db, user,True))
-    }
+    return await signin(db, user_data.model_dump(), request, response)
+
+
+@router.post("/refresh/{id}/", response_model=Token)
+async def refresh_token(
+    id: int,
+    refresh_token: str = Body(...),
+    db: AsyncSession = Depends(get_db),
+):
+    return await handle_refresh(db, refresh_token, id)
+
+
+@router.delete("/logout/", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(response=Depends(revoke_refresh_session)):
+    return response
 
 
 @router.get("/retrieve-client-details")

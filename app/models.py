@@ -21,10 +21,11 @@ from property_street_backend.app.controllers.assets.models import (
 from property_street_backend.app.controllers.actors.models import (
     User
 ) 
-# from property_street_backend.app.controllers.auth.models import (
-#     RefreshSession,
-#     RequestLog,
-# )
+from property_street_backend.app.controllers.auth.models import (
+    RefreshSession,
+    RequestLog,
+)
+from property_street_backend.app.controllers.activity_logging.models import ActivityLog
 from property_street_backend.app.controllers.cart.models import CartItem
 from property_street_backend.app.controllers.ratings.models import Rating
 from property_street_backend.app.controllers.settings.models import UserSetting
@@ -54,8 +55,9 @@ models = [
     AssetFeature,
     RoommateFinder, 
     AssetCloudImage, 
-    # RefreshSession,
-    # RequestLog,
+    RefreshSession,
+    RequestLog,
+    ActivityLog,
     CloudImageDetail,
     GoogleOAuthDetail,
     RoomieApplication,

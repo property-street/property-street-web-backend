@@ -33,13 +33,14 @@ from property_street_backend.app.controllers.actors import routes as actors_rout
 from property_street_backend.app.controllers.assets import routes as assets_routes
 from property_street_backend.app.controllers.settings import routes as settings_routes
 from property_street_backend.app.controllers.activity import routes as activity_routes
+from property_street_backend.app.controllers.activity_logging import routes as activity_logging_routes
+from property_street_backend.app.controllers.activity_logging.middleware import ActivityLoggerMiddleware
 from property_street_backend.app.controllers.ratings import routes as rating_review_routes
+from property_street_backend.app.controllers.token_management import routes as token_management_routes
 from property_street_backend.app.controllers.notification import routes as notification_routes
 from property_street_backend.app.controllers.asset_request import routes as asset_request_routes
 from property_street_backend.app.controllers.roommate_finder import routes as roommates_finder_routes
-from property_street_backend.app.routers import (
-    google_oauth,
-)
+from property_street_backend.app.controllers.oauth import routes as oauth_routes
 from property_street_backend.app.initiator import (
     app, 
     get_redis,
@@ -115,6 +116,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(ActivityLoggerMiddleware)
 
 
 home_router = APIRouter()
@@ -172,13 +174,15 @@ app.include_router(home_router)
 app.include_router(ws_routes.router)
 app.include_router(auth_routes.router)
 app.include_router(chat_routes.router)
-app.include_router(google_oauth.router)
+app.include_router(oauth_routes.router)
 app.include_router(actors_routes.router)
 app.include_router(search_routes.router)
 app.include_router(assets_routes.router)
 app.include_router(assets_routes.router)
 app.include_router(settings_routes.router)
 app.include_router(activity_routes.router)
+app.include_router(activity_logging_routes.router)
+app.include_router(token_management_routes.router)
 app.include_router(notification_routes.router)
 app.include_router(asset_request_routes.router)
 app.include_router(rating_review_routes.router)

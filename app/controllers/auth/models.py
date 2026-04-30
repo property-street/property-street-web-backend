@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 
 from property_street_backend.config.postgres_connection_manager import Base
 
@@ -15,14 +15,19 @@ class RefreshSession(Base):
         index=True,
     )
     access_token_hash = Column(String, nullable=True)
-    refresh_token_hash = Column(String, nullable=False)
+    token_hash = Column(String, nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     user_agent = Column(String, nullable=True)
     ip_address = Column(String, nullable=True)
     last_used_at = Column(DateTime(timezone=True), nullable=True)
     is_revoked = Column(Boolean, nullable=False, default=False)
 
-    user = relationship("User", backref="refresh_sessions", lazy="selectin", uselist=False)
+    user = relationship(
+        "User",
+        backref=backref("refresh_sessions", passive_deletes=True),
+        lazy="selectin",
+        uselist=False,
+    )
 
 
 class RequestLog(Base):
