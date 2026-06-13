@@ -13,7 +13,7 @@ from .schemas import (
     InteractionEvents,
     PatchPropertySchema,
     PropertyResponseSchema,
-    PropertyInteractionSchema,
+    DiscoverPropertiesResponse,
 )
 from .services import (
     discover_properties,
@@ -39,8 +39,6 @@ from property_street_backend.app.controllers.auth.services import (
 from .property_processor_utils import handle_property_create_update
 # from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.assets.services import fetch_latest_assets
-from datetime import datetime
-from sqlalchemy import select, and_
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -65,7 +63,7 @@ async def latest(
     )
 
 
-@router.get("/discover", response_model=List[PropertyResponseSchema])
+@router.get("/discover", response_model=DiscoverPropertiesResponse)
 async def discover(
     session: AsyncSession = Depends(get_db),
     user: Optional[User] = Depends(decode_user_from_token_optional),

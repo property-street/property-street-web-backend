@@ -154,6 +154,9 @@ class PropertyResponseSchema(ConfigDictSetter, AssetSchema):
             return 0
         return v
 
+class DiscoverPropertiesResponse(BaseModel):
+    has_more: bool
+    properties: List[PropertyResponseSchema]
 
 class AssetResponseSchema(PropertyResponseSchema):
     pass

@@ -227,7 +227,7 @@ async def discover_properties(
         .where(Asset.verified.is_(True))
         .distinct()
         .offset(offset)
-        .limit(size)
+        .limit(size+1)
     )
 
     if parsed_seen_ids:
@@ -290,8 +290,14 @@ async def discover_properties(
 
     result = await session.execute(stmt.order_by(Asset.created_at.desc()))
     assets = result.scalars().all()
+    has_more = len(assets) > size
+    if has_more:
+        assets = assets[:size]
     valid_assets, _ = await validate_assets(session, assets, verified_only=True)
-    return await enrich_property_engagement_data(valid_assets, session, user)
+    return {
+        "properties":await enrich_property_engagement_data(valid_assets, session, user),
+        "has_more": has_more
+    }
 
 
 async def enrich_property_engagement_data(
