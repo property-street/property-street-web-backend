@@ -13,6 +13,7 @@ from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.app.controllers.assets.models import Asset
+from property_street_backend.app.controllers.activity_logging.services import log_event
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.assets.schemas import PropertySchema
 from property_street_backend.app.controllers.assets.property_processor_utils import handle_property_create_update
@@ -130,4 +131,26 @@ async def handle_resolve_property_request(
     property_request.assets.append(property)
     await session.commit()
     await session.refresh(property_request)
+
+    try:
+        affected_ids = f"AssetRequest:{property_request.id},Asset:{property.id}"
+        await log_event(
+            db=session,
+            user=agent,
+            event_type="asset_request",
+            action="resolve_asset_request",
+            affected_model="AssetRequest",
+            affected_model_id=property_request.id,
+            affected_model_ids=affected_ids,
+            description=(
+                f"Resolved asset request {property_request.id} with property {property.id}."
+            ),
+            payload={
+                "asset_request_id": property_request.id,
+                "property_id": property.id,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Failed to log resolve event for asset request {property_request.id}: {e}")
+
     return AssetRequestResponseSchema.from_orm_with_relations(property_request)

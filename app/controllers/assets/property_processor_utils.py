@@ -39,6 +39,7 @@ from property_street_backend.app.initiator import logger
 from property_street_backend.log_config.logger_config import (
     log_message
 )
+from property_street_backend.app.controllers.activity_logging.services import log_event
 from property_street_backend.app.controllers.assets.asset_routine_methods import (
     add_asset_id_to_newly_created_cache
 )
@@ -184,5 +185,26 @@ async def handle_property_create_update(
     # ========================
     notify_admin_on_new_property(property, newly_created)
 
+    # ========================
+    # Event logging
+    # ========================
+    try:
+        await log_event(
+            db=db,
+            user=agent,
+            event_type="asset",
+            action="create_property" if newly_created else "update_property",
+            affected_model="Asset",
+            affected_model_id=property.id,
+            description=(
+                f"{'Created' if newly_created else 'Updated'} property {property.title or property.id}."
+            ),
+            payload={
+                "property_id": property.id,
+                "newly_created": newly_created,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Failed to log asset event for property {property.id}: {e}")
             
     return property

@@ -1,5 +1,6 @@
+import json
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import func
@@ -8,7 +9,7 @@ from sqlalchemy.future import select
 
 from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.app.controllers.activity_logging.enums import ActivityStatusChoice
-from property_street_backend.app.controllers.activity_logging.models import ActivityLog
+from property_street_backend.app.controllers.activity_logging.models import ActivityLog, EventLog
 from property_street_backend.app.controllers.activity_logging.schemas import ActivityStatisticsSchema
 
 
@@ -43,6 +44,39 @@ async def log_activity(
     db.add(activity)
     await db.commit()
     return activity
+
+
+async def log_event(
+    db: AsyncSession,
+    user: User,
+    event_type: str,
+    action: str,
+    status: ActivityStatusChoice = ActivityStatusChoice.success,
+    affected_model: Optional[str] = None,
+    affected_model_id: Optional[int] = None,
+    affected_model_ids: Optional[str] = None,
+    description: Optional[str] = None,
+    payload: Optional[Any] = None,
+) -> EventLog:
+    if payload is not None and not isinstance(payload, str):
+        payload = json.dumps(payload, default=str)
+
+    event = EventLog(
+        user_id=user.id,
+        event_type=event_type,
+        action=action,
+        status=status,
+        description=description,
+        affected_model=affected_model,
+        affected_model_id=affected_model_id,
+        affected_model_ids=affected_model_ids,
+        payload=payload,
+        timestamp=datetime.now(timezone.utc),
+    )
+    db.add(event)
+    await db.commit()
+    await db.refresh(event)
+    return event
 
 
 async def get_user_activities(

@@ -50,6 +50,7 @@ from property_street_backend.app.controllers.activity import (
     auto_category_hset_key,
     newly_created_asset_set_key, 
 )
+from property_street_backend.app.controllers.activity_logging.services import log_event
 from .asset_routine_methods import add_asset_id_to_newly_created_cache
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.assets.asset_routine_methods import (
@@ -674,6 +675,20 @@ async def handle_delete_property(db: AsyncSession, id: int, agent: User):
         )
     await db.delete(property)
     await db.commit()
+
+    try:
+        await log_event(
+            db=db,
+            user=agent,
+            event_type="asset",
+            action="delete_property",
+            affected_model="Asset",
+            affected_model_id=id,
+            description=f"Deleted property {id}.",
+            payload={"property_id": id},
+        )
+    except Exception as e:
+        logger.error(f"Failed to log asset delete event for property {id}: {e}")
 
 
 def category_candidates_stmt(

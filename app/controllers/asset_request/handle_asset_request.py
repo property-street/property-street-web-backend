@@ -8,6 +8,7 @@ from .schemas import AssetRequestResponseSchema
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.models import AssetRequest, Area, User
+from property_street_backend.app.controllers.activity_logging.services import log_event
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.ws_init import agent_specific_channels
 
@@ -63,6 +64,20 @@ async def handle_asset_request(
         await redis_client.publish(channel, json.dumps(data_to_publish))
         if DEBUG:
             log_message('success', f'Asset request successfully published to channel!')
+
+        try:
+            await log_event(
+                db=db,
+                user=requester,
+                event_type="asset_request",
+                action="create_asset_request",
+                affected_model="AssetRequest",
+                affected_model_id=request_instance.id,
+                description=f"Created asset request {request_instance.id}.",
+                payload=schematized_data_to_dict,
+            )
+        except Exception as e:
+            logger.error(f"Failed to log event for asset request {request_instance.id}: {e}")
 
         return schematized_data
     except Exception as e:

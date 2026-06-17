@@ -8,6 +8,7 @@ from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.models import Area, CloudImageDetail, User
+from property_street_backend.app.controllers.activity_logging.services import log_event
 from property_street_backend.app.controllers.ws_init import generic_channels
 
 
@@ -59,6 +60,20 @@ async def publish_roommate_finding(
 
         if DEBUG:
             logger.info('**Roommate finder request successfully published.')
+
+        try:
+            await log_event(
+                db=db,
+                user=requester,
+                event_type="roommate_finder",
+                action="create_roommate_request",
+                affected_model="RoommateFinder",
+                affected_model_id=roommate_finder.id,
+                description=f"Created roommate finder request {roommate_finder.id}.",
+                payload=response.model_dump(exclude_none=True),
+            )
+        except Exception as e:
+            logger.error(f"Failed to log roommate finder create event {roommate_finder.id}: {e}")
         
         return response
     except Exception as e:

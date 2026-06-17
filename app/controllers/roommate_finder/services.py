@@ -5,11 +5,11 @@ from .models import RoommateFinder
 from pydantic import ValidationError
 from .schemas import RoommateFinderResponseSchema
 from property_street_backend.app.controllers.actors.models import User
+from property_street_backend.app.controllers.activity_logging.services import log_event
 from property_street_backend.log_config.logger_config import log_message
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
-from sqlalchemy.future import select
 
 def get_cached_roomies_application_ids(requester: User)->list:
     return requester.cached_roomies_application_ids
@@ -73,6 +73,21 @@ async def delete_roommate_request(
     try:
         await db.delete(rf)
         await db.commit()
+
+        try:
+            await log_event(
+                db=db,
+                user=requester,
+                event_type="roommate_finder",
+                action="delete_roommate_request",
+                affected_model="RoommateFinder",
+                affected_model_id=request_id,
+                description=f"Deleted roommate finder request {request_id}.",
+                payload={"request_id": request_id},
+            )
+        except Exception as e:
+            log_message('error', f"Failed to log roommate finder delete event {request_id}: {e}")
+
     except IntegrityError:
         # likely due to RESTRICT constraint (existing applications)
         await db.rollback()

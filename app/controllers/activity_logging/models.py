@@ -34,3 +34,33 @@ class ActivityLog(Base):
         index=True,
     )
     user = relationship("User", backref="activity_logs", uselist=False, lazy="selectin")
+
+RequestLog = ActivityLog
+
+
+class EventLog(Base):
+    __tablename__ = "event_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_type = Column(String(100), nullable=False, index=True)
+    action = Column(String(255), nullable=False, index=True)
+    status = Column(
+        SQLAlchemyEnum(ActivityStatusChoice, name="event_status_choice"),
+        default=ActivityStatusChoice.success,
+        nullable=False,
+        index=True,
+    )
+    description = Column(Text, nullable=True)
+    affected_model = Column(String(100), nullable=True, index=True)
+    affected_model_id = Column(Integer, nullable=True, index=True)
+    affected_model_ids = Column(String(255), nullable=True)
+    payload = Column(Text, nullable=True)
+    timestamp = Column(DateTime(timezone=True), default=func.now(), index=True)
+
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", name="fk_event_logs_user_id_users", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user = relationship("User", backref="event_logs", uselist=False, lazy="selectin")

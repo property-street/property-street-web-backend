@@ -25,7 +25,7 @@ from property_street_backend.app.controllers.auth.models import (
     RefreshSession,
     RequestLog,
 )
-from property_street_backend.app.controllers.activity_logging.models import ActivityLog
+from property_street_backend.app.controllers.activity_logging.models import ActivityLog, EventLog
 from property_street_backend.app.controllers.cart.models import CartItem
 from property_street_backend.app.controllers.ratings.models import Rating
 from property_street_backend.app.controllers.settings.models import UserSetting
@@ -58,6 +58,7 @@ models = [
     RefreshSession,
     RequestLog,
     ActivityLog,
+    EventLog,
     CloudImageDetail,
     GoogleOAuthDetail,
     RoomieApplication,
