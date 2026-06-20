@@ -9,8 +9,8 @@ from property_street_backend.app.models import (
     Asset, 
 )
 from tests.auth.test_create_agent import create_test_agent
-from app.controllers.auth.services import fetch_access_token
-from app.controllers.assets.property_processor_utils import property_create_persistence_ttl
+from property_street_backend.app.controllers.auth.services import fetch_access_token
+from property_street_backend.app.controllers.assets.property_processor_utils import property_create_persistence_ttl
 from property_street_backend.tests.activity.test_controller.test_newly_created_asset_cache_management import (
     assertions_after_caching,
 )

@@ -2,7 +2,6 @@ import json
 import re
 import unicodedata
 from fastapi import status
-from decimal import Decimal, InvalidOperation
 from sqlalchemy import and_, or_
 from redis.asyncio import Redis
 from fastapi import HTTPException
@@ -10,6 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy.future import select
 from datetime import datetime, timezone
 from sqlalchemy.orm import selectinload
+from decimal import Decimal, InvalidOperation
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Literal, Optional, Dict
 
@@ -51,6 +51,8 @@ from property_street_backend.app.controllers.activity import (
     newly_created_asset_set_key, 
 )
 from property_street_backend.app.controllers.activity_logging.services import log_event
+from property_street_backend.app.controllers.analytics.enums import ResourceType
+from property_street_backend.app.controllers.analytics.services import record_resource_deletion
 from .asset_routine_methods import add_asset_id_to_newly_created_cache
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.assets.asset_routine_methods import (
@@ -675,6 +677,11 @@ async def handle_delete_property(db: AsyncSession, id: int, agent: User):
         )
     await db.delete(property)
     await db.commit()
+
+    try:
+        await record_resource_deletion(db, ResourceType.property)
+    except Exception as e:
+        logger.error(f"Failed to persist property deletion metric for property {id}: {e}")
 
     try:
         await log_event(

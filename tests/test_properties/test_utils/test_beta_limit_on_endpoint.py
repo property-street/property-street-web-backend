@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from property_street_backend.app.models import Asset
-from app.controllers.auth.services import fetch_access_token
+from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.config.settings import TEST_UNLIMITED_BETA_AGENTS_EMAIL
 from property_street_backend.tests.test_properties.test_processing import property_payload
 from property_street_backend.app.controllers.assets.relationship_handler import apply_model

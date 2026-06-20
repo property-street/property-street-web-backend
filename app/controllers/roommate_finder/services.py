@@ -1,11 +1,16 @@
+import re
+from sqlalchemy import func, or_
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .models import RoommateFinder
 from pydantic import ValidationError
 from .schemas import RoommateFinderResponseSchema
+from property_street_backend.app.models import Area
 from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.app.controllers.activity_logging.services import log_event
+from property_street_backend.app.controllers.analytics.enums import ResourceType
+from property_street_backend.app.controllers.analytics.services import record_resource_deletion
 from property_street_backend.log_config.logger_config import log_message
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -30,6 +35,110 @@ def validate_rf_reqs(raw_requests):
                 message=f"RoomamteFinder ID {asset_id or 'unknown'} failed validation. Reason: {ve}"
             )
     return valid_requests, skipped_requests
+
+
+def split_tokens(value: str) -> list[str]:
+    if not value:
+        return []
+    normalized = re.sub(r"[,]", " ", value)
+    return [token.strip().lower() for token in normalized.split() if token.strip()]
+
+
+def parse_seen_ids(seen_ids: str) -> list[int]:
+    if not seen_ids:
+        return []
+    return [int(value) for value in re.findall(r"\d+", seen_ids)]
+
+
+async def discover_roommate_finder_requests(
+    session: AsyncSession,
+    requester: User | None = None,
+    *,
+    page: int = 1,
+    size: int = 20,
+    query: str | None = None,
+    area: str | None = None,
+    seen_ids: str | None = None,
+):
+    offset = (page - 1) * size
+    tokens = split_tokens(query or "")
+    area_tokens = split_tokens(area or "")
+    parsed_seen = parse_seen_ids(seen_ids or "")
+
+    stmt = (
+        select(RoommateFinder)
+        .options(
+            selectinload(RoommateFinder.area),
+            selectinload(RoommateFinder.room_images),
+            selectinload(RoommateFinder.requester)
+                .selectinload(User.profile_avatar),
+        )
+        .order_by(RoommateFinder.created_at.desc())
+    )
+
+    if parsed_seen:
+        stmt = stmt.where(~RoommateFinder.id.in_(parsed_seen))
+
+    if tokens:
+        for token in tokens:
+            stmt = stmt.where(
+                or_(
+                    RoommateFinder.category.ilike(f"%{token}%"),
+                    RoommateFinder.extra_conditions.ilike(f"%{token}%"),
+                )
+            )
+
+    if area_tokens:
+        stmt = stmt.join(RoommateFinder.area)
+        for token in area_tokens:
+            stmt = stmt.where(
+                or_(
+                    Area.country.ilike(f"%{token}%"),
+                    Area.state_or_province.ilike(f"%{token}%"),
+                    Area.city_or_town.ilike(f"%{token}%"),
+                    Area.street.ilike(f"%{token}%"),
+                    Area.building_name_or_suite.ilike(f"%{token}%"),
+                )
+            )
+
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_result = await session.execute(count_stmt)
+        total_count = int(count_result.scalar_one() or 0)
+
+        paged_stmt = stmt.offset(offset).limit(size + 1)
+        result = await session.execute(paged_stmt)
+        requests = result.scalars().all()
+    except Exception as e:
+        log_message(
+            log_type="error",
+            message=f"An error occurred while discovering Roommate-finder requests. Reason: {e}",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while discovering Roommate-finder requests.",
+        )
+
+    has_more = len(requests) > size
+    if has_more:
+        requests = requests[:size]
+
+    valid_reqs, skipped_reqs = validate_rf_reqs(requests)
+    if skipped_reqs:
+        log_message(
+            log_type="error",
+            message=f"{len(skipped_reqs)} RoommateFinder requests skipped during discovery.",
+        )
+
+    return {
+        "requests": valid_reqs,
+        "cached_roomies_application_ids": (
+            get_cached_roomies_application_ids(requester) if requester else []
+        ),
+        "has_more": has_more,
+        "total_count": total_count,
+    }
+
 
 async def handle_my_requests(
     page: int,
@@ -73,6 +182,11 @@ async def delete_roommate_request(
     try:
         await db.delete(rf)
         await db.commit()
+
+        try:
+            await record_resource_deletion(db, ResourceType.roommate_finder)
+        except Exception as e:
+            log_message('error', f"Failed to persist roommate finder deletion metric for request {request_id}: {e}")
 
         try:
             await log_event(

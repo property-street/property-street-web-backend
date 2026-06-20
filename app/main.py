@@ -53,8 +53,6 @@ from property_street_backend.config.settings import (
 from property_street_backend.config.redis_connection_manager import runtime_async_redis
 from property_street_backend.app.controllers.cache_expiration import cache_expiry_initializer
 from property_street_backend.config.postgres_connection_manager import runtime_async_session_maker
-from property_street_backend.app.controllers.utils import remove_all_newly_created_cached_asset_once_on_app_startup
-
 
 
 
@@ -69,7 +67,7 @@ async def lifespan(app: FastAPI):
 
         await ensure_admin_user(session)
 
-        await remove_all_newly_created_cached_asset_once_on_app_startup(redis_client, session)
+        # await remove_all_newly_created_cached_asset_once_on_app_startup(redis_client, session)
     
         listener_task, stop_event, _ = await cache_expiry_initializer(
             redis_client

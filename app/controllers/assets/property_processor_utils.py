@@ -40,6 +40,8 @@ from property_street_backend.log_config.logger_config import (
     log_message
 )
 from property_street_backend.app.controllers.activity_logging.services import log_event
+from property_street_backend.app.controllers.analytics.enums import ResourceType
+from property_street_backend.app.controllers.analytics.services import record_resource_creation
 from property_street_backend.app.controllers.assets.asset_routine_methods import (
     add_asset_id_to_newly_created_cache
 )
@@ -207,4 +209,12 @@ async def handle_property_create_update(
     except Exception as e:
         logger.error(f"Failed to log asset event for property {property.id}: {e}")
             
+    if newly_created:
+        try:
+            await record_resource_creation(db, ResourceType.property)
+        except Exception as e:
+            logger.warning(
+                f"Failed to persist property creation metric for property {property.id}: {e}"
+            )
+
     return property

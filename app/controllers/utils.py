@@ -205,24 +205,3 @@ async def get_or_create_singleton_instance(db: AsyncSession):
         await db.commit()
         await db.refresh(singleton)
     return singleton
-
-
-async def remove_all_newly_created_cached_asset_once_on_app_startup(redis_client: Redis, db: AsyncSession):
-    instance = await get_or_create_singleton_instance(db)
-    action_entry = 'cache_cleared_of_newly_created'
-    
-    if instance.action.get(action_entry):
-        if DEBUG:
-            logger.info("**Cache already cleared")
-        return
-    
-    if DEBUG:
-        logger.info("**Cached newly-created assets clearing...")
-    await remove_all_newly_created_assets_cache(redis_client)
-
-    instance.action = {action_entry: True}  # overwrite dictionary
-    db.add(instance)
-    await db.commit()
-
-    if DEBUG:
-        logger.info("**Cached newly-created assets cleared")

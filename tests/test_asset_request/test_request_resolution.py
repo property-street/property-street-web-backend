@@ -9,19 +9,16 @@ from property_street_backend.app.models import (
     AssetRequest,
 )
 from tests.auth.test_create_agent import create_test_agent
-from app.controllers.auth.services import fetch_access_token
+from property_street_backend.app.controllers.auth.services import fetch_access_token
 from property_street_backend.tests.test_properties.test_processing import property_payload
-from app.controllers.assets.property_processor_utils import property_create_persistence_ttl
+from property_street_backend.app.controllers.assets.property_processor_utils import property_create_persistence_ttl
 from property_street_backend.tests.test_asset_request import payload as property_request_payload
-from property_street_backend.tests.activity.test_controller.test_newly_created_asset_cache_management import (
-    assertions_after_caching,
-)
+
 
 
 @pytest.mark.asyncio
 async def test_resolve_request(client__fixture: dict):
     test_db: AsyncSession = client__fixture["db"]
-    redis_client: Redis = client__fixture["redis_client"]
     http_client: AsyncClient = client__fixture["http_client"]
 
     agent = await create_test_agent(test_db)

@@ -44,6 +44,8 @@ from property_street_backend.config import env_is_test
 from property_street_backend.app.database import get_db
 from property_street_backend.app.controllers.actors.models import User
 from property_street_backend.app.controllers.auth.models import RefreshSession
+from property_street_backend.app.controllers.analytics.enums import ResourceType
+from property_street_backend.app.controllers.analytics.services import record_resource_creation
 from property_street_backend.log_config.logger_config import log_error
 from property_street_backend.app.controllers.actors.enums import UserRoleChoice
 
@@ -301,6 +303,12 @@ async def create_user(
     
     # Ensure the user instance reflects the latest state from the database
     await db.refresh(user)
+
+    try:
+        await record_resource_creation(db, ResourceType.user)
+    except Exception as e:
+        logger.warning(f"Failed to persist user creation metric for {user.email}: {e}")
+
     return user
 
 

@@ -9,6 +9,8 @@ from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.models import AssetRequest, Area, User
 from property_street_backend.app.controllers.activity_logging.services import log_event
+from property_street_backend.app.controllers.analytics.enums import ResourceType
+from property_street_backend.app.controllers.analytics.services import record_resource_creation
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.controllers.ws_init import agent_specific_channels
 
@@ -64,6 +66,13 @@ async def handle_asset_request(
         await redis_client.publish(channel, json.dumps(data_to_publish))
         if DEBUG:
             log_message('success', f'Asset request successfully published to channel!')
+
+        try:
+            await record_resource_creation(db, ResourceType.property_request)
+        except Exception as e:
+            logger.error(
+                f"Failed to persist property request metric for asset request {request_instance.id}: {e}"
+            )
 
         try:
             await log_event(

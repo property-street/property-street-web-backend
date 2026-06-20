@@ -15,6 +15,8 @@ from property_street_backend.app.utils.store import (
 from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.app.models import CloudImageDetail
+from property_street_backend.app.controllers.analytics.enums import ResourceType
+from property_street_backend.app.controllers.analytics.services import record_resource_reported
 from property_street_backend.log_config.logger_config import log_error
 
 
@@ -183,4 +185,9 @@ async def handle_update_profile_avatar(db: AsyncSession, user: User, data: dict)
     db.add(user)
     await db.commit()
     await db.refresh(user)
+    try:
+        await record_resource_reported(db, ResourceType.user)
+    except Exception as e:
+        log_error(f"Failed to persist user avatar update metric for user {user.id}: {e}")
+
     return user.profile_avatar

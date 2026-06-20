@@ -8,8 +8,10 @@ from property_street_backend.app.initiator import logger
 from property_street_backend.config.settings import DEBUG
 from property_street_backend.log_config.logger_config import log_message
 from property_street_backend.app.models import Area, CloudImageDetail, User
-from property_street_backend.app.controllers.activity_logging.services import log_event
 from property_street_backend.app.controllers.ws_init import generic_channels
+from property_street_backend.app.controllers.analytics.enums import ResourceType
+from property_street_backend.app.controllers.activity_logging.services import log_event
+from property_street_backend.app.controllers.analytics.services import record_resource_creation
 
 
 async def publish_roommate_finding(
@@ -45,21 +47,23 @@ async def publish_roommate_finding(
         await db.refresh(roommate_finder)
         response = RoommateFinderResponseSchema.from_orm_with_relations(roommate_finder)
         
-        channel_payload = response.model_dump(exclude_none=True)
-        # add the id of the roommate finder instance to the request_data
-        channel_payload['db_id'] = roommate_finder.id,
-
-        
-        channel_category = 'roommates_finder'
-        data_to_publish ={
-            'request_data': channel_payload,
-            'category': channel_category
-        }
-        channel = generic_channels.get(channel_category)
-        await redis_client.publish(channel, json.dumps(data_to_publish))
-
-        if DEBUG:
-            logger.info('**Roommate finder request successfully published.')
+        #**# Websocket session
+        # channel_payload = response.model_dump(exclude_none=True)
+        # # add the id of the roommate finder instance to the request_data
+        # channel_payload['db_id'] = roommate_finder.id,
+# 
+        # 
+        # channel_category = 'roommates_finder'
+        # data_to_publish = {
+        #     'request_data': channel_payload,
+        #     'category': channel_category
+        # }
+        # channel = generic_channels.get(channel_category)
+        # await redis_client.publish(channel, json.dumps(data_to_publish))
+# 
+        # if DEBUG:
+        #     logger.info('**Roommate finder request successfully published.')
+        #**# Websocket session
 
         try:
             await log_event(
@@ -74,6 +78,13 @@ async def publish_roommate_finding(
             )
         except Exception as e:
             logger.error(f"Failed to log roommate finder create event {roommate_finder.id}: {e}")
+
+        try:
+            await record_resource_creation(db, ResourceType.roommate_finder)
+        except Exception as e:
+            logger.error(
+                f"Failed to persist roommate finder creation metric for request {roommate_finder.id}: {e}"
+            )
         
         return response
     except Exception as e:

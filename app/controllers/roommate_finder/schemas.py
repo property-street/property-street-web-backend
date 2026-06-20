@@ -53,6 +53,10 @@ class RFRSListWithCachedIds(BaseModel):
     requests: list[RoommateFinderResponseSchema] = []
     cached_roomies_application_ids: Optional[list[int]] = []
 
+class RoommateFinderDiscoverResponse(RFRSListWithCachedIds):
+    has_more: bool
+    total_count: int
+
 class RoommateRequestSearchResponse(BaseModel):
     type: str = 'roommates-finder'
     data: RoommateFinderResponseSchema

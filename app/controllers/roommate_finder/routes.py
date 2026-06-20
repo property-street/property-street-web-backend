@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from redis.asyncio import Redis
 from fastapi import APIRouter, status, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from property_street_backend.app.models import User
 from property_street_backend.app.database import get_db
 from .services import (
+    discover_roommate_finder_requests,
     handle_my_requests,
     get_cached_roomies_application_ids,
     get_roommate_request_by_id,
@@ -18,6 +19,7 @@ from property_street_backend.app.controllers.auth.services import (
 )
 from .schemas import (
     RFRSListWithCachedIds,
+    RoommateFinderDiscoverResponse,
     RoommateFinderRequestSchema,
     RoommateFinderResponseSchema,
 )
@@ -66,6 +68,32 @@ async def retrieve_latest_roommates_finder_requests(
         size = size,
         session = session,
         requester = requester
+    )
+
+
+@router.get(
+    '/discover',
+    status_code=status.HTTP_200_OK,
+    response_description="Roommate finder requests discovered.",
+    response_model=RoommateFinderDiscoverResponse,
+)
+async def discover_roommates_finder_requests(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    query: Optional[str] = Query(None),
+    area: Optional[str] = Query(None),
+    seen_ids: Optional[str] = Query(None),
+    session: AsyncSession = Depends(get_db),
+    requester: Optional[User] = Depends(decode_user_from_token_optional),
+):
+    return await discover_roommate_finder_requests(
+        session=session,
+        requester=requester,
+        page=page,
+        size=size,
+        query=query,
+        area=area,
+        seen_ids=seen_ids,
     )
 
 @router.get(

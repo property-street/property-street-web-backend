@@ -31,7 +31,6 @@ class AssetRequestResponseSchema(BaseSchema):
                     'first_name': data.requester.first_name,
                     'last_name': data.requester.last_name,
                     'username': data.requester.username,
-                    'name': f"{data.requester.first_name} {data.requester.last_name}",
                     'avatar_url': (
                         data.requester.profile_avatar.secure_url
                         if data.requester and getattr(data.requester, 'profile_avatar', None) and getattr(data.requester.profile_avatar, 'secure_url', None)
@@ -60,6 +59,12 @@ class PropertyRequestSchema(AssetRequestResponseSchema):
 class PropertyRequestSearchResponse(BaseModel):
     type: str = 'property-request'
     data: PropertyRequestSchema
+
+class DiscoverResponse(BaseModel):
+    requests: List[AssetRequestResponseSchema] = []
+    has_more: bool
+    total_count: int
+
 
 class RequestResolution(BaseModel):
     property_id: Optional[int] = None
